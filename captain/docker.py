@@ -179,6 +179,8 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
 
     docker_args += ["-v", f"{cfg.project_dir}/kernel.configs:/work/kernel.configs"]
 
+    docker_args += ["--mount", "type=volume,source=captain-cache-packages,target=/cache/packages"]
+
     # Mount kernel source if provided
     if cfg.kernel_src is not None:
         kernel_src_path = Path(cfg.kernel_src).resolve()

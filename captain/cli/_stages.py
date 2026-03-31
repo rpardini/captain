@@ -137,6 +137,7 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
         f"--extra-tree={tools_tree}",
         f"--extra-tree={modules_tree}",
         f"--output-dir={output_dir}",
+        "--package-cache-dir=/cache/packages",
         "build",
         *mkosi_args,
         logger=ilog,
