@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import platform
 from pathlib import Path
 
 from captain.config import Config
-from captain.log import StageLogger, err, for_stage
 from captain.util import run
 
-_default_log = for_stage("docker")
+log = logging.getLogger(__name__)
 
 
 def _image_exists(image: str) -> bool:
@@ -37,7 +37,7 @@ def _dockerfile_hash(cfg: Config) -> str:
     return hashlib.sha256(dockerfile.read_bytes()).hexdigest()
 
 
-def build_builder(cfg: Config, logger: StageLogger | None = None) -> None:
+def build_builder(cfg: Config) -> None:
     """Build the Docker builder image when the Dockerfile has changed.
 
     The image is tagged with a content hash of the Dockerfile so that
@@ -46,19 +46,18 @@ def build_builder(cfg: Config, logger: StageLogger | None = None) -> None:
     ``docker/build-push-action`` step with ``load: true``), we skip the
     build entirely.  Use ``NO_CACHE=1`` to force a full rebuild.
     """
-    _log = logger or _default_log
     tag = _dockerfile_hash(cfg)
     tagged_image = f"{cfg.builder_image}:{tag}"
 
     if not cfg.no_cache and _image_exists(tagged_image):
-        _log.log(f"Docker image '{cfg.builder_image}' is up to date.")
+        log.info("Docker image '%s' is up to date.", cfg.builder_image)
         # Ensure the un-hashed tag exists so later docker-run calls that
         # reference cfg.builder_image (without the hash suffix) succeed.
         # This matters when the hashed tag was pre-loaded by CI.
         run(["docker", "tag", tagged_image, cfg.builder_image], check=False)
         return
 
-    _log.log(f"Building Docker image '{cfg.builder_image}'...")
+    log.info("Building Docker image '%s'...", cfg.builder_image)
     cmd = ["docker", "build"]
     if cfg.no_cache:
         cmd.append("--no-cache")
@@ -75,18 +74,17 @@ def _release_dockerfile_hash(cfg: Config) -> str:
     return hashlib.sha256(dockerfile.read_bytes()).hexdigest()
 
 
-def build_release_image(cfg: Config, logger: StageLogger | None = None) -> None:
+def build_release_image(cfg: Config) -> None:
     """Build the release Docker image from ``Dockerfile.release``."""
-    _log = logger or _default_log
     tag = _release_dockerfile_hash(cfg)
     tagged_image = f"{RELEASE_IMAGE}:{tag}"
 
     if not cfg.no_cache and _image_exists(tagged_image):
-        _log.log(f"Docker image '{RELEASE_IMAGE}' is up to date.")
+        log.info("Docker image '%s' is up to date.", RELEASE_IMAGE)
         run(["docker", "tag", tagged_image, RELEASE_IMAGE])
         return
 
-    _log.log(f"Building Docker image '{RELEASE_IMAGE}'...")
+    log.info("Building Docker image '%s'...", RELEASE_IMAGE)
     cmd = ["docker", "build", "-f", str(cfg.project_dir / "Dockerfile.release")]
     if cfg.no_cache:
         cmd.append("--no-cache")
@@ -152,8 +150,6 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         f"FORCE_KERNEL={int(cfg.force_kernel)}",
         "-e",
         f"FORCE_ISO={int(cfg.force_iso)}",
-        # Force all stage modes to native inside the container so
-        # build.py never tries to launch Docker recursively.
         "-e",
         "KERNEL_MODE=native",
         "-e",
@@ -185,7 +181,7 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
     if cfg.kernel_src is not None:
         kernel_src_path = Path(cfg.kernel_src).resolve()
         if not kernel_src_path.is_dir():
-            err(f"KERNEL_SRC={cfg.kernel_src} does not exist")
+            log.error("KERNEL_SRC=%s does not exist", cfg.kernel_src)
             raise SystemExit(1)
         docker_args.extend(["-v", f"{kernel_src_path}:/work/kernel-src:ro"])
         docker_args.extend(["-e", "KERNEL_SRC=/work/kernel-src"])
@@ -198,18 +194,19 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         else:
             kernel_cfg_path = kernel_cfg_path.resolve()
         if not kernel_cfg_path.is_file():
-            err(f"KERNEL_CONFIG={cfg.kernel_config} does not exist")
+            log.error("KERNEL_CONFIG=%s does not exist", cfg.kernel_config)
             raise SystemExit(1)
         docker_args.extend(["-v", f"{kernel_cfg_path}:/work/kernel-config:ro"])
         docker_args.extend(["-e", "KERNEL_CONFIG=/work/kernel-config"])
 
     docker_args.extend(extra_args)
+    log.warning("Docker args (builder): %s", " ".join(docker_args))
     run(docker_args)
 
 
-def run_mkosi(cfg: Config, *mkosi_args: str, logger: StageLogger | None = None) -> None:
+def run_mkosi(cfg: Config, *mkosi_args: str) -> None:
     """Run mkosi inside the builder container."""
-    ensure_binfmt(cfg, logger=logger)
+    ensure_binfmt(cfg)
     run_in_builder(
         cfg,
         cfg.builder_image,
@@ -218,10 +215,9 @@ def run_mkosi(cfg: Config, *mkosi_args: str, logger: StageLogger | None = None) 
     )
 
 
-def ensure_binfmt(cfg: Config, logger: StageLogger | None = None) -> None:
+def ensure_binfmt(cfg: Config) -> None:
     """Register binfmt_misc handlers if doing a cross-architecture build."""
-    _log = logger or _default_log
-    host_arch = platform.machine()  # e.g. "x86_64" or "aarch64"
+    host_arch = platform.machine()
     need_binfmt = False
 
     match (host_arch, cfg.arch):
@@ -233,8 +229,10 @@ def ensure_binfmt(cfg: Config, logger: StageLogger | None = None) -> None:
     if not need_binfmt:
         return
 
-    _log.log(
-        f"Registering binfmt_misc handlers for cross-arch build ({host_arch} -> {cfg.arch})..."
+    log.info(
+        "Registering binfmt_misc handlers for cross-arch build (%s -> %s)...",
+        host_arch,
+        cfg.arch,
     )
     result = run(
         [
@@ -250,11 +248,11 @@ def ensure_binfmt(cfg: Config, logger: StageLogger | None = None) -> None:
         capture=True,
     )
     if result.returncode != 0:
-        _log.warn("Could not auto-register binfmt handlers.")
-        _log.warn("Run manually: docker run --privileged --rm tonistiigi/binfmt --install all")
+        log.warning("Could not auto-register binfmt handlers.")
+        log.warning("Run manually: docker run --privileged --rm tonistiigi/binfmt --install all")
 
 
-def fix_docker_ownership(cfg: Config, logger, paths: list[str]) -> None:
+def fix_docker_ownership(cfg: Config, paths: list[str]) -> None:
     """Fix ownership of Docker-created files (container runs as root).
 
     Spawns a lightweight container to ``chown -R`` the given paths
@@ -267,10 +265,6 @@ def fix_docker_ownership(cfg: Config, logger, paths: list[str]) -> None:
     uid = os.getuid()
     gid = os.getgid()
 
-    # *paths* use the container mount prefix /work — translate to host.
-    # Check the path itself **and** every child — the top-level directory
-    # may already be owned by the host user while files inside it were
-    # created by the container (root).
     needs_fix: list[str] = []
     for p in paths:
         host_path = Path(p.replace("/work", str(cfg.project_dir), 1))
@@ -291,7 +285,7 @@ def fix_docker_ownership(cfg: Config, logger, paths: list[str]) -> None:
     if not needs_fix:
         return
 
-    logger.log("Fixing ownership of Docker-created files...")
+    log.info("Fixing ownership of Docker-created files...")
     run(
         [
             "docker",

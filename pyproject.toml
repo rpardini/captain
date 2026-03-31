@@ -2,7 +2,7 @@
 version = "0.0.1"
 name = "captain"
 requires-python = ">=3.10"
-dependencies = ["configargparse>=1.7"]
+dependencies = ["configargparse>=1.7", "rich>=14.3.3"]
 
 [tool.ruff]
 target-version = "py310"
