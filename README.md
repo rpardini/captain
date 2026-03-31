@@ -33,13 +33,11 @@ The build has four stages:
 
 ## Usage
 
-**Prerequisites:** Python >= 3.10, Docker, [configargparse](https://pypi.org/project/ConfigArgParse/)
+**Prerequisites:** `uv` (Python), Docker.
 
 ```bash
-pip install -r requirements.txt
-
 # Build with defaults (amd64, kernel 6.18.16)
-./build.py --help
+uv run ./build.py --help
 
 usage: build.py [flags]
 
@@ -176,7 +174,7 @@ Each stage can be executed in one of three modes:
 
 ```bash
 .
-├── build.py                    # Main build entry point (Python >= 3.10)
+├── build.py                    # Main build entry point (Python >= 3.13; use `uv run build.py`)
 ├── captain/                    # Build system package (stdlib only)
 │   ├── __init__.py
 │   ├── cli.py                  # CLI subcommands (argparse)

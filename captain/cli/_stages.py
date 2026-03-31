@@ -48,8 +48,10 @@ def _build_kernel_stage(cfg: Config) -> None:
     docker.run_in_builder(
         cfg,
         "--entrypoint",
-        "python3",
+        "/usr/bin/uv",
         cfg.builder_image,
+        *(["--verbose"] if logging.getLogger().isEnabledFor(logging.DEBUG) else []),
+        "run",
         "/work/build.py",
         "kernel",
     )
@@ -82,8 +84,10 @@ def _build_tools_stage(cfg: Config) -> None:
     docker.run_in_builder(
         cfg,
         "--entrypoint",
-        "python3",
+        "/usr/bin/uv",
         cfg.builder_image,
+        *(["--verbose"] if logging.getLogger().isEnabledFor(logging.DEBUG) else []),
+        "run",
         "/work/build.py",
         "tools",
     )
@@ -175,8 +179,10 @@ def _build_iso_stage(cfg: Config) -> None:
     docker.run_in_builder(
         cfg,
         "--entrypoint",
-        "python3",
+        "/usr/bin/uv",
         cfg.builder_image,
+        *(["--verbose"] if logging.getLogger().isEnabledFor(logging.DEBUG) else []),
+        "run",
         "/work/build.py",
         "iso",
     )

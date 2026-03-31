@@ -11,6 +11,7 @@ permissions:
 
 env:
   KERNEL_VERSION: 6.18.16
+  COLUMNS: 120 # for nicer to read colored output
 
 jobs:
   # -------------------------------------------------------------------
@@ -22,10 +23,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Install lint tools
         run: make lint-install
@@ -142,11 +141,11 @@ jobs:
             mkosi.output/kernel/${{ env.KERNEL_VERSION }}/${{ matrix.arch }}
           key: ${{ steps.kernel-cache-key.outputs.key }}
 
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Build kernel
-        run: ./build.py kernel
+        run: uv run ./build.py kernel
 
       - name: Fix output file ownership
         run: sudo chown -R "$(id -u):$(id -g)" mkosi.output/
@@ -195,11 +194,11 @@ jobs:
             mkosi.output/tools/${{ matrix.arch }}/opt/cni
           key: tools-${{ matrix.arch }}-${{ hashFiles('captain/tools.py') }}
 
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Download tools
-        run: ./build.py tools
+        run: uv run ./build.py tools
 
       - name: Save tools cache
         if: github.ref == 'refs/heads/main' && steps.tools-cache.outputs.cache-hit != 'true'
@@ -267,11 +266,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y bubblewrap
 
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Build initramfs
-        run: ./build.py initramfs
+        run: uv run ./build.py initramfs
 
       - name: Upload initramfs artifacts
         uses: actions/upload-artifact@v4
@@ -358,11 +357,11 @@ jobs:
           cp "out/initramfs-${KERNEL_VERSION}-${{ matrix.output_arch }}" \
              "mkosi.output/initramfs/${KERNEL_VERSION}/${{ matrix.arch }}/image.cpio.zst"
 
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Build ISO
-        run: ./build.py iso
+        run: uv run ./build.py iso
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
@@ -412,8 +411,8 @@ jobs:
           name: iso-${{ matrix.target }}
           path: out
 
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -423,7 +422,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish artifacts to GHCR
-        run: ./build.py release publish
+        run: uv run ./build.py release publish
 
   # -------------------------------------------------------------------
   # Publish combined multi-arch image (reuses per-arch registry blobs)
@@ -480,8 +479,8 @@ jobs:
           name: iso-arm64
           path: out
 
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -491,4 +490,4 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish combined image to GHCR
-        run: ./build.py release publish
+        run: uv run ./build.py release publish

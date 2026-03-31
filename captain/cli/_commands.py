@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+import sys
 from pathlib import Path
 
 from captain import artifacts, docker, qemu
@@ -92,7 +93,13 @@ def _cmd_shell(cfg: Config, _extra_args: list[str]) -> None:
     """Interactive shell inside the builder container."""
     docker.build_builder(cfg)
     log.info("Entering builder shell (type 'exit' to leave)...")
-    docker.run_in_builder(cfg, "-it", "--entrypoint", "/bin/bash", cfg.builder_image)
+    docker.run_in_builder(
+        cfg,
+        *(["-it"] if sys.stdout.isatty() and sys.stdin.isatty() else []),
+        "--entrypoint",
+        "/bin/bash",
+        cfg.builder_image,
+    )
 
 
 def _cmd_clean(cfg: Config, _extra_args: list[str], args: object = None) -> None:

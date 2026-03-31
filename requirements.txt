@@ -1,2 +1,0 @@
-configargparse>=1.7
-rich>=14.3.3

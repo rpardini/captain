@@ -166,8 +166,10 @@ def _cmd_release(cfg: Config, extra_args: list[str], args: object = None) -> Non
                 cfg,
                 *env_args,
                 "--entrypoint",
-                "python3",
+                "/usr/bin/uv",
                 docker.RELEASE_IMAGE,
+                *(["--verbose"] if logging.getLogger().isEnabledFor(logging.DEBUG) else []),
+                "run",
                 *inner_cmd,
             )
         except subprocess.CalledProcessError as exc:

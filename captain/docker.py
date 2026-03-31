@@ -6,6 +6,7 @@ import hashlib
 import logging
 import os
 import platform
+import sys
 from pathlib import Path
 
 from captain.config import Config
@@ -58,10 +59,12 @@ def build_builder(cfg: Config) -> None:
         return
 
     log.info("Building Docker image '%s'...", cfg.builder_image)
-    cmd = ["docker", "build"]
+    cmd = ["docker", "buildx", "build"]
     if cfg.no_cache:
         cmd.append("--no-cache")
-    cmd.extend(["-t", tagged_image, "-t", cfg.builder_image, str(cfg.project_dir)])
+    cmd.extend(
+        ["--progress=plain", "-t", tagged_image, "-t", cfg.builder_image, str(cfg.project_dir)]
+    )
     run(cmd)
 
 
@@ -85,9 +88,10 @@ def build_release_image(cfg: Config) -> None:
         return
 
     log.info("Building Docker image '%s'...", RELEASE_IMAGE)
-    cmd = ["docker", "build", "-f", str(cfg.project_dir / "Dockerfile.release")]
+    cmd = ["docker", "buildx", "build", "-f", str(cfg.project_dir / "Dockerfile.release")]
     if cfg.no_cache:
         cmd.append("--no-cache")
+    cmd.extend(["--progress=plain"])
     cmd.extend(["-t", tagged_image, "-t", RELEASE_IMAGE, str(cfg.project_dir)])
     run(cmd)
 
@@ -104,6 +108,9 @@ def run_in_release(cfg: Config, *extra_args: str) -> None:
         "--rm",
         # Buildah needs mount/remount capabilities for layer operations.
         "--privileged",
+        # interactive if running in a terminal
+        *(["-i"] if sys.stdout.isatty() and sys.stdin.isatty() else []),
+        "-t",  # terminal
         "-v",
         f"{cfg.project_dir}:/work",
         "-w",
@@ -116,6 +123,10 @@ def run_in_release(cfg: Config, *extra_args: str) -> None:
         # (no user namespaces needed — we only assemble scratch images).
         "-e",
         "BUILDAH_ISOLATION=chroot",
+        "-e",
+        f"TERM={os.environ.get('TERM', 'xterm-256color')}",
+        "-e",
+        f"COLUMNS={os.environ.get('COLUMNS', '120')}",
     ]
     # Forward host registry credentials so buildah/skopeo can authenticate.
     # The caller sets these env vars on the host (e.g. via docker login or
@@ -138,6 +149,9 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "run",
         "--rm",
         "--privileged",
+        # interactive if running in a terminal
+        *(["-i"] if sys.stdout.isatty() and sys.stdin.isatty() else []),
+        "-t",  # terminal
         "-w",
         "/work",
         "-e",
@@ -160,6 +174,10 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "ISO_MODE=native",
         "-e",
         "RELEASE_MODE=native",
+        "-e",
+        f"TERM={os.environ.get('TERM', 'xterm-256color')}",
+        "-e",
+        f"COLUMNS={os.environ.get('COLUMNS', '120')}",
     ]
 
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.output:/work/mkosi.output"]
@@ -171,6 +189,7 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.postinst:/work/mkosi.postinst"]
 
     docker_args += ["-v", f"{cfg.project_dir}/captain:/work/captain"]
+    docker_args += ["-v", f"{cfg.project_dir}/pyproject.toml:/work/pyproject.toml"]
     docker_args += ["-v", f"{cfg.project_dir}/build.py:/work/build.py"]
 
     docker_args += ["-v", f"{cfg.project_dir}/kernel.configs:/work/kernel.configs"]
@@ -200,7 +219,7 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         docker_args.extend(["-e", "KERNEL_CONFIG=/work/kernel-config"])
 
     docker_args.extend(extra_args)
-    log.warning("Docker args (builder): %s", " ".join(docker_args))
+    log.debug("Docker args (builder): %s", docker_args)
     run(docker_args)
 
 
