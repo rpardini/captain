@@ -140,8 +140,6 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "run",
         "--rm",
         "--privileged",
-        "-v",
-        f"{cfg.project_dir}:/work",
         "-w",
         "/work",
         "-e",
@@ -167,6 +165,19 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "-e",
         "RELEASE_MODE=native",
     ]
+
+    docker_args += ["-v", f"{cfg.project_dir}/mkosi.output:/work/mkosi.output"]
+    docker_args += ["-v", f"{cfg.project_dir}/mkosi.extra:/work/mkosi.extra"]
+    docker_args += ["-v", f"{cfg.project_dir}/out:/work/out"]
+
+    docker_args += ["-v", f"{cfg.project_dir}/mkosi.conf:/work/mkosi.conf"]
+    docker_args += ["-v", f"{cfg.project_dir}/mkosi.finalize:/work/mkosi.finalize"]
+    docker_args += ["-v", f"{cfg.project_dir}/mkosi.postinst:/work/mkosi.postinst"]
+
+    docker_args += ["-v", f"{cfg.project_dir}/captain:/work/captain"]
+    docker_args += ["-v", f"{cfg.project_dir}/build.py:/work/build.py"]
+
+    docker_args += ["-v", f"{cfg.project_dir}/kernel.configs:/work/kernel.configs"]
 
     # Mount kernel source if provided
     if cfg.kernel_src is not None:
