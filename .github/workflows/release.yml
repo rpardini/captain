@@ -8,9 +8,6 @@ permissions:
   contents: write
   packages: write
 
-env:
-  COLUMNS: 120 # for nicer to read colored output
-
 jobs:
   release:
     runs-on: ubuntu-latest

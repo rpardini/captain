@@ -6,7 +6,7 @@
 FROM debian:trixie
 
 # Install buildah, skopeo, curl and git
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get -o "Dpkg::Use-Pty=0" update && apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends \
     buildah \
     skopeo \
     curl \

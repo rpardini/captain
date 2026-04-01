@@ -126,7 +126,9 @@ def run_in_release(cfg: Config, *extra_args: str) -> None:
         "-e",
         f"TERM={os.environ.get('TERM', 'xterm-256color')}",
         "-e",
-        f"COLUMNS={os.environ.get('COLUMNS', '120')}",
+        f"COLUMNS={os.environ.get('COLUMNS', '200')}",
+        "-e",
+        f"GITHUB_ACTIONS={os.environ.get('GITHUB_ACTIONS', '')}",
     ]
     # Forward host registry credentials so buildah/skopeo can authenticate.
     # The caller sets these env vars on the host (e.g. via docker login or
@@ -177,7 +179,9 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "-e",
         f"TERM={os.environ.get('TERM', 'xterm-256color')}",
         "-e",
-        f"COLUMNS={os.environ.get('COLUMNS', '120')}",
+        f"COLUMNS={os.environ.get('COLUMNS', '200')}",
+        "-e",
+        f"GITHUB_ACTIONS={os.environ.get('GITHUB_ACTIONS', '')}",
     ]
 
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.output:/work/mkosi.output"]

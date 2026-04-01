@@ -9,7 +9,7 @@ ARG MKOSI_VERSION=v26
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install mkosi runtime dependencies and kernel build dependencies in one layer
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get -o "Dpkg::Use-Pty=0" update && apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends \
     apt \
     dpkg \
     debian-archive-keyring \
@@ -55,10 +55,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     grub-common \
     && NATIVE_ARCH="$(dpkg --print-architecture)" \
     && FOREIGN_ARCH=$([ "$NATIVE_ARCH" = "amd64" ] && echo "arm64" || echo "amd64") \
-    && apt-get install -y --no-install-recommends "grub-efi-${NATIVE_ARCH}-bin" \
+    && apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends "grub-efi-${NATIVE_ARCH}-bin" \
     && dpkg --add-architecture "$FOREIGN_ARCH" \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends "grub-efi-${FOREIGN_ARCH}-bin:${FOREIGN_ARCH}" \
+    && apt-get -o "Dpkg::Use-Pty=0" update \
+    && apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends "grub-efi-${FOREIGN_ARCH}-bin:${FOREIGN_ARCH}" \
     && rm -rf /var/lib/apt/lists/*
 
 # Install astral-sh's uv with a script - install to /usr for global access

@@ -7,13 +7,18 @@ call in submodules automatically inherits the Rich console handler.
 from __future__ import annotations
 
 import logging
+import os
 
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.traceback import install as _install_rich_traceback
 
 # Rich console — writes to stderr so log output never pollutes piped stdout.
-console = Console(stderr=True)
+# If running under GHA, force colors.
+if os.environ.get("GITHUB_ACTIONS", "") == "":
+    console = Console(stderr=True)
+else:
+    console = Console(stderr=True, color_system="standard", width=160, highlight=False)
 
 # Install Rich traceback handler globally (once, at import time).
 _install_rich_traceback(console=console, show_locals=True, width=None)
