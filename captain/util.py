@@ -97,7 +97,7 @@ def run(
         return proc
 
     if log.isEnabledFor(logging.DEBUG):
-        captain.console.print(Rule(f"⮕ Finished subprocess: {cmd} ⮕", style="darkgreen"))
+        captain.console.print(Rule(f"⮕ Finished subprocess: {cmd} ⮕", style="green"))
 
     return proc
 
