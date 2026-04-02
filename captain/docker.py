@@ -116,6 +116,8 @@ def run_in_release(cfg: Config, *extra_args: str) -> None:
         "-w",
         "/work",
         "-e",
+        "CAPTAIN_IN_DOCKER=docker",
+        "-e",
         f"ARCH={cfg.arch}",
         "-e",
         "RELEASE_MODE=native",
@@ -156,6 +158,8 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "-t",  # terminal
         "-w",
         "/work",
+        "-e",
+        "CAPTAIN_IN_DOCKER=docker",
         "-e",
         f"ARCH={cfg.arch}",
         "-e",
@@ -223,7 +227,6 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         docker_args.extend(["-e", "KERNEL_CONFIG=/work/kernel-config"])
 
     docker_args.extend(extra_args)
-    log.debug("Docker args (builder): %s", docker_args)
     run(docker_args)
 
 
