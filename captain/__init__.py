@@ -16,9 +16,9 @@ from rich.traceback import install as _install_rich_traceback
 # Rich console — writes to stderr so log output never pollutes piped stdout.
 # If running under GHA, force colors.
 if os.environ.get("GITHUB_ACTIONS", "") == "":
-    console = Console(stderr=True)
+    console: Console =  Console(stderr=True)
 else:
-    console = Console(stderr=True, color_system="standard", width=160, highlight=False)
+    console: Console =  Console(stderr=True, color_system="standard", width=160, highlight=False)
 
 # Install Rich traceback handler globally (once, at import time).
 _install_rich_traceback(console=console, show_locals=True, width=None)
