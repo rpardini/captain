@@ -168,7 +168,7 @@ def _cmd_release(cfg: Config, extra_args: list[str], args: object = None) -> Non
                 "--entrypoint",
                 "/usr/bin/uv",
                 docker.RELEASE_IMAGE,
-                *(["--verbose"] if logging.getLogger().isEnabledFor(logging.DEBUG) else []),
+                *(["--verbose"] if log.isEnabledFor(logging.DEBUG) else []),
                 "run",
                 *inner_cmd,
             )
