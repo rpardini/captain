@@ -88,7 +88,7 @@ class Config:
         )
 
     @classmethod
-    def from_args(cls, args: argparse.Namespace, project_dir: Path) -> Config:
+    def from_args(cls, args: argparse.Namespace, project_dir: Path | None) -> Config:
         """Create a Config from a parsed :class:`argparse.Namespace`.
 
         The *args* namespace is produced by :mod:`configargparse` which
@@ -98,6 +98,10 @@ class Config:
         ``getattr`` with fallbacks is used because per-subcommand
         parsers only define the flags relevant to that subcommand.
         """
+
+        if project_dir is None:
+            raise ValueError("project_dir must be provided to Config.from_args")
+
         return cls(
             project_dir=project_dir,
             output_dir=project_dir / "out",
