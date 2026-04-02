@@ -10,6 +10,10 @@ import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from rich.rule import Rule
+
+import captain
+
 log = logging.getLogger(__name__)
 
 
@@ -75,7 +79,12 @@ def run(
     run_env: dict[str, str] | None = None
     if env is not None:
         run_env = {**os.environ, **env}
-    return subprocess.run(
+
+    # If not capturing, and debugging, emit a Rich separator line, for visual clarity.
+    if not capture and log.isEnabledFor(logging.DEBUG):
+        captain.console.print(Rule(f"⮕ Starting subprocess: {cmd} ⮕", style="green"))
+
+    proc = subprocess.run(
         cmd,
         check=check,
         capture_output=capture,
@@ -83,6 +92,14 @@ def run(
         env=run_env,
         cwd=cwd,
     )
+
+    if capture:
+        return proc
+
+    if log.isEnabledFor(logging.DEBUG):
+        captain.console.print(Rule(f"⮕ Finished subprocess: {cmd} ⮕", style="darkgreen"))
+
+    return proc
 
 
 def ensure_dir(path: Path) -> Path:
