@@ -31,6 +31,9 @@ class _StageFormatter(logging.Formatter):
         name = record.name
         stage = name.split(".", 1)[1] if name.startswith("captain.") else name
         record.__dict__["stage"] = stage
+        if os.environ.get("CAPTAIN_IN_DOCKER", "") == "docker":
+            # Running on host: show stage names in green for visual clarity.
+            record.__dict__["stage"] = f"[bold][blue]in-docker[/bold]: [/blue]{stage}"
         return super().format(record)
 
 
@@ -42,12 +45,12 @@ if not _root.handlers:
         console=console,
         show_time=False,
         show_level=True,
-        show_path=False,
-        markup=False,
+        show_path=True,
+        markup=True,
         rich_tracebacks=True,
         tracebacks_show_locals=True,
     )
-    _handler.setFormatter(_StageFormatter("[%(stage)s] %(message)s"))
+    _handler.setFormatter(_StageFormatter("%(stage)s: %(message)s"))
     _root.addHandler(_handler)
     _root.setLevel(logging.DEBUG)
     _root.propagate = False
