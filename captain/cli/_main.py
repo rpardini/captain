@@ -29,7 +29,6 @@ from ._commands import (
     _cmd_clean,
     _cmd_initramfs,
     _cmd_iso,
-    _cmd_kernel,
     _cmd_qemu_test,
     _cmd_shell,
     _cmd_summary,
@@ -86,7 +85,6 @@ def main(project_dir: Path | None = None) -> None:
     # 7. Dispatch.
     dispatch: dict[str, object] = {
         "build": _cmd_build,
-        "kernel": _cmd_kernel,
         "tools": _cmd_tools,
         "initramfs": _cmd_initramfs,
         "iso": _cmd_iso,
@@ -105,23 +103,19 @@ def main(project_dir: Path | None = None) -> None:
         else:
             handler(cfg, extra)  # type: ignore[operator]
     else:
+        log.error("You hit ungolden path; passing stuff to mkosi directly is not reproducible.")
         # Pass through to mkosi (shouldn't happen with _extract_command
         # but kept as a safety net).
         tools_tree = str(cfg.tools_output)
-        modules_tree = str(cfg.modules_output)
         output_dir = str(cfg.initramfs_output)
         match cfg.mkosi_mode:
             case "docker":
                 docker.build_builder(cfg)
                 container_tree = f"/work/mkosi.output/tools/{cfg.arch}"
-                container_modules = (
-                    f"/work/mkosi.output/kernel/{cfg.kernel_version}/{cfg.arch}/modules"
-                )
                 container_outdir = f"/work/mkosi.output/initramfs/{cfg.kernel_version}/{cfg.arch}"
                 docker.run_mkosi(
                     cfg,
                     f"--extra-tree={container_tree}",
-                    f"--extra-tree={container_modules}",
                     f"--output-dir={container_outdir}",
                     command,
                     *extra,
@@ -132,7 +126,6 @@ def main(project_dir: Path | None = None) -> None:
                         "mkosi",
                         f"--architecture={cfg.arch_info.mkosi_arch}",
                         f"--extra-tree={tools_tree}",
-                        f"--extra-tree={modules_tree}",
                         f"--output-dir={output_dir}",
                         command,
                         *extra,
