@@ -43,6 +43,17 @@ def collect_kernel(cfg: Config) -> None:
         log.info("kernel: %s (%s)", vmlinuz_dst, _human_size(vmlinuz_dst.stat().st_size))
     else:
         log.warning("No kernel image found in %s", cfg.kernel_output)
+        # In this case, mkosi might have collected the kernel from a installed linux-image package.
+        # Find it and use it instead.
+        log.debug("Looking for kernel image produced by mkosi in %s", cfg.initramfs_output)
+        vmlinu_files = sorted(cfg.initramfs_output.glob("*.vmlinu*"))
+        if vmlinu_files:
+            vmlinuz_src = vmlinu_files[0]
+            vmlinuz_dst = out / f"vmlinuz-{cfg.kernel_version}-{cfg.arch_info.output_arch}"
+            shutil.copy2(vmlinuz_src, vmlinuz_dst)
+            log.info("kernel: %s (%s)", vmlinuz_dst, _human_size(vmlinuz_dst.stat().st_size))
+        else:
+            log.warning("No kernel image found in %s either", cfg.initramfs_output)
 
 
 def collect_initramfs(cfg: Config) -> None:
