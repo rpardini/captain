@@ -23,7 +23,11 @@ def _build_kernel_stage(cfg: Config) -> None:
     modules_dir = cfg.modules_output / "usr" / "lib" / "modules"
     vmlinuz_dir = cfg.kernel_output
     has_vmlinuz = vmlinuz_dir.is_dir() and any(vmlinuz_dir.glob("vmlinuz-*"))
-    log.debug(f"Checking kernel build idempotency: modules_dir={modules_dir}, has_vmlinuz={has_vmlinuz}")
+    log.debug(
+        "Checking kernel build idempotency: modules_dir=%s, has_vmlinuz=%s",
+        modules_dir,
+        has_vmlinuz,
+    )
 
     if modules_dir.is_dir() and has_vmlinuz and not cfg.force_kernel:
         log.info("Kernel already built (use --force-kernel to rebuild)")
