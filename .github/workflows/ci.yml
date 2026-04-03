@@ -360,7 +360,7 @@ jobs:
           cp -v "out/initramfs-${KERNEL_VERSION}-${{ matrix.output_arch }}" \
              "mkosi.output/initramfs/${KERNEL_VERSION}/${{ matrix.arch }}/image.cpio.zst"
           cp -v "out/vmlinuz-${KERNEL_VERSION}-${{ matrix.output_arch }}" \
-             "mkosi.output/initramfs/${KERNEL_VERSION}/${{ matrix.arch }}/"
+             "mkosi.output/initramfs/${KERNEL_VERSION}/${{ matrix.arch }}/image.vmlinuz"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
