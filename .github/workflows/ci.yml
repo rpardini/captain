@@ -32,151 +32,15 @@ jobs:
         run: make lint
 
   # -------------------------------------------------------------------
-  # Fast cache lookup – decides whether the OCI runner is needed
-  # There are consistent issues with OCI runners not getting scheduled.
-  # This is the workaround.
-  # -------------------------------------------------------------------
-  check-kernel-cache:
-    if: false # disabled
-    runs-on: ubuntu-latest
-    outputs:
-      amd64-cache-hit: ${{ steps.amd64-cache.outputs.cache-hit }}
-      arm64-cache-hit: ${{ steps.arm64-cache.outputs.cache-hit }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Check amd64 kernel cache
-        id: amd64-cache
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            mkosi.output/kernel/${{ env.KERNEL_VERSION }}/amd64
-          key: kernel-amd64-${{ env.KERNEL_VERSION }}-${{ hashFiles('kernel.configs/*', 'Dockerfile') }}
-          lookup-only: true
-
-      - name: Check arm64 kernel cache
-        id: arm64-cache
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            mkosi.output/kernel/${{ env.KERNEL_VERSION }}/arm64
-          key: kernel-arm64-${{ env.KERNEL_VERSION }}-${{ hashFiles('kernel.configs/*', 'Dockerfile') }}
-          lookup-only: true
-
-  # -------------------------------------------------------------------
-  # Build kernel (vmlinuz + modules) inside Docker
-  # -------------------------------------------------------------------
-  build-kernel:
-    if: false # disabled
-    needs: [lint, check-kernel-cache]
-    # Forks / cache-hit → cheap default runner; mainline cache-miss → fast oracle runner
-    runs-on: >
-      ${{ github.repository != 'tinkerbell/captain' && matrix.fork_runner
-        || needs.check-kernel-cache.outputs[format('{0}-cache-hit', matrix.arch)] == 'true' && matrix.fork_runner
-        || fromJSON(matrix.mainline_runner) }}
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [amd64, arm64]
-        include:
-          - arch: amd64
-            fork_runner: ubuntu-latest
-            mainline_runner: '{"group":"Default","labels":["oracle-vm-16cpu-64gb-x86-64"]}'
-          - arch: arm64
-            fork_runner: ubuntu-24.04-arm
-            mainline_runner: '{"group":"Default","labels":["oracle-vm-16cpu-64gb-arm64"]}'
-    env:
-      ARCH: ${{ matrix.arch }}
-      KERNEL_MODE: docker
-      MKOSI_MODE: skip
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Load shared config
-        run: cat .github/config.env >> "$GITHUB_ENV"
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Compute Dockerfile hash
-        id: dockerfile-hash
-        run: echo "hash=$(sha256sum Dockerfile | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-
-      - name: Pull or build builder image
-        id: builder
-        run: |
-          HASH="${{ steps.dockerfile-hash.outputs.hash }}"
-          REMOTE="ghcr.io/${{ github.repository }}/${{ env.BUILDER_IMAGE }}"
-          if docker pull "${REMOTE}:${HASH}-${{ matrix.arch }}"; then
-            docker tag "${REMOTE}:${HASH}-${{ matrix.arch }}" "${{ env.BUILDER_IMAGE }}:${HASH}"
-            docker tag "${REMOTE}:${HASH}-${{ matrix.arch }}" "${{ env.BUILDER_IMAGE }}"
-            echo "built=false" >> "$GITHUB_OUTPUT"
-          else
-            docker buildx build --progress=plain -t "${{ env.BUILDER_IMAGE }}:${HASH}" -t "${{ env.BUILDER_IMAGE }}" .
-            echo "built=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Push builder image to GHCR
-        if: github.ref == 'refs/heads/main' && steps.builder.outputs.built == 'true'
-        run: |
-          HASH="${{ steps.dockerfile-hash.outputs.hash }}"
-          REMOTE="ghcr.io/${{ github.repository }}/${{ env.BUILDER_IMAGE }}"
-          docker tag "${{ env.BUILDER_IMAGE }}:${HASH}" "${REMOTE}:${HASH}-${{ matrix.arch }}"
-          docker push "${REMOTE}:${HASH}-${{ matrix.arch }}"
-
-      - name: Compute kernel cache key
-        id: kernel-cache-key
-        run: echo "key=kernel-${{ matrix.arch }}-${{ env.KERNEL_VERSION }}-${{ hashFiles('kernel.configs/*', 'Dockerfile') }}" >> "$GITHUB_OUTPUT"
-
-      - name: Restore kernel cache
-        id: kernel-cache
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            mkosi.output/kernel/${{ env.KERNEL_VERSION }}/${{ matrix.arch }}
-          key: ${{ steps.kernel-cache-key.outputs.key }}
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-
-      - name: Build kernel
-        run: uv run ./build.py kernel
-
-      - name: Fix output file ownership
-        run: sudo chown -R "$(id -u):$(id -g)" mkosi.output/
-
-      - name: Save kernel cache
-        if: github.ref == 'refs/heads/main' && steps.kernel-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: |
-            mkosi.output/kernel/${{ env.KERNEL_VERSION }}/${{ matrix.arch }}
-          key: ${{ steps.kernel-cache-key.outputs.key }}
-
-      - name: Upload kernel artifacts
-        uses: actions/upload-artifact@v6
-        with:
-          name: kernel-${{ matrix.arch }}
-          path: |
-            mkosi.output/kernel/${{ env.KERNEL_VERSION }}/${{ matrix.arch }}
-          retention-days: 1
-
-  # -------------------------------------------------------------------
   # Download tools (containerd, runc, nerdctl, CNI plugins)
   # -------------------------------------------------------------------
   download-tools:
-    needs: [lint]
+    needs: [ lint ]
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
+        arch: [ amd64, arm64 ]
     env:
       ARCH: ${{ matrix.arch }}
       KERNEL_MODE: skip
@@ -222,17 +86,20 @@ jobs:
   # -------------------------------------------------------------------
   # Build initramfs via mkosi (depends on kernel + tools)
   # -------------------------------------------------------------------
-  build-initramfs:
+  build-all:
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    needs: [download-tools] # build-kernel
+    needs: [ download-tools ] # build-kernel
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
+        include:
+          - { arch: amd64, output_arch: x86_64, iso: true }
+          - { arch: arm64, output_arch: aarch64, iso: true }
     env:
       ARCH: ${{ matrix.arch }}
       KERNEL_MODE: skip
       MKOSI_MODE: native
+      ISO_MODE: docker
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -272,7 +139,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Build initramfs
-        run: uv run ./build.py initramfs
+        run: uv run ./build.py build # full build, incl initramfs and iso
 
       - name: Upload initramfs artifacts
         uses: actions/upload-artifact@v6
@@ -281,146 +148,24 @@ jobs:
           path: out/
           retention-days: 1
 
-  # -------------------------------------------------------------------
-  # Build UEFI-bootable ISO (depends on initramfs)
-  # -------------------------------------------------------------------
-  build-iso:
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    needs: [build-initramfs]
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [amd64, arm64]
-        include:
-          - arch: amd64
-            output_arch: x86_64
-          - arch: arm64
-            output_arch: aarch64
-    env:
-      ARCH: ${{ matrix.arch }}
-      KERNEL_MODE: skip
-      MKOSI_MODE: skip
-      ISO_MODE: docker
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Load shared config
-        run: cat .github/config.env >> "$GITHUB_ENV"
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Compute Dockerfile hash
-        id: dockerfile-hash
-        run: echo "hash=$(sha256sum Dockerfile | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-
-      - name: Pull or build builder image
-        id: builder
-        run: |
-          HASH="${{ steps.dockerfile-hash.outputs.hash }}"
-          REMOTE="ghcr.io/${{ github.repository }}/${{ env.BUILDER_IMAGE }}"
-          if docker pull "${REMOTE}:${HASH}-${{ matrix.arch }}"; then
-            docker tag "${REMOTE}:${HASH}-${{ matrix.arch }}" "${{ env.BUILDER_IMAGE }}:${HASH}"
-            docker tag "${REMOTE}:${HASH}-${{ matrix.arch }}" "${{ env.BUILDER_IMAGE }}"
-            echo "built=false" >> "$GITHUB_OUTPUT"
-          else
-            docker build -t "${{ env.BUILDER_IMAGE }}:${HASH}" -t "${{ env.BUILDER_IMAGE }}" .
-            echo "built=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Push builder image to GHCR
-        if: github.ref == 'refs/heads/main' && steps.builder.outputs.built == 'true'
-        run: |
-          HASH="${{ steps.dockerfile-hash.outputs.hash }}"
-          REMOTE="ghcr.io/${{ github.repository }}/${{ env.BUILDER_IMAGE }}"
-          docker tag "${{ env.BUILDER_IMAGE }}:${HASH}" "${REMOTE}:${HASH}-${{ matrix.arch }}"
-          docker push "${REMOTE}:${HASH}-${{ matrix.arch }}"
-
-      - name: Download kernel artifacts
-        if: false # don't
-        uses: actions/download-artifact@v6
-        with:
-          name: kernel-${{ matrix.arch }}
-          path: mkosi.output/kernel/${{ env.KERNEL_VERSION }}/${{ matrix.arch }}
-
-      - name: Download initramfs artifacts
-        uses: actions/download-artifact@v6
-        with:
-          name: initramfs-${{ matrix.arch }}
-          path: out
-
-      - name: Stage initramfs and kernel for ISO build
-        run: |
-          mkdir -p "mkosi.output/initramfs/${KERNEL_VERSION}/${{ matrix.arch }}"
-          cp -v "out/initramfs-${KERNEL_VERSION}-${{ matrix.output_arch }}" \
-             "mkosi.output/initramfs/${KERNEL_VERSION}/${{ matrix.arch }}/image.cpio.zst"
-          cp -v "out/vmlinuz-${KERNEL_VERSION}-${{ matrix.output_arch }}" \
-             "mkosi.output/initramfs/${KERNEL_VERSION}/${{ matrix.arch }}/image.vmlinuz"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-
-      - name: Build ISO
-        run: uv run ./build.py iso
+      # -------------------------------------------------------------------
+      # Build UEFI-bootable ISO (depends on initramfs)
+      # -------------------------------------------------------------------
 
       - name: Upload ISO artifact
+        if: ${{ matrix.iso }} # only if matrix entry had iso: true
         uses: actions/upload-artifact@v6
         with:
           name: iso-${{ matrix.arch }}
           path: out/captainos-${{ env.KERNEL_VERSION }}-${{ matrix.output_arch }}.iso
           retention-days: 1
 
-  # -------------------------------------------------------------------
-  # Publish per-arch artifacts and compute checksums
-  # -------------------------------------------------------------------
-  publish-per-arch:
-    if: github.ref == 'refs/heads/main'
-    runs-on: ${{ matrix.target == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    needs: [build-iso]
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [amd64, arm64]
-    env:
-      ARCH: ${{ matrix.target }}
-      TARGET: ${{ matrix.target }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Load shared config
-        run: cat .github/config.env >> "$GITHUB_ENV"
-
-      - name: Download kernel artifacts
-        if: false # disabled
-        uses: actions/download-artifact@v6
-        with:
-          name: kernel-${{ matrix.target }}
-          path: mkosi.output/kernel/${{ env.KERNEL_VERSION }}/${{ matrix.target }}
-
-      - name: Download initramfs artifacts
-        uses: actions/download-artifact@v6
-        with:
-          name: initramfs-${{ matrix.target }}
-          path: out
-
-      - name: Download ISO artifact
-        uses: actions/download-artifact@v6
-        with:
-          name: iso-${{ matrix.target }}
-          path: out
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
+      # -------------------------------------------------------------------
+      # Publish per-arch artifacts and compute checksums
+      # -------------------------------------------------------------------
 
       - name: Log in to GHCR
+        if: github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -428,6 +173,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish artifacts to GHCR
+        if: github.ref == 'refs/heads/main'
+        env:
+          TARGET: ${{ matrix.arch }}
         run: uv run ./build.py release publish
 
   # -------------------------------------------------------------------
@@ -436,7 +184,7 @@ jobs:
   publish-combined:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    needs: [publish-per-arch]
+    needs: [ build-all ]
     env:
       ARCH: amd64
       TARGET: combined
