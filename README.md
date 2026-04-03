@@ -55,10 +55,7 @@ build configuration:
   --no-cache                          rebuild builder image without Docker cache
 
 kernel:
-  --kernel-version VER                kernel version to build (default: 6.18.16)
-  --kernel-src PATH                   path to local kernel source tree
-  --kernel-mode {docker,native,skip}  kernel stage execution mode (default: docker)
-  --force-kernel                      force kernel rebuild even if outputs exist
+  --flavor-id VER                kernel version to build (default: 6.18.16)
 
 tools:
   --tools-mode {docker,native,skip}   tools stage execution mode (default: docker)
