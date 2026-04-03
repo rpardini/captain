@@ -167,11 +167,7 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "-e",
         f"FORCE_TOOLS={int(cfg.force_tools)}",
         "-e",
-        f"FORCE_KERNEL={int(cfg.force_kernel)}",
-        "-e",
         f"FORCE_ISO={int(cfg.force_iso)}",
-        "-e",
-        "KERNEL_MODE=native",
         "-e",
         "TOOLS_MODE=native",
         "-e",
@@ -202,31 +198,7 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
     docker_args += ["-v", f"{cfg.project_dir}/pyproject.toml:/work/pyproject.toml"]
     docker_args += ["-v", f"{cfg.project_dir}/build.py:/work/build.py"]
 
-    docker_args += ["-v", f"{cfg.project_dir}/kernel.configs:/work/kernel.configs"]
-
     docker_args += ["--mount", "type=volume,source=captain-cache-packages,target=/cache/packages"]
-
-    # Mount kernel source if provided
-    if cfg.kernel_src is not None:
-        kernel_src_path = Path(cfg.kernel_src).resolve()
-        if not kernel_src_path.is_dir():
-            log.error("KERNEL_SRC=%s does not exist", cfg.kernel_src)
-            raise SystemExit(1)
-        docker_args.extend(["-v", f"{kernel_src_path}:/work/kernel-src:ro"])
-        docker_args.extend(["-e", "KERNEL_SRC=/work/kernel-src"])
-
-    # Mount kernel config override and point KERNEL_CONFIG to the container path
-    if cfg.kernel_config is not None:
-        kernel_cfg_path = Path(cfg.kernel_config)
-        if not kernel_cfg_path.is_absolute():
-            kernel_cfg_path = (cfg.project_dir / kernel_cfg_path).resolve()
-        else:
-            kernel_cfg_path = kernel_cfg_path.resolve()
-        if not kernel_cfg_path.is_file():
-            log.error("KERNEL_CONFIG=%s does not exist", cfg.kernel_config)
-            raise SystemExit(1)
-        docker_args.extend(["-v", f"{kernel_cfg_path}:/work/kernel-config:ro"])
-        docker_args.extend(["-e", "KERNEL_CONFIG=/work/kernel-config"])
 
     docker_args.extend(extra_args)
     run(docker_args)

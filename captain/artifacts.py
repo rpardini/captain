@@ -32,10 +32,8 @@ def _human_size(size: int) -> str:
 
 
 def collect_kernel(cfg: Config) -> None:
-    """Copy the kernel image from mkosi.output/kernel/{version}/{arch}/ to out/."""
+    """Copy the kernel image produced by mkosi."""
     out = ensure_dir(cfg.output_dir)
-    # In this case, mkosi might have collected the kernel from a installed linux-image package.
-    # Find it and use it instead.
     log.debug("Looking for kernel image produced by mkosi in %s", cfg.initramfs_output)
     vmlinu_files = sorted(cfg.initramfs_output.glob("*.vmlinu*"))
     if vmlinu_files:
@@ -46,20 +44,7 @@ def collect_kernel(cfg: Config) -> None:
             "mkosi supplied kernel: %s (%s)", vmlinuz_dst, _human_size(vmlinuz_dst.stat().st_size)
         )
     else:
-        log.warning("No kernel image produced by mkosi in %s", cfg.initramfs_output)
-        vmlinuz_dir = cfg.kernel_output
-        vmlinuz_files = sorted(vmlinuz_dir.glob("vmlinuz-*")) if vmlinuz_dir.is_dir() else []
-        if vmlinuz_files:
-            vmlinuz_src = vmlinuz_files[0]
-            vmlinuz_dst = out / f"vmlinuz-{cfg.kernel_version}-{cfg.arch_info.output_arch}"
-            shutil.copy2(vmlinuz_src, vmlinuz_dst)
-            log.info(
-                "kernel built from source: %s (%s)",
-                vmlinuz_dst,
-                _human_size(vmlinuz_dst.stat().st_size),
-            )
-        else:
-            log.warning("No kernel image found in %s", cfg.kernel_output)
+        log.error("No kernel image produced by mkosi in %s", cfg.initramfs_output)
 
 
 def collect_initramfs(cfg: Config) -> None:
@@ -73,6 +58,22 @@ def collect_initramfs(cfg: Config) -> None:
         log.info("initramfs: %s (%s)", initrd_dst, _human_size(initrd_dst.stat().st_size))
     else:
         log.warning("No initramfs CPIO found in %s", cfg.initramfs_output)
+
+
+def collect_dtbs(cfg):
+    """Collect the dtb directory produced by mkosi's finalize script."""
+    indir = ensure_dir(cfg.initramfs_output)
+    dtb_dir: Path = indir / "dtb"
+    if dtb_dir.exists():
+        log.info("Found dtb directory in %s, copying to output...", dtb_dir)
+        out = ensure_dir(cfg.output_dir)
+        target_dtb_dir = out / f"dtb-{cfg.kernel_version}-{cfg.arch_info.output_arch}"
+        if target_dtb_dir.exists():
+            shutil.rmtree(target_dtb_dir)
+        shutil.copytree(dtb_dir, target_dtb_dir)
+        log.info("Copied dtb directory: %s", target_dtb_dir)
+    else:
+        log.warning("No dtb directory found in %s", dtb_dir)
 
 
 def collect_iso(cfg: Config) -> None:
@@ -131,20 +132,3 @@ def collect(cfg: Config) -> None:
     collect_initramfs(cfg)
     collect_kernel(cfg)
     collect_iso(cfg)
-
-
-def collect_dtbs(cfg):
-    """Copy the 'dtb' dir from mkosi.output/initramfs/{arch}/ to out/ if it exists."""
-    indir = ensure_dir(cfg.initramfs_output)
-    dtb_dir: Path = indir / "dtb"
-    if dtb_dir.exists():
-        log.info("Found dtb directory in %s, copying to output...", dtb_dir)
-        out = ensure_dir(cfg.output_dir)
-        target_dtb_dir = out / f"dtb-{cfg.kernel_version}-{cfg.arch_info.output_arch}"
-        # copy the directory incl subdirs and files
-        if target_dtb_dir.exists():
-            shutil.rmtree(target_dtb_dir)
-        shutil.copytree(dtb_dir, target_dtb_dir)
-        log.info("Copied dtb directory: %s", target_dtb_dir)
-    else:
-        log.warning("No dtb directory found in %s", dtb_dir)
