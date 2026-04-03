@@ -85,7 +85,7 @@ def _cmd_build(cfg: Config, extra_args: list[str]) -> None:
         _build_kernel_stage(cfg)
     _build_tools_stage(cfg)
     _build_mkosi_stage(cfg, extra_args)
-    _build_iso_stage(cfg) # TODO also conditional...
+    _build_iso_stage(cfg)  # TODO also conditional...
     artifacts.collect(cfg)
     log.info("Build complete!")
 
