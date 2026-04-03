@@ -5,6 +5,12 @@
 # creating directories and dropping config files.
 set -euo pipefail
 
+echo "==> CaptainOS post-install: dump env at $(hostname)..."
+env
+
+echo "==> CaptainOS post-install: show mounts at $(hostname)..."
+mount || true
+
 echo "==> CaptainOS post-install: configuring services..."
 
 # Ensure CA certificate bundle is generated (dpkg triggers may not
@@ -36,5 +42,8 @@ done
 
 # Set default target to multi-user (no graphical)
 systemctl set-default multi-user.target 2>/dev/null || true
+
+echo "==> List installed packages..."
+dpkg -l --no-pager || true
 
 echo "==> CaptainOS post-install complete."
