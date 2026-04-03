@@ -65,7 +65,7 @@ def _check_kernel_modules(cfg: Config) -> None:
 
 def _cmd_initramfs(cfg: Config, extra_args: list[str]) -> None:
     """Build only the initramfs via mkosi, then collect artifacts."""
-    _check_kernel_modules(cfg)
+    # _check_kernel_modules(cfg)
     _build_mkosi_stage(cfg, extra_args)
     artifacts.collect_initramfs(cfg)
     artifacts.collect_kernel(cfg)
@@ -85,7 +85,7 @@ def _cmd_build(cfg: Config, extra_args: list[str]) -> None:
         _build_kernel_stage(cfg)
     _build_tools_stage(cfg)
     _build_mkosi_stage(cfg, extra_args)
-    _build_iso_stage(cfg) # TODO also conditional...
+    _build_iso_stage(cfg)  # TODO also conditional...
     artifacts.collect(cfg)
     log.info("Build complete!")
 

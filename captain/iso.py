@@ -41,13 +41,11 @@ def _grub_cfg(arch: str) -> str:
 
 def _find_vmlinuz(cfg: Config) -> Path:
     """Locate the vmlinuz kernel image."""
-    vmlinuz_dir = cfg.kernel_output
-    candidates = sorted(vmlinuz_dir.glob("vmlinuz-*")) if vmlinuz_dir.is_dir() else []
-    if not candidates:
-        log.error("No vmlinuz found in %s", vmlinuz_dir)
-        log.error("Build the kernel first: ./build.py kernel")
+    vmlinuz_files = sorted(cfg.initramfs_output.glob("*.vmlinuz*"))
+    if not vmlinuz_files:
+        log.error("No vmlinuz found in %s", cfg.initramfs_output)
         raise SystemExit(1)
-    return candidates[0]
+    return vmlinuz_files[0]
 
 
 def _find_initramfs(cfg: Config) -> Path:
