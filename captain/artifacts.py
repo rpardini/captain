@@ -34,26 +34,26 @@ def _human_size(size: int) -> str:
 def collect_kernel(cfg: Config) -> None:
     """Copy the kernel image from mkosi.output/kernel/{version}/{arch}/ to out/."""
     out = ensure_dir(cfg.output_dir)
-    vmlinuz_dir = cfg.kernel_output
-    vmlinuz_files = sorted(vmlinuz_dir.glob("vmlinuz-*")) if vmlinuz_dir.is_dir() else []
-    if vmlinuz_files:
-        vmlinuz_src = vmlinuz_files[0]
+    # In this case, mkosi might have collected the kernel from a installed linux-image package.
+    # Find it and use it instead.
+    log.debug("Looking for kernel image produced by mkosi in %s", cfg.initramfs_output)
+    vmlinu_files = sorted(cfg.initramfs_output.glob("*.vmlinu*"))
+    if vmlinu_files:
+        vmlinuz_src = vmlinu_files[0]
         vmlinuz_dst = out / f"vmlinuz-{cfg.kernel_version}-{cfg.arch_info.output_arch}"
         shutil.copy2(vmlinuz_src, vmlinuz_dst)
         log.info("kernel: %s (%s)", vmlinuz_dst, _human_size(vmlinuz_dst.stat().st_size))
     else:
-        log.warning("No kernel image found in %s", cfg.kernel_output)
-        # In this case, mkosi might have collected the kernel from a installed linux-image package.
-        # Find it and use it instead.
-        log.debug("Looking for kernel image produced by mkosi in %s", cfg.initramfs_output)
-        vmlinu_files = sorted(cfg.initramfs_output.glob("*.vmlinu*"))
-        if vmlinu_files:
-            vmlinuz_src = vmlinu_files[0]
+        log.warning("No kernel image produced by mkosi in %s", cfg.initramfs_output)
+        vmlinuz_dir = cfg.kernel_output
+        vmlinuz_files = sorted(vmlinuz_dir.glob("vmlinuz-*")) if vmlinuz_dir.is_dir() else []
+        if vmlinuz_files:
+            vmlinuz_src = vmlinuz_files[0]
             vmlinuz_dst = out / f"vmlinuz-{cfg.kernel_version}-{cfg.arch_info.output_arch}"
             shutil.copy2(vmlinuz_src, vmlinuz_dst)
             log.info("kernel: %s (%s)", vmlinuz_dst, _human_size(vmlinuz_dst.stat().st_size))
         else:
-            log.warning("No kernel image found in %s either", cfg.initramfs_output)
+            log.warning("No kernel image found in %s", cfg.kernel_output)
 
 
 def collect_initramfs(cfg: Config) -> None:
