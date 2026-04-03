@@ -39,7 +39,7 @@ def _collect_arch_artifacts(
     project_dir: Path,
     out: Path,
     arch: str,
-    kernel_version: str,
+    flavor_id: str,
 ) -> list[Path]:
     """Collect and return the artifact files for a single architecture.
 
@@ -48,10 +48,10 @@ def _collect_arch_artifacts(
     oarch = get_arch_info(arch).output_arch
 
     ## # Collect kernel @TODO probably fix or remove?
-    ## vmlinuz_dir = project_dir / "mkosi.output" / "kernel" / kernel_version / arch
+    ## vmlinuz_dir = project_dir / "mkosi.output" / "kernel" / flavor_id / arch
     ## vmlinuz_files = sorted(vmlinuz_dir.glob("vmlinuz-*")) if vmlinuz_dir.is_dir() else []
     ##
-    ## vmlinuz_dst = out / f"vmlinuz-{kernel_version}-{oarch}"
+    ## vmlinuz_dst = out / f"vmlinuz-{flavor_id}-{oarch}"
     ## if vmlinuz_files:
     ##     shutil.copy2(vmlinuz_files[0], vmlinuz_dst)
     ##     log.info("kernel: %s", vmlinuz_dst)
@@ -59,11 +59,11 @@ def _collect_arch_artifacts(
     ##     log.warning("No kernel image found for %s", arch)
 
     arch_files = [
-        out / f"vmlinuz-{kernel_version}-{oarch}",
-        out / f"initramfs-{kernel_version}-{oarch}",
-        out / f"captainos-{kernel_version}-{oarch}.iso",
+        out / f"vmlinuz-{flavor_id}-{oarch}",
+        out / f"initramfs-{flavor_id}-{oarch}",
+        out / f"captainos-{flavor_id}-{oarch}.iso",
     ]
-    checksums_path = out / f"sha256sums-{kernel_version}-{oarch}.txt"
+    checksums_path = out / f"sha256sums-{flavor_id}-{oarch}.txt"
     artifacts.collect_checksums(arch_files, checksums_path)
 
     push_files = [*arch_files, checksums_path]
