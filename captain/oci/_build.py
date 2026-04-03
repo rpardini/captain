@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import shutil
 import tarfile
 from datetime import datetime
 from pathlib import Path
@@ -46,16 +45,18 @@ def _collect_arch_artifacts(
 
     Returns [vmlinuz, initramfs, iso, checksums] paths in *out*.
     """
-    # Collect kernel
-    vmlinuz_dir = project_dir / "mkosi.output" / "kernel" / kernel_version / arch
-    vmlinuz_files = sorted(vmlinuz_dir.glob("vmlinuz-*")) if vmlinuz_dir.is_dir() else []
     oarch = get_arch_info(arch).output_arch
-    vmlinuz_dst = out / f"vmlinuz-{kernel_version}-{oarch}"
-    if vmlinuz_files:
-        shutil.copy2(vmlinuz_files[0], vmlinuz_dst)
-        log.info("kernel: %s", vmlinuz_dst)
-    else:
-        log.warning("No kernel image found for %s", arch)
+
+    ## # Collect kernel @TODO probably fix or remove?
+    ## vmlinuz_dir = project_dir / "mkosi.output" / "kernel" / kernel_version / arch
+    ## vmlinuz_files = sorted(vmlinuz_dir.glob("vmlinuz-*")) if vmlinuz_dir.is_dir() else []
+    ##
+    ## vmlinuz_dst = out / f"vmlinuz-{kernel_version}-{oarch}"
+    ## if vmlinuz_files:
+    ##     shutil.copy2(vmlinuz_files[0], vmlinuz_dst)
+    ##     log.info("kernel: %s", vmlinuz_dst)
+    ## else:
+    ##     log.warning("No kernel image found for %s", arch)
 
     arch_files = [
         out / f"vmlinuz-{kernel_version}-{oarch}",

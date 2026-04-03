@@ -77,7 +77,6 @@ def run_qemu(cfg: Config, args: argparse.Namespace | None = None) -> None:
         log.error("Build artifacts not found:")
         for m in missing:
             log.error("  %s", m)
-        log.error("Run './build.py --kernel-version %s' first.", cfg.kernel_version)
         sys.exit(1)
 
     tink = _tink_cmdline(args) if args is not None else ""
