@@ -188,6 +188,8 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         f"GITHUB_ACTIONS={os.environ.get('GITHUB_ACTIONS', '')}",
     ]
 
+    docker_args += ["--mount", "type=volume,source=captain-workdir,target=/work"]
+
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.output:/work/mkosi.output"]
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.extra:/work/mkosi.extra"]
     docker_args += ["-v", f"{cfg.project_dir}/out:/work/out"]
