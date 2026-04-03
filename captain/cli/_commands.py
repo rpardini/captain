@@ -65,7 +65,7 @@ def _cmd_shell(cfg: Config, _extra_args: list[str]) -> None:
 
 
 def _cmd_clean(cfg: Config, _extra_args: list[str], args: object = None) -> None:
-    """Remove build artifacts for the selected kernel version, or all."""
+    """Remove build artifacts for the selected flavor, or all."""
     clean_all = getattr(args, "clean_all", False)
 
     if clean_all:
@@ -75,8 +75,8 @@ def _cmd_clean(cfg: Config, _extra_args: list[str], args: object = None) -> None
 
 
 def _clean_version(cfg: Config) -> None:
-    """Remove build artifacts for a single kernel version."""
-    kver = cfg.kernel_version
+    """Remove build artifacts for a single flavor."""
+    kver = cfg.flavor_id
     log.info("Cleaning build artifacts for kernel %s (%s)...", kver, cfg.arch)
     mkosi_output = cfg.mkosi_output
 
@@ -130,7 +130,7 @@ def _clean_version(cfg: Config) -> None:
 
 
 def _clean_all(cfg: Config) -> None:
-    """Remove all build artifacts (all kernel versions)."""
+    """Remove all build artifacts (all flavors)."""
     log.info("Cleaning ALL build artifacts...")
     mkosi_output = cfg.mkosi_output
     mkosi_cache = cfg.project_dir / "mkosi.cache"
@@ -183,7 +183,7 @@ def _cmd_summary(cfg: Config, _extra_args: list[str]) -> None:
         case "docker":
             docker.build_builder(cfg)
             container_tree = f"/work/mkosi.output/tools/{cfg.arch}"
-            container_outdir = f"/work/mkosi.output/initramfs/{cfg.kernel_version}/{cfg.arch}"
+            container_outdir = f"/work/mkosi.output/initramfs/{cfg.flavor_id}/{cfg.arch}"
             docker.run_mkosi(
                 cfg,
                 f"--extra-tree={container_tree}",
@@ -224,7 +224,7 @@ def _cmd_checksums(cfg: Config, _extra_args: list[str], args: object = None) -> 
         # Default mode: produce checksums for the selected architecture.
         out = cfg.output_dir
         oarch = cfg.arch_info.output_arch
-        kver = cfg.kernel_version
+        kver = cfg.flavor_id
         arch_files = [
             out / f"vmlinuz-{kver}-{oarch}",
             out / f"initramfs-{kver}-{oarch}",

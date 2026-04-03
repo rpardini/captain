@@ -194,7 +194,7 @@ def publish(
             cfg.project_dir,
             out,
             arch,
-            cfg.kernel_version,
+            cfg.flavor_id,
         )
 
     # Create deterministic layer tars (shared across manifest pushes).
@@ -204,13 +204,13 @@ def publish(
         arch_layer_tars[arch] = [_deterministic_tar(f, out) for f in files]
 
         # A single layer for all DTBs, if any; those are highly compressible together.
-        dtb_dir_in = out / f"dtb-{cfg.kernel_version}-{get_arch_info(arch).output_arch}"
+        dtb_dir_in = out / f"dtb-{cfg.flavor_id}-{get_arch_info(arch).output_arch}"
         if not dtb_dir_in.is_dir():
             log.warning("No dtbs directory found for %s: %s", arch, dtb_dir_in)
         else:
             log.info(f"Found DTB directory for {arch}: {dtb_dir_in}")
             all_dtb_files: list[Path] = sorted(dtb_dir_in.glob("**/*.dtb*"))
-            dtb_tar_path = out / f"dtbs-{cfg.kernel_version}-{arch}.tar"
+            dtb_tar_path = out / f"dtbs-{cfg.flavor_id}-{arch}.tar"
             with tarfile.open(dtb_tar_path, "w") as tar:
                 for f in all_dtb_files:
                     tar.add(f, arcname=f.relative_to(out))
