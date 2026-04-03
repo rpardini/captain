@@ -10,7 +10,7 @@ permissions:
   packages: write
 
 env:
-  KERNEL_VERSION: 6.18.16
+  DEFAULT_FLAVOR_ID: "trixie-full"
 
 jobs:
   # -------------------------------------------------------------------
@@ -93,13 +93,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { arch: amd64, output_arch: x86_64, iso: true }
-          - { arch: arm64, output_arch: aarch64, iso: true }
+          - { arch: amd64, output_arch: x86_64, iso: true, FLAVOR_ID: "trixie-full" }
+          - { arch: arm64, output_arch: aarch64, iso: true, FLAVOR_ID: "trixie-full" }
     env:
       ARCH: ${{ matrix.arch }}
       KERNEL_MODE: skip
       MKOSI_MODE: docker
       ISO_MODE: docker
+      KERNEL_VERSION: ${{ matrix.FLAVOR_ID }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -126,7 +127,7 @@ jobs:
       - name: Upload initramfs artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: initramfs-${{ matrix.arch }}
+          name: initramfs-${{ matrix.FLAVOR_ID }}-${{ matrix.arch }}
           path: out/
           retention-days: 1
 
@@ -138,8 +139,8 @@ jobs:
         if: ${{ matrix.iso }} # only if matrix entry had iso: true
         uses: actions/upload-artifact@v6
         with:
-          name: iso-${{ matrix.arch }}
-          path: out/captainos-${{ env.KERNEL_VERSION }}-${{ matrix.output_arch }}.iso
+          name: iso-${{ matrix.FLAVOR_ID }}-${{ matrix.arch }}
+          path: out/captainos-${{ env.FLAVOR_ID }}-${{ matrix.output_arch }}.iso
           retention-days: 1
 
       # -------------------------------------------------------------------
@@ -182,25 +183,25 @@ jobs:
       - name: Download initramfs artifacts (amd64)
         uses: actions/download-artifact@v6
         with:
-          name: initramfs-amd64
+          name: initramfs-${{ env.DEFAULT_FLAVOR_ID }}-amd64
           path: out
 
       - name: Download ISO artifact (amd64)
         uses: actions/download-artifact@v6
         with:
-          name: iso-amd64
+          name: iso-${{ env.DEFAULT_FLAVOR_ID }}-amd64
           path: out
 
       - name: Download initramfs artifacts (arm64)
         uses: actions/download-artifact@v6
         with:
-          name: initramfs-arm64
+          name: initramfs-${{ env.DEFAULT_FLAVOR_ID }}-arm64
           path: out
 
       - name: Download ISO artifact (arm64)
         uses: actions/download-artifact@v6
         with:
-          name: iso-arm64
+          name: iso-${{ env.DEFAULT_FLAVOR_ID }}-arm64
           path: out
 
       - name: Install uv
