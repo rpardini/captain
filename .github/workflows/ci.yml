@@ -342,6 +342,7 @@ jobs:
           docker push "${REMOTE}:${HASH}-${{ matrix.arch }}"
 
       - name: Download kernel artifacts
+        if: false # don't
         uses: actions/download-artifact@v6
         with:
           name: kernel-${{ matrix.arch }}
@@ -353,11 +354,13 @@ jobs:
           name: initramfs-${{ matrix.arch }}
           path: out
 
-      - name: Stage initramfs for ISO build
+      - name: Stage initramfs and kernel for ISO build
         run: |
           mkdir -p "mkosi.output/initramfs/${KERNEL_VERSION}/${{ matrix.arch }}"
-          cp "out/initramfs-${KERNEL_VERSION}-${{ matrix.output_arch }}" \
+          cp -v "out/initramfs-${KERNEL_VERSION}-${{ matrix.output_arch }}" \
              "mkosi.output/initramfs/${KERNEL_VERSION}/${{ matrix.arch }}/image.cpio.zst"
+          cp -v "out/vmlinuz-${KERNEL_VERSION}-${{ matrix.output_arch }}" \
+             "mkosi.output/initramfs/${KERNEL_VERSION}/${{ matrix.arch }}/"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
