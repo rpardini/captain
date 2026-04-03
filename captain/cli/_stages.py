@@ -1,4 +1,4 @@
-"""Build stage orchestration — kernel, tools, mkosi, ISO."""
+"""Build stage orchestration — tools, mkosi, ISO."""
 
 from __future__ import annotations
 
@@ -78,7 +78,7 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
     docker.build_builder(cfg)
     log.info("Building initrd with mkosi (docker)...")
     tools_tree = f"/work/mkosi.output/tools/{cfg.arch}"
-    output_dir = f"/work/mkosi.output/initramfs/{cfg.kernel_version}/{cfg.arch}"
+    output_dir = f"/work/mkosi.output/initramfs/{cfg.flavor_id}/{cfg.arch}"
     docker.run_mkosi(
         cfg,
         f"--extra-tree={tools_tree}",
@@ -90,7 +90,7 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
     docker.fix_docker_ownership(
         cfg,
         [
-            f"/work/mkosi.output/initramfs/{cfg.kernel_version}/{cfg.arch}",
+            f"/work/mkosi.output/initramfs/{cfg.flavor_id}/{cfg.arch}",
             "/work/out",
         ],
     )
@@ -105,7 +105,7 @@ def _build_iso_stage(cfg: Config) -> None:
         return
 
     # --- idempotency --------------------------------------------------
-    iso_path = cfg.iso_output / f"captainos-{cfg.kernel_version}-{cfg.arch_info.output_arch}.iso"
+    iso_path = cfg.iso_output / f"captainos-{cfg.flavor_id}-{cfg.arch_info.output_arch}.iso"
     if iso_path.is_file() and not cfg.force_iso:
         log.info("ISO already built: %s (use --force-iso to rebuild)", iso_path)
         return

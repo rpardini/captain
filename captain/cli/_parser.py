@@ -9,7 +9,7 @@ from collections.abc import Callable, Iterable
 
 import configargparse
 
-from captain.config import DEFAULT_KERNEL_VERSION
+from captain.config import DEFAULT_FLAVOR_ID
 
 # ---------------------------------------------------------------------------
 # Known subcommands (order matters for help text)
@@ -197,14 +197,14 @@ def _add_common_flags(parser: configargparse.ArgParser) -> None:
     )
 
 
-def _add_kernel_flags(parser: configargparse.ArgParser) -> None:
-    """--kernel-version"""
+def _add_flavor_flags(parser: configargparse.ArgParser) -> None:
+    """--flavor-id"""
     g = parser.add_argument_group("kernel")
     g.add_argument(
-        "--kernel-version",
-        env_var="KERNEL_VERSION",
+        "--flavor-id",
+        env_var="FLAVOR_ID",
         metavar="VER",
-        default=DEFAULT_KERNEL_VERSION,
+        default=DEFAULT_FLAVOR_ID,
         help="kernel version to build",
     )
 
@@ -537,18 +537,18 @@ def _add_tink_flags(parser: configargparse.ArgParser) -> None:
 _COMMAND_FLAGS: dict[str, list[Callable[..., None]]] = {
     "build": [
         _add_common_flags,
-        _add_kernel_flags,
+        _add_flavor_flags,
         _add_tools_flags,
         _add_mkosi_flags,
         _add_iso_flags,
     ],
     "tools": [_add_common_flags, _add_tools_flags],
-    "initramfs": [_add_common_flags, _add_kernel_flags, _add_mkosi_flags],
-    "iso": [_add_common_flags, _add_kernel_flags, _add_iso_flags],
-    "checksums": [_add_common_flags, _add_kernel_flags, _add_checksums_flags],
-    "release": [_add_common_flags, _add_kernel_flags, _add_release_flags],
+    "initramfs": [_add_common_flags, _add_flavor_flags, _add_mkosi_flags],
+    "iso": [_add_common_flags, _add_flavor_flags, _add_iso_flags],
+    "checksums": [_add_common_flags, _add_flavor_flags, _add_checksums_flags],
+    "release": [_add_common_flags, _add_flavor_flags, _add_release_flags],
     "shell": [_add_common_flags],
-    "clean": [_add_common_flags, _add_kernel_flags, _add_clean_flags],
-    "summary": [_add_common_flags, _add_kernel_flags, _add_summary_flags],
-    "qemu-test": [_add_common_flags, _add_kernel_flags, _add_qemu_flags, _add_tink_flags],
+    "clean": [_add_common_flags, _add_flavor_flags, _add_clean_flags],
+    "summary": [_add_common_flags, _add_flavor_flags, _add_summary_flags],
+    "qemu-test": [_add_common_flags, _add_flavor_flags, _add_qemu_flags, _add_tink_flags],
 }

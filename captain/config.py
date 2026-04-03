@@ -16,9 +16,9 @@ log = logging.getLogger(__name__)
 # Valid values for ISO_MODE and MKOSI_MODE.
 VALID_MODES = ("docker", "native", "skip")
 
-# The single source of truth for the default kernel version.
-# Override at runtime via --kernel-version or KERNEL_VERSION env var.
-DEFAULT_KERNEL_VERSION = "6.18.16"
+# The single source of truth for the default flavor.
+# Override at runtime via --flavor-id or FLAVOR_ID env var.
+DEFAULT_FLAVOR_ID = "6.18.16"
 
 
 @dataclass(slots=True)
@@ -31,7 +31,7 @@ class Config:
 
     # Target
     arch: str = "amd64"
-    kernel_version: str = DEFAULT_KERNEL_VERSION
+    flavor_id: str = DEFAULT_FLAVOR_ID
 
     # Docker
     builder_image: str = "captainos-builder"
@@ -100,7 +100,7 @@ class Config:
             project_dir=project_dir,
             output_dir=project_dir / "out",
             arch=getattr(args, "arch", "amd64"),
-            kernel_version=getattr(args, "kernel_version", DEFAULT_KERNEL_VERSION),
+            flavor_id=getattr(args, "flavor_id", DEFAULT_FLAVOR_ID),
             builder_image=getattr(args, "builder_image", "captainos-builder"),
             no_cache=getattr(args, "no_cache", False),
             tools_mode=getattr(args, "tools_mode", "docker"),
@@ -126,7 +126,7 @@ class Config:
             project_dir=project_dir,
             output_dir=project_dir / "out",
             arch=os.environ.get("ARCH", "amd64"),
-            kernel_version=os.environ.get("KERNEL_VERSION", DEFAULT_KERNEL_VERSION),
+            flavor_id=os.environ.get("FLAVOR_ID", DEFAULT_FLAVOR_ID),
             builder_image=os.environ.get("BUILDER_IMAGE", "captainos-builder"),
             no_cache=os.environ.get("NO_CACHE") == "1",
             tools_mode=os.environ.get("TOOLS_MODE", "docker"),
@@ -157,12 +157,12 @@ class Config:
     @property
     def initramfs_output(self) -> Path:
         """Per-version, per-arch directory for mkosi initramfs output."""
-        return self.project_dir / "mkosi.output" / "initramfs" / self.kernel_version / self.arch
+        return self.project_dir / "mkosi.output" / "initramfs" / self.flavor_id / self.arch
 
     @property
     def iso_output(self) -> Path:
         """Per-version, per-arch directory for the built ISO image."""
-        return self.project_dir / "mkosi.output" / "iso" / self.kernel_version / self.arch
+        return self.project_dir / "mkosi.output" / "iso" / self.flavor_id / self.arch
 
     @property
     def iso_staging(self) -> Path:

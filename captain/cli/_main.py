@@ -112,7 +112,7 @@ def main(project_dir: Path | None = None) -> None:
             case "docker":
                 docker.build_builder(cfg)
                 container_tree = f"/work/mkosi.output/tools/{cfg.arch}"
-                container_outdir = f"/work/mkosi.output/initramfs/{cfg.kernel_version}/{cfg.arch}"
+                container_outdir = f"/work/mkosi.output/initramfs/{cfg.flavor_id}/{cfg.arch}"
                 docker.run_mkosi(
                     cfg,
                     f"--extra-tree={container_tree}",
