@@ -450,6 +450,7 @@ jobs:
         run: cat .github/config.env >> "$GITHUB_ENV"
 
       - name: Download kernel artifacts (amd64)
+        if: false # no
         uses: actions/download-artifact@v6
         with:
           name: kernel-amd64
@@ -468,6 +469,7 @@ jobs:
           path: out
 
       - name: Download kernel artifacts (arm64)
+        if: false # no
         uses: actions/download-artifact@v6
         with:
           name: kernel-arm64
