@@ -69,6 +69,7 @@ def _cmd_initramfs(cfg: Config, extra_args: list[str]) -> None:
     _build_mkosi_stage(cfg, extra_args)
     artifacts.collect_initramfs(cfg)
     artifacts.collect_kernel(cfg)
+    artifacts.collect_dtbs(cfg)
     log.info("Initramfs build complete!")
 
 
@@ -84,7 +85,7 @@ def _cmd_build(cfg: Config, extra_args: list[str]) -> None:
     if cfg.build_kernel:
         _build_kernel_stage(cfg)
     _build_tools_stage(cfg)
-    _build_mkosi_stage(cfg, extra_args)
+    _cmd_initramfs(cfg, extra_args) # delegate, so it also collects
     _build_iso_stage(cfg)  # TODO also conditional...
     artifacts.collect(cfg)
     log.info("Build complete!")
