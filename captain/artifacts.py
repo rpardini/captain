@@ -42,7 +42,9 @@ def collect_kernel(cfg: Config) -> None:
         vmlinuz_src = vmlinu_files[0]
         vmlinuz_dst = out / f"vmlinuz-{cfg.kernel_version}-{cfg.arch_info.output_arch}"
         shutil.copy2(vmlinuz_src, vmlinuz_dst)
-        log.info("kernel: %s (%s)", vmlinuz_dst, _human_size(vmlinuz_dst.stat().st_size))
+        log.info(
+            "mkosi supplied kernel: %s (%s)", vmlinuz_dst, _human_size(vmlinuz_dst.stat().st_size)
+        )
     else:
         log.warning("No kernel image produced by mkosi in %s", cfg.initramfs_output)
         vmlinuz_dir = cfg.kernel_output
@@ -51,7 +53,11 @@ def collect_kernel(cfg: Config) -> None:
             vmlinuz_src = vmlinuz_files[0]
             vmlinuz_dst = out / f"vmlinuz-{cfg.kernel_version}-{cfg.arch_info.output_arch}"
             shutil.copy2(vmlinuz_src, vmlinuz_dst)
-            log.info("kernel: %s (%s)", vmlinuz_dst, _human_size(vmlinuz_dst.stat().st_size))
+            log.info(
+                "kernel built from source: %s (%s)",
+                vmlinuz_dst,
+                _human_size(vmlinuz_dst.stat().st_size),
+            )
         else:
             log.warning("No kernel image found in %s", cfg.kernel_output)
 
