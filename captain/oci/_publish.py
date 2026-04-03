@@ -213,7 +213,7 @@ def publish(
             dtb_tar_path = out / f"dtbs-{cfg.kernel_version}-{arch}.tar"
             with tarfile.open(dtb_tar_path, "w") as tar:
                 for f in all_dtb_files:
-                    tar.add(f, arcname=f.relative_to(dtb_dir_in))
+                    tar.add(f, arcname=f.relative_to(out))
             arch_layer_tars[arch].append(dtb_tar_path)
 
     pushed = True
