@@ -13,19 +13,11 @@ from captain.util import run
 
 from ._stages import (
     _build_iso_stage,
-    _build_kernel_stage,
     _build_mkosi_stage,
     _build_tools_stage,
 )
 
 log = logging.getLogger(__name__)
-
-
-def _cmd_kernel(cfg: Config, _extra_args: list[str]) -> None:
-    """Build only the kernel (no tools, no mkosi)."""
-    _build_kernel_stage(cfg)
-    artifacts.collect_kernel(cfg)
-    log.info("Kernel build stage complete!")
 
 
 def _cmd_tools(cfg: Config, _extra_args: list[str]) -> None:
@@ -34,38 +26,8 @@ def _cmd_tools(cfg: Config, _extra_args: list[str]) -> None:
     log.info("Tools stage complete!")
 
 
-def _check_kernel_modules(cfg: Config) -> None:
-    """Verify kernel modules exist before building the initramfs.
-
-    The initramfs depends on pre-built kernel modules in the ExtraTrees
-    directory.  If they are missing (e.g. due to an artifact download
-    issue) the build should fail immediately rather than silently
-    producing an initramfs without modules.
-    """
-    modules_dir = cfg.modules_output / "usr" / "lib" / "modules"
-    if not modules_dir.is_dir():
-        log.error("Kernel modules directory not found: %s", modules_dir)
-        log.error("Ensure the kernel build artifacts are downloaded correctly.")
-        raise SystemExit(1)
-    # Check that at least one module version directory exists with modules
-    version_dirs = [d for d in modules_dir.iterdir() if d.is_dir()]
-    if not version_dirs:
-        log.error("No kernel version directories found in %s", modules_dir)
-        raise SystemExit(1)
-    # Search all version directories for at least one kernel module
-    for version_dir in version_dirs:
-        if any(version_dir.rglob("*.ko*")):
-            log.info("Kernel modules found in %s (version: %s)", version_dir, version_dir.name)
-            return
-    searched = ", ".join(str(d) for d in version_dirs)
-    log.error("No kernel modules (.ko/.ko.zst) found in any kernel version directory.")
-    log.error("Searched directories: %s", searched)
-    raise SystemExit(1)
-
-
 def _cmd_initramfs(cfg: Config, extra_args: list[str]) -> None:
     """Build only the initramfs via mkosi, then collect artifacts."""
-    # _check_kernel_modules(cfg)
     _build_mkosi_stage(cfg, extra_args)
     artifacts.collect_initramfs(cfg)
     artifacts.collect_kernel(cfg)
@@ -81,12 +43,10 @@ def _cmd_iso(cfg: Config, _extra_args: list[str]) -> None:
 
 
 def _cmd_build(cfg: Config, extra_args: list[str]) -> None:
-    """Full build: kernel → tools → initramfs → iso → artifacts."""
-    if cfg.build_kernel:
-        _build_kernel_stage(cfg)
+    """Full build: tools → initramfs → iso → artifacts."""
     _build_tools_stage(cfg)
     _cmd_initramfs(cfg, extra_args)  # delegate, so it also collects
-    _build_iso_stage(cfg)  # TODO also conditional...
+    _build_iso_stage(cfg)  # TODO also conditional... / and/or include dtb's for arm64
     artifacts.collect(cfg)
     log.info("Build complete!")
 
@@ -218,18 +178,15 @@ def _clean_all(cfg: Config) -> None:
 def _cmd_summary(cfg: Config, _extra_args: list[str]) -> None:
     """Print mkosi configuration summary."""
     tools_tree = str(cfg.tools_output)
-    modules_tree = str(cfg.modules_output)
     output_dir = str(cfg.initramfs_output)
     match cfg.mkosi_mode:
         case "docker":
             docker.build_builder(cfg)
             container_tree = f"/work/mkosi.output/tools/{cfg.arch}"
-            container_modules = f"/work/mkosi.output/kernel/{cfg.kernel_version}/{cfg.arch}/modules"
             container_outdir = f"/work/mkosi.output/initramfs/{cfg.kernel_version}/{cfg.arch}"
             docker.run_mkosi(
                 cfg,
                 f"--extra-tree={container_tree}",
-                f"--extra-tree={container_modules}",
                 f"--output-dir={container_outdir}",
                 "summary",
             )
@@ -239,7 +196,6 @@ def _cmd_summary(cfg: Config, _extra_args: list[str]) -> None:
                     "mkosi",
                     f"--architecture={cfg.arch_info.mkosi_arch}",
                     f"--extra-tree={tools_tree}",
-                    f"--extra-tree={modules_tree}",
                     f"--output-dir={output_dir}",
                     "summary",
                 ],
