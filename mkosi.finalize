@@ -63,6 +63,7 @@ if [[ -d "$MODDIR" ]]; then
     echo "==> Trimming unnecessary kernel modules..."
     BEFORE=$(du -sb "$MODDIR" | awk '{print $1}')
 
+    # @TODO: this has to be templated, for flavors like fat or full we should keep most modules.
     # Module directory patterns to remove (relative to kernel/ inside the
     # modules tree).  Each entry is passed to 'find -path'.
     EXCLUDE_PATTERNS=(
@@ -82,6 +83,12 @@ if [[ -d "$MODDIR" ]]; then
         "*/kernel/virt"
         # Niche NIC driver
         "*/kernel/drivers/net/ethernet/netronome"
+        # Sound stuff
+        "*/kernel/sound"
+        # Media stuff
+        "*/kernel/drivers/media"
+        # Wireless net drivers
+        "*/kernel/drivers/net/wireless"
     )
 
     for pattern in "${EXCLUDE_PATTERNS[@]}"; do
