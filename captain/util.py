@@ -142,17 +142,6 @@ def _missing(cmds: list[str]) -> list[str]:
     return [cmd for cmd in cmds if _shutil.which(cmd) is None]
 
 
-def check_kernel_dependencies(arch: str) -> list[str]:
-    """Check host tools required for a native kernel build.
-
-    Returns a list of missing command names (empty if all found).
-    """
-    required = ["make", "gcc", "flex", "bison", "bc", "rsync", "strip", "zstd", "depmod"]
-    if arch in ("arm64", "aarch64"):
-        required += ["aarch64-linux-gnu-gcc", "aarch64-linux-gnu-strip"]
-    return _missing(required)
-
-
 def check_mkosi_dependencies() -> list[str]:
     """Check host tools required for a native mkosi image build.
 
@@ -183,4 +172,4 @@ def check_dependencies(arch: str) -> list[str]:
 
     Returns a list of missing command names (empty if all found).
     """
-    return check_kernel_dependencies(arch) + check_mkosi_dependencies()
+    return check_mkosi_dependencies()
