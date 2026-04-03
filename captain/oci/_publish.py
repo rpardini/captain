@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
 from captain import buildah, skopeo
 from captain.config import Config
-from captain.util import ensure_dir
-
+from captain.util import ensure_dir, get_arch_info
 from ._build import _build_platform_image, _collect_arch_artifacts, _deterministic_tar
 from ._common import _ARCHES, _image_ref
 
@@ -199,7 +199,21 @@ def publish(
     # Create deterministic layer tars (shared across manifest pushes).
     arch_layer_tars: dict[str, list[Path]] = {}
     for arch, files in arch_files.items():
+        log.info("Creating layer tars for %s... files: %s", arch, files)
         arch_layer_tars[arch] = [_deterministic_tar(f, out) for f in files]
+
+        # A single layer for all DTBs, if any; those are highly compressible together.
+        dtb_dir_in = out / f"dtb-{cfg.kernel_version}-{get_arch_info(arch).output_arch}"
+        if not dtb_dir_in.is_dir():
+            log.warning("No dtbs directory found for %s: %s", arch, dtb_dir_in)
+        else:
+            log.info(f"Found DTB directory for {arch}: {dtb_dir_in}")
+            all_dtb_files: list[Path] = sorted(dtb_dir_in.glob("**/*.dtb*"))
+            dtb_tar_path = out / f"dtbs-{cfg.kernel_version}-{arch}.tar"
+            with tarfile.open(dtb_tar_path, "w") as tar:
+                for f in all_dtb_files:
+                    tar.add(f, arcname=f.relative_to(dtb_dir_in))
+            arch_layer_tars[arch].append(dtb_tar_path)
 
     pushed = True
     try:
