@@ -43,7 +43,6 @@ jobs:
         arch: [ amd64, arm64 ]
     env:
       ARCH: ${{ matrix.arch }}
-      KERNEL_MODE: skip
       MKOSI_MODE: skip
       TOOLS_MODE: native
     steps:
@@ -84,11 +83,11 @@ jobs:
           retention-days: 1
 
   # -------------------------------------------------------------------
-  # Build initramfs via mkosi (depends on kernel + tools)
+  # Build initramfs via mkosi (depends on tools)
   # -------------------------------------------------------------------
   build-all:
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    needs: [ download-tools ] # build-kernel
+    needs: [ download-tools ]
     strategy:
       fail-fast: false
       matrix:
@@ -97,10 +96,9 @@ jobs:
           - { arch: arm64, output_arch: aarch64, iso: true, FLAVOR_ID: "trixie-full" }
     env:
       ARCH: ${{ matrix.arch }}
-      KERNEL_MODE: skip
       MKOSI_MODE: docker
       ISO_MODE: docker
-      KERNEL_VERSION: ${{ matrix.FLAVOR_ID }}
+      FLAVOR_ID: ${{ matrix.FLAVOR_ID }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -217,5 +215,5 @@ jobs:
 
       - name: Publish combined image to GHCR
         env:
-          KERNEL_VERSION: "${{ env.DEFAULT_FLAVOR_ID }}"
+          FLAVOR_ID: "${{ env.DEFAULT_FLAVOR_ID }}"
         run: uv run ./build.py release publish

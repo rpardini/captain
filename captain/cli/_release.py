@@ -15,7 +15,7 @@ from captain.util import check_release_dependencies
 
 from ._parser import (
     _add_common_flags,
-    _add_kernel_flags,
+    _add_flavor_flags,
     _add_release_base_flags,
     _add_release_pull_output,
     _add_release_tag_version,
@@ -30,13 +30,13 @@ _RELEASE_SUBCOMMANDS = ("publish", "pull", "tag")
 _RELEASE_SUBCMD_INFO: dict[str, tuple[str, list]] = {
     "publish": (
         "Publish artifacts as a multi-arch OCI image",
-        [_add_common_flags, _add_kernel_flags, _add_release_base_flags, _add_release_target_flag],
+        [_add_common_flags, _add_flavor_flags, _add_release_base_flags, _add_release_target_flag],
     ),
     "pull": (
         "Pull and extract artifacts (amd64, arm64, or combined)",
         [
             _add_common_flags,
-            _add_kernel_flags,
+            _add_flavor_flags,
             _add_release_base_flags,
             _add_release_target_flag,
             _add_release_pull_output,
@@ -44,7 +44,7 @@ _RELEASE_SUBCMD_INFO: dict[str, tuple[str, list]] = {
     ),
     "tag": (
         "Tag all artifact images with a version",
-        [_add_common_flags, _add_kernel_flags, _add_release_base_flags, _add_release_tag_version],
+        [_add_common_flags, _add_flavor_flags, _add_release_base_flags, _add_release_tag_version],
     ),
 }
 
@@ -135,7 +135,7 @@ def _cmd_release(cfg: Config, extra_args: list[str], args: object = None) -> Non
         sha = _resolve_git_sha(args, cfg.project_dir)
         env_args: list[str] = [
             "-e",
-            f"KERNEL_VERSION={cfg.kernel_version}",
+            f"FLAVOR_ID={cfg.flavor_id}",
             "-e",
             f"REGISTRY={registry}",
             "-e",
@@ -195,7 +195,7 @@ def _cmd_release(cfg: Config, extra_args: list[str], args: object = None) -> Non
     exclude = getattr(args, "version_exclude", None)
     sha = _resolve_git_sha(args, cfg.project_dir)
     tag = oci.compute_version_tag(cfg.project_dir, sha, exclude=exclude)
-    tag = f"{tag}-{cfg.kernel_version}"
+    tag = f"{tag}-{cfg.flavor_id}"
 
     if sub == "publish":
         target = getattr(args, "target", None) or cfg.arch
