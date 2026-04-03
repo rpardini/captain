@@ -12,6 +12,7 @@ from uuid import uuid4
 from captain import buildah, skopeo
 from captain.config import Config
 from captain.util import ensure_dir, get_arch_info
+
 from ._build import _build_platform_image, _collect_arch_artifacts, _deterministic_tar
 from ._common import _ARCHES, _image_ref
 
