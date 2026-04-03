@@ -195,6 +195,7 @@ def _cmd_release(cfg: Config, extra_args: list[str], args: object = None) -> Non
     exclude = getattr(args, "version_exclude", None)
     sha = _resolve_git_sha(args, cfg.project_dir)
     tag = oci.compute_version_tag(cfg.project_dir, sha, exclude=exclude)
+    tag = f"{tag}-{cfg.kernel_version}"
 
     if sub == "publish":
         target = getattr(args, "target", None) or cfg.arch
