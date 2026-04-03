@@ -3,6 +3,9 @@
 # The root filesystem is writable here.
 set -euo pipefail
 
+echo "==> Showing full contents of environment variables for debugging:"
+env
+
 echo "==> CaptainOS finalize: unlocking root account..."
 
 # Unlock root with empty password
@@ -54,10 +57,11 @@ done
 # is available as a cacheable artifact.  We strip unneeded modules here so
 # the initramfs stays small without requiring a kernel recompile.
 # ---------------------------------------------------------------------------
-echo "==> Listing all installed kernel modules: ${BUILDROOT}"
-find "${BUILDROOT}/" -type f -name "*.ko*"
-
 MODDIR="$BUILDROOT/usr/lib/modules"
+
+echo "==> Listing all installed kernel modules: ${MODDIR}"
+du -h -x -d 5 "$MODDIR" | sort -h || true
+
 if [[ -d "$MODDIR" ]]; then
     echo "==> Trimming unnecessary kernel modules..."
     BEFORE=$(du -sb "$MODDIR" | awk '{print $1}')
@@ -102,15 +106,30 @@ if [[ -d "$MODDIR" ]]; then
 fi
 
 echo "==> Listing remaining kernel modules: ${BUILDROOT}"
-find "${BUILDROOT}/" -type f -name "*.ko*"
-
-echo "==> Listing contents of /boot"
-ls -lah "${BUILDROOT}"/boot
-
-echo "==> Showing full contents of environment variables for debugging:"
-env
+du -h -x -d 5 "$MODDIR" | sort -h || true
 
 echo "==> Removing /boot from the image to save space"
-rm -rfv "$BUILDROOT"/boot
+rm -rfv "${BUILDROOT}"/boot
+
+DTB_SRC_DIR=$(echo -n "${BUILDROOT}"/usr/lib/linux-image-*)
+if [[ -d "$DTB_SRC_DIR" ]]; then
+	echo "==> Exporting kernel DTBs; DTB_DIR: ${DTB_SRC_DIR}"
+	mkdir -pv "${BUILDROOT}/root/dtb"
+	# Move every .dtb* file in the DTB_SRC_DIR to "${BUILDROOT}/root/dtb" -- maintain the directory structure
+	find "${DTB_SRC_DIR}" -type f -name "*.dtb*" -exec sh -c 'for f; do mkdir -p "${0}/$(dirname "${f#'"${DTB_SRC_DIR}"'/}")" && mv "$f" "${0}/${f#'"${DTB_SRC_DIR}"'/}" ; done' "${BUILDROOT}/root/dtb" {} + || true
+
+	echo "--> Leftover files in ${DTB_SRC_DIR}:"
+	find "${DTB_SRC_DIR}" -type f
+
+	# Now simply output the dtb directory to mkosi's OUTPUTDIR
+	echo "==> Copying DTBs to mkosi output directory: ${OUTPUTDIR}/dtb"
+	mv -v "${BUILDROOT}/root/dtb" "${OUTPUTDIR}/dtb"
+else
+	echo "==> No DTB source directory found at ${DTB_SRC_DIR}; skipping DTB export"
+fi
+
+# Show a 4-deep overview of the full rootfs contents
+echo "==> Final contents of root filesystem (up to depth 4):"
+du -h -x -d 4 "$BUILDROOT" | sort -h || true
 
 echo "==> CaptainOS finalize complete."
