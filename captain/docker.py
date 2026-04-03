@@ -163,7 +163,7 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "-e",
         f"ARCH={cfg.arch}",
         "-e",
-        f"KERNEL_VERSION={cfg.kernel_version}",
+        f"FLAVOR_ID={cfg.flavor_id}",
         "-e",
         f"FORCE_TOOLS={int(cfg.force_tools)}",
         "-e",
