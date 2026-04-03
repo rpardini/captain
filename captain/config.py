@@ -31,24 +31,19 @@ class Config:
 
     # Target
     arch: str = "amd64"
-    build_kernel: bool = False
     kernel_version: str = DEFAULT_KERNEL_VERSION
-    kernel_config: str | None = None
-    kernel_src: str | None = None
 
     # Docker
     builder_image: str = "captainos-builder"
     no_cache: bool = False
 
     # Per-stage mode: "docker" | "native" | "skip"
-    kernel_mode: str = "docker"
     tools_mode: str = "docker"
     mkosi_mode: str = "docker"
     iso_mode: str = "docker"
     release_mode: str = "docker"
 
     # Force flags
-    force_kernel: bool = False
     force_tools: bool = False
     force_iso: bool = False
 
@@ -67,7 +62,6 @@ class Config:
         self.arch_info = get_arch_info(self.arch)
         self.arch = self.arch_info.arch  # normalise aliases (x86_64 → amd64, etc.)
         for name, value in (
-            ("KERNEL_MODE", self.kernel_mode),
             ("TOOLS_MODE", self.tools_mode),
             ("MKOSI_MODE", self.mkosi_mode),
             ("ISO_MODE", self.iso_mode),
@@ -81,8 +75,7 @@ class Config:
     def needs_docker(self) -> bool:
         """True if any stage requires Docker."""
         return (
-            self.kernel_mode == "docker"
-            or self.tools_mode == "docker"
+            self.tools_mode == "docker"
             or self.mkosi_mode == "docker"
             or self.iso_mode == "docker"
             or self.release_mode == "docker"
@@ -107,18 +100,13 @@ class Config:
             project_dir=project_dir,
             output_dir=project_dir / "out",
             arch=getattr(args, "arch", "amd64"),
-            build_kernel=getattr(args, "build_kernel", False),
             kernel_version=getattr(args, "kernel_version", DEFAULT_KERNEL_VERSION),
-            kernel_config=getattr(args, "kernel_config", None) or None,
-            kernel_src=getattr(args, "kernel_src", None) or None,
             builder_image=getattr(args, "builder_image", "captainos-builder"),
             no_cache=getattr(args, "no_cache", False),
-            kernel_mode=getattr(args, "kernel_mode", "docker"),
             tools_mode=getattr(args, "tools_mode", "docker"),
             mkosi_mode=getattr(args, "mkosi_mode", "docker"),
             iso_mode=getattr(args, "iso_mode", "docker"),
             release_mode=getattr(args, "release_mode", "docker"),
-            force_kernel=getattr(args, "force_kernel", False),
             force_tools=getattr(args, "force_tools", False),
             force_iso=getattr(args, "force_iso", False),
             qemu_append=getattr(args, "qemu_append", ""),
@@ -138,18 +126,13 @@ class Config:
             project_dir=project_dir,
             output_dir=project_dir / "out",
             arch=os.environ.get("ARCH", "amd64"),
-            build_kernel=os.environ.get("BUILD_KERNEL") == "1",
             kernel_version=os.environ.get("KERNEL_VERSION", DEFAULT_KERNEL_VERSION),
-            kernel_config=os.environ.get("KERNEL_CONFIG") or None,
-            kernel_src=os.environ.get("KERNEL_SRC") or None,
             builder_image=os.environ.get("BUILDER_IMAGE", "captainos-builder"),
             no_cache=os.environ.get("NO_CACHE") == "1",
-            kernel_mode=os.environ.get("KERNEL_MODE", "docker"),
             tools_mode=os.environ.get("TOOLS_MODE", "docker"),
             mkosi_mode=os.environ.get("MKOSI_MODE", "docker"),
             iso_mode=os.environ.get("ISO_MODE", "docker"),
             release_mode=os.environ.get("RELEASE_MODE", "docker"),
-            force_kernel=os.environ.get("FORCE_KERNEL") == "1",
             force_tools=os.environ.get("FORCE_TOOLS") == "1",
             force_iso=os.environ.get("FORCE_ISO") == "1",
             qemu_append=os.environ.get("QEMU_APPEND", ""),
@@ -166,27 +149,6 @@ class Config:
         Kernel modules are stored separately under :attr:`kernel_output`.
         """
         return self.project_dir / "mkosi.output" / "tools" / self.arch
-
-    @property
-    def kernel_output(self) -> Path:
-        """Per-version, per-arch directory for all kernel build artifacts.
-
-        Contains the vmlinuz image (loaded separately by iPXE) and
-        a ``modules/`` subtree that mirrors a root filesystem layout
-        (``usr/lib/modules/{kver}/``) so it can be passed directly
-        as an ``--extra-tree=`` to mkosi.
-        """
-        return self.project_dir / "mkosi.output" / "kernel" / self.kernel_version / self.arch
-
-    @property
-    def modules_output(self) -> Path:
-        """Per-version, per-arch root for kernel modules.
-
-        Returns ``kernel/{version}/{arch}/modules`` which contains a
-        merged-usr tree (``usr/lib/modules/{kver}/``) suitable for
-        passing as ``--extra-tree=`` to mkosi.
-        """
-        return self.kernel_output / "modules"
 
     @property
     def mkosi_output(self) -> Path:
