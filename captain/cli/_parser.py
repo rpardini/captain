@@ -198,7 +198,7 @@ def _add_common_flags(parser: configargparse.ArgParser) -> None:
 
 
 def _add_kernel_flags(parser: configargparse.ArgParser) -> None:
-    """--kernel-version, --kernel-src, --kernel-mode, --force-kernel"""
+    """--kernel-version"""
     g = parser.add_argument_group("kernel")
     g.add_argument(
         "--kernel-version",
@@ -206,34 +206,6 @@ def _add_kernel_flags(parser: configargparse.ArgParser) -> None:
         metavar="VER",
         default=DEFAULT_KERNEL_VERSION,
         help="kernel version to build",
-    )
-    g.add_argument(
-        "--kernel-config",
-        env_var="KERNEL_CONFIG",
-        metavar="PATH",
-        default=None,
-        help="path to kernel config file (overrides auto-detection from kernel.configs/)",
-    )
-    g.add_argument(
-        "--kernel-src",
-        env_var="KERNEL_SRC",
-        metavar="PATH",
-        default=None,
-        help="path to local kernel source tree",
-    )
-    g.add_argument(
-        "--kernel-mode",
-        env_var="KERNEL_MODE",
-        default="docker",
-        choices=list(VALID_MODES),
-        help="kernel stage execution mode",
-    )
-    g.add_argument(
-        "--force-kernel",
-        env_var="FORCE_KERNEL",
-        action="store_true",
-        default=False,
-        help="force kernel rebuild even if outputs exist",
     )
 
 
@@ -570,7 +542,6 @@ _COMMAND_FLAGS: dict[str, list[Callable[..., None]]] = {
         _add_mkosi_flags,
         _add_iso_flags,
     ],
-    "kernel": [_add_common_flags, _add_kernel_flags],
     "tools": [_add_common_flags, _add_tools_flags],
     "initramfs": [_add_common_flags, _add_kernel_flags, _add_mkosi_flags],
     "iso": [_add_common_flags, _add_kernel_flags, _add_iso_flags],
