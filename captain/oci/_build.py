@@ -47,17 +47,6 @@ def _collect_arch_artifacts(
     """
     oarch = get_arch_info(arch).output_arch
 
-    ## # Collect kernel @TODO probably fix or remove?
-    ## vmlinuz_dir = project_dir / "mkosi.output" / "kernel" / flavor_id / arch
-    ## vmlinuz_files = sorted(vmlinuz_dir.glob("vmlinuz-*")) if vmlinuz_dir.is_dir() else []
-    ##
-    ## vmlinuz_dst = out / f"vmlinuz-{flavor_id}-{oarch}"
-    ## if vmlinuz_files:
-    ##     shutil.copy2(vmlinuz_files[0], vmlinuz_dst)
-    ##     log.info("kernel: %s", vmlinuz_dst)
-    ## else:
-    ##     log.warning("No kernel image found for %s", arch)
-
     arch_files = [
         out / f"vmlinuz-{flavor_id}-{oarch}",
         out / f"initramfs-{flavor_id}-{oarch}",
