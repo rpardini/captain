@@ -54,6 +54,9 @@ done
 # is available as a cacheable artifact.  We strip unneeded modules here so
 # the initramfs stays small without requiring a kernel recompile.
 # ---------------------------------------------------------------------------
+echo "==> Listing all installed kernel modules: ${BUILDROOT}"
+find "${BUILDROOT}/" -type f -name "*.ko*"
+
 MODDIR="$BUILDROOT/usr/lib/modules"
 if [[ -d "$MODDIR" ]]; then
     echo "==> Trimming unnecessary kernel modules..."
@@ -81,7 +84,8 @@ if [[ -d "$MODDIR" ]]; then
     )
 
     for pattern in "${EXCLUDE_PATTERNS[@]}"; do
-        find "$MODDIR" -path "$pattern" -type d -exec rm -rf {} + 2>/dev/null || true
+        echo "-->    Removing modules matching pattern: '${pattern}'"
+        find "$MODDIR" -path "$pattern" -type d -exec rm -rfv {} + || true
     done
 
     AFTER=$(du -sb "$MODDIR" | awk '{print $1}')
@@ -96,5 +100,17 @@ if [[ -d "$MODDIR" ]]; then
         depmod -a -b "$BUILDROOT/usr" "$kver"
     done
 fi
+
+echo "==> Listing remaining kernel modules: ${BUILDROOT}"
+find "${BUILDROOT}/" -type f -name "*.ko*"
+
+echo "==> Listing contents of /boot"
+ls -lah "${BUILDROOT}"/boot
+
+echo "==> Showing full contents of environment variables for debugging:"
+env
+
+echo "==> Removing /boot from the image to save space"
+rm -rfv "$BUILDROOT"/boot
 
 echo "==> CaptainOS finalize complete."
