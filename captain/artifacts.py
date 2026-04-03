@@ -131,3 +131,20 @@ def collect(cfg: Config) -> None:
     collect_initramfs(cfg)
     collect_kernel(cfg)
     collect_iso(cfg)
+
+
+def collect_dtbs(cfg):
+    """Copy the 'dtb' dir from mkosi.output/initramfs/{arch}/ to out/ if it exists."""
+    indir = ensure_dir(cfg.initramfs_output)
+    dtb_dir: Path = indir / "dtb"
+    if dtb_dir.exists():
+        log.info("Found dtb directory in %s, copying to output...", dtb_dir)
+        out = ensure_dir(cfg.output_dir)
+        target_dtb_dir = out / f"dtb-{cfg.kernel_version}-{cfg.arch_info.output_arch}"
+        # copy the directory incl subdirs and files
+        if target_dtb_dir.exists():
+            shutil.rmtree(target_dtb_dir)
+        shutil.copytree(dtb_dir, target_dtb_dir)
+        log.info("Copied dtb directory: %s", target_dtb_dir)
+    else:
+        log.warning("No dtb directory found in %s", dtb_dir)
