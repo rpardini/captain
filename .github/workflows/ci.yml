@@ -166,7 +166,7 @@ jobs:
   # -------------------------------------------------------------------
   publish-combined:
     if: github.ref == 'refs/heads/main'
-    name: "publish-combined ${{ env.DEFAULT_FLAVOR_ID }}"
+    name: "publish-combined"
     runs-on: ubuntu-latest
     needs: [ build-all ]
     env:
@@ -216,6 +216,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish combined image to GHCR
-        run: uv run ./build.py release publish
         env:
           KERNEL_VERSION: "${{ env.DEFAULT_FLAVOR_ID }}"
+        run: uv run ./build.py release publish
