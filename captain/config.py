@@ -13,7 +13,7 @@ from captain.util import ArchInfo, get_arch_info
 
 log = logging.getLogger(__name__)
 
-# Valid values for KERNEL_MODE and MKOSI_MODE.
+# Valid values for ISO_MODE and MKOSI_MODE.
 VALID_MODES = ("docker", "native", "skip")
 
 # The single source of truth for the default kernel version.

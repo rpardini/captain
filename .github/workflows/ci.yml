@@ -166,11 +166,13 @@ jobs:
   # -------------------------------------------------------------------
   publish-combined:
     if: github.ref == 'refs/heads/main'
+    name: "publish-combined ${{ env.DEFAULT_FLAVOR_ID }}"
     runs-on: ubuntu-latest
     needs: [ build-all ]
     env:
       ARCH: amd64
       TARGET: combined
+      KERNEL_VERSION: ${{ env.DEFAULT_FLAVOR_ID }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
