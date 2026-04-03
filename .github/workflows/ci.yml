@@ -172,7 +172,6 @@ jobs:
     env:
       ARCH: amd64
       TARGET: combined
-      KERNEL_VERSION: ${{ env.DEFAULT_FLAVOR_ID }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -218,3 +217,5 @@ jobs:
 
       - name: Publish combined image to GHCR
         run: uv run ./build.py release publish
+        env:
+          KERNEL_VERSION: "${{ env.DEFAULT_FLAVOR_ID }}"
