@@ -18,7 +18,7 @@ VALID_MODES = ("docker", "native", "skip")
 
 # The single source of truth for the default flavor.
 # Override at runtime via --flavor-id or FLAVOR_ID env var.
-DEFAULT_FLAVOR_ID = "6.18.16"
+DEFAULT_FLAVOR_ID = "trixie-full"
 
 
 @dataclass(slots=True)
