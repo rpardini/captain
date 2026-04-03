@@ -31,6 +31,7 @@ class Config:
 
     # Target
     arch: str = "amd64"
+    build_kernel: bool = False
     kernel_version: str = DEFAULT_KERNEL_VERSION
     kernel_config: str | None = None
     kernel_src: str | None = None
@@ -106,6 +107,7 @@ class Config:
             project_dir=project_dir,
             output_dir=project_dir / "out",
             arch=getattr(args, "arch", "amd64"),
+            build_kernel=getattr(args, "build_kernel", False),
             kernel_version=getattr(args, "kernel_version", DEFAULT_KERNEL_VERSION),
             kernel_config=getattr(args, "kernel_config", None) or None,
             kernel_src=getattr(args, "kernel_src", None) or None,
@@ -136,6 +138,7 @@ class Config:
             project_dir=project_dir,
             output_dir=project_dir / "out",
             arch=os.environ.get("ARCH", "amd64"),
+            build_kernel=os.environ.get("BUILD_KERNEL") == "1",
             kernel_version=os.environ.get("KERNEL_VERSION", DEFAULT_KERNEL_VERSION),
             kernel_config=os.environ.get("KERNEL_CONFIG") or None,
             kernel_src=os.environ.get("KERNEL_SRC") or None,

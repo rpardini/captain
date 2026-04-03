@@ -81,10 +81,11 @@ def _cmd_iso(cfg: Config, _extra_args: list[str]) -> None:
 
 def _cmd_build(cfg: Config, extra_args: list[str]) -> None:
     """Full build: kernel → tools → initramfs → iso → artifacts."""
-    _build_kernel_stage(cfg)
+    if cfg.build_kernel:
+        _build_kernel_stage(cfg)
     _build_tools_stage(cfg)
     _build_mkosi_stage(cfg, extra_args)
-    _build_iso_stage(cfg)
+    _build_iso_stage(cfg) # TODO also conditional...
     artifacts.collect(cfg)
     log.info("Build complete!")
 
