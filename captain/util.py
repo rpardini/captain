@@ -10,6 +10,7 @@ import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from rich.panel import Panel
 from rich.rule import Rule
 
 import captain
@@ -82,6 +83,7 @@ def run(
 
     # If not capturing, and debugging, emit a Rich separator line, for visual clarity.
     if not capture and log.isEnabledFor(logging.DEBUG):
+        captain.console.print(Panel(f"Running command: {' '.join(cmd)}", style="green"))
         captain.console.print(Rule(f"⮕ Starting subprocess: {cmd} ⮕", style="green"))
 
     proc = subprocess.run(
