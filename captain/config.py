@@ -96,6 +96,10 @@ class Config:
         if project_dir is None:
             raise ValueError("project_dir must be provided to Config.from_args")
 
+        log.debug(
+            "Creating Config from args: %s (env flavor: %s)", args, os.environ.get("FLAVOR_ID")
+        )
+
         return cls(
             project_dir=project_dir,
             output_dir=project_dir / "out",
@@ -122,6 +126,9 @@ class Config:
         for any non-CLI callers (e.g. tests, scripts) that need a
         ``Config`` without going through argparse.
         """
+
+        log.debug("Creating Config from env: %s", os.environ)
+
         return cls(
             project_dir=project_dir,
             output_dir=project_dir / "out",
