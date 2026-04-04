@@ -19,10 +19,12 @@ import logging
 import sys
 from pathlib import Path
 
+import captain.flavor
 from captain import docker
 from captain.config import Config
 from captain.util import run
 
+from ..flavor import BaseFlavor
 from ._commands import (
     _cmd_build,
     _cmd_checksums,
@@ -82,7 +84,14 @@ def main(project_dir: Path | None = None) -> None:
     cfg = Config.from_args(args, project_dir)
     cfg.mkosi_args = mkosi_args
 
-    # 7. Dispatch.
+    # 7. Instantiate the flavor (from cfg.flavor_id)
+    flavor: BaseFlavor = captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
+
+    # 8. Have the flavor generate any necessary files in the project directory;
+    #    flavor is responsible for mkosi.conf and any extra trees, scripts, etc.
+    flavor.generate()
+
+    # 8. Dispatch.
     dispatch: dict[str, object] = {
         "build": _cmd_build,
         "tools": _cmd_tools,
