@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import sys
 from pathlib import Path
 
 from captain.config import Config
@@ -32,39 +31,55 @@ class BaseFlavor:
 
 
 def create_and_setup_flavor_for_id(flavor_id: str, cfg: Config) -> BaseFlavor:
-    # create_flavor() is defined in files in /flavors/<flavor_id>/<flavor_id>.py
-    # and returns a BaseFlavor
-    flavor_dir = cfg.project_dir / "flavors" / cfg.flavor_id
-    flavor_python_file_path = flavor_dir / f"{cfg.flavor_id}.py"
+    import importlib.util
+    import sys
+
+    flavor_dir = cfg.project_dir / "flavors" / flavor_id
+    flavor_python_file_path = flavor_dir / f"{flavor_id}.py"
+
     if not flavor_python_file_path.is_file():
         log.error(
-            "Flavor '%s' not found. Expected to find %s", cfg.flavor_id, flavor_python_file_path
+            "Flavor '%s' not found. Expected to find %s",
+            flavor_id,
+            flavor_python_file_path,
         )
         raise SystemExit(1)
 
-    # We import the flavor module dynamically, using importlib
-    import importlib.util
+    # Use a fully qualified, hierarchical module name
+    module_name = f"captain.flavors.{flavor_id}.{flavor_id}"
 
-    spec = importlib.util.spec_from_file_location(
-        f"flavors.{cfg.flavor_id}", flavor_python_file_path
-    )
+    spec = importlib.util.spec_from_file_location(module_name, flavor_python_file_path)
     if spec is None or spec.loader is None:
         log.error("Failed to load flavor module from %s", flavor_python_file_path)
         raise SystemExit(1)
 
     log.debug("Loaded flavor module spec from %s: %s", flavor_python_file_path, spec)
 
-    flavor_module = importlib.util.module_from_spec(spec)
+    module = importlib.util.module_from_spec(spec)
 
-    log.debug("Registering flavor module %s in sys.modules under name %s", flavor_module, spec.name)
-    sys.modules[spec.name] = flavor_module
+    # Critical: set package for proper import + logging hierarchy
+    module.__package__ = f"flavors.{flavor_id}"
 
+    # Register before execution (required for imports + identity)
+    sys.modules[module_name] = module
 
-    spec.loader.exec_module(flavor_module)
+    spec.loader.exec_module(module)
 
-    log.debug("Executing flavor module %s's create_flavor() function", flavor_module)
-    flavor: BaseFlavor = flavor_module.create_flavor()
+    # Validate API explicitly
+    if not hasattr(module, "create_flavor"):
+        log.error("Flavor module %s does not define create_flavor()", module_name)
+        raise SystemExit(1)
 
+    log.debug("Executing %s.create_flavor()", module_name)
+    flavor: BaseFlavor = module.create_flavor()
+
+    if not isinstance(flavor, BaseFlavor):
+        log.error(
+            "create_flavor() in %s did not return BaseFlavor (got %r)",
+            module_name,
+            type(flavor),
+        )
+        raise SystemExit(1)
 
     log.debug("Calling setup() on flavor %s with config: %s", flavor, cfg)
     flavor.setup(cfg, flavor_dir)
