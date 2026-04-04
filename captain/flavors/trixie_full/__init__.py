@@ -3,7 +3,7 @@ from pathlib import Path
 
 from captain.config import Config
 from captain.flavor import BaseFlavor
-from flavors.common_debian.common_debian import DebianCommonFlavor
+from captain.flavors.common_debian import DebianCommonFlavor
 
 log: logging.Logger = logging.getLogger(__name__)
 

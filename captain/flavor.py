@@ -31,52 +31,43 @@ class BaseFlavor:
 
 
 def create_and_setup_flavor_for_id(flavor_id: str, cfg: Config) -> BaseFlavor:
-    import importlib.util
-    import sys
+    flavor_id_but_underscores_instead_of_dashes = flavor_id.replace("-", "_")
+    flavor_dir = cfg.project_dir / "captain" / "flavors" / flavor_id_but_underscores_instead_of_dashes
 
-    flavor_dir = cfg.project_dir / "flavors" / flavor_id
-    flavor_python_file_path = flavor_dir / f"{flavor_id}.py"
-
-    if not flavor_python_file_path.is_file():
+    if not flavor_dir.is_dir():
         log.error(
-            "Flavor '%s' not found. Expected to find %s",
+            "Flavor '%s' not found. Expected to find directory %s",
             flavor_id,
-            flavor_python_file_path,
+            flavor_dir,
         )
         raise SystemExit(1)
 
-    # Use a fully qualified, hierarchical module name
-    module_name = f"captain.flavors.{flavor_id}.{flavor_id}"
+    wanted_module = f"captain.flavors.{flavor_id_but_underscores_instead_of_dashes}"
+    log.debug("Attempting to import flavor module %s from directory %s", wanted_module, flavor_dir)
 
-    spec = importlib.util.spec_from_file_location(module_name, flavor_python_file_path)
-    if spec is None or spec.loader is None:
-        log.error("Failed to load flavor module from %s", flavor_python_file_path)
+    try:
+        module = __import__(wanted_module, fromlist=["create_flavor"])
+    except ImportError as e:
+        log.error(
+            "Failed to import flavor module %s from directory %s: %s",
+            wanted_module,
+            flavor_dir,
+            e,
+        )
         raise SystemExit(1)
-
-    log.debug("Loaded flavor module spec from %s: %s", flavor_python_file_path, spec)
-
-    module = importlib.util.module_from_spec(spec)
-
-    # Critical: set package for proper import + logging hierarchy
-    module.__package__ = f"flavors.{flavor_id}"
-
-    # Register before execution (required for imports + identity)
-    sys.modules[module_name] = module
-
-    spec.loader.exec_module(module)
 
     # Validate API explicitly
     if not hasattr(module, "create_flavor"):
-        log.error("Flavor module %s does not define create_flavor()", module_name)
+        log.error("Flavor module %s does not define create_flavor()", wanted_module)
         raise SystemExit(1)
 
-    log.debug("Executing %s.create_flavor()", module_name)
+    log.debug("Executing %s.create_flavor()", wanted_module)
     flavor: BaseFlavor = module.create_flavor()
 
     if not isinstance(flavor, BaseFlavor):
         log.error(
             "create_flavor() in %s did not return BaseFlavor (got %r)",
-            module_name,
+            wanted_module,
             type(flavor),
         )
         raise SystemExit(1)
