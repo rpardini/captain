@@ -4,14 +4,20 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 from captain.config import Config
 
 log = logging.getLogger(__name__)
 
 
-class BaseFlavor:
+@runtime_checkable
+class BaseFlavor(Protocol):
     cfg: Config
+    id: str
+    name: str
+    description: str
+    supported_architectures: set[str]
 
     def setup(self, cfg: Config, flavor_dir: Path) -> None:
         # assert cfg is not None, "setup() must be called with a Config before accessing self.cfg"
@@ -31,8 +37,8 @@ class BaseFlavor:
 
 
 def create_and_setup_flavor_for_id(flavor_id: str, cfg: Config) -> BaseFlavor:
-    flavor_id_but_underscores_instead_of_dashes = flavor_id.replace("-", "_")
-    flavor_dir = cfg.project_dir / "captain" / "flavors" / flavor_id_but_underscores_instead_of_dashes
+    flavor_id_underscore = flavor_id.replace("-", "_")
+    flavor_dir = cfg.project_dir / "captain" / "flavors" / flavor_id_underscore
 
     if not flavor_dir.is_dir():
         log.error(
@@ -42,7 +48,7 @@ def create_and_setup_flavor_for_id(flavor_id: str, cfg: Config) -> BaseFlavor:
         )
         raise SystemExit(1)
 
-    wanted_module = f"captain.flavors.{flavor_id_but_underscores_instead_of_dashes}"
+    wanted_module = f"captain.flavors.{flavor_id_underscore}"
     log.debug("Attempting to import flavor module %s from directory %s", wanted_module, flavor_dir)
 
     try:
@@ -54,7 +60,7 @@ def create_and_setup_flavor_for_id(flavor_id: str, cfg: Config) -> BaseFlavor:
             flavor_dir,
             e,
         )
-        raise SystemExit(1)
+        raise e
 
     # Validate API explicitly
     if not hasattr(module, "create_flavor"):
@@ -74,5 +80,11 @@ def create_and_setup_flavor_for_id(flavor_id: str, cfg: Config) -> BaseFlavor:
 
     log.debug("Calling setup() on flavor %s with config: %s", flavor, cfg)
     flavor.setup(cfg, flavor_dir)
+
+    log.debug(
+        "Flavor is setup; description: %s; supported_architectures: %s",
+        flavor.description,
+        flavor.supported_architectures,
+    )
 
     return flavor
