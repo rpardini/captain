@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
+import shutil
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 import jinja2
-import shutil
 
 from captain.config import Config
 
@@ -70,8 +70,10 @@ class BaseFlavor(Protocol):
     def render_templates(self, output_dir: Path):
         log.debug("Called BaseFlavor.render_templates() with output_dir: %s", output_dir)
         # Use jinja2 to render all templates in self.template_map, writing output to output_dir
-        # The keys of self.template_map are the relative output paths (e.g. "mkosi.conf"), and the values are lists of Path objects pointing to Jinja2 template files.
-        # If more than one template is provided for a given output path, they should be rendered in order and concatenated together to produce the final output file.
+        # The keys of self.template_map are the relative output paths (e.g. "mkosi.conf"), and the
+        # values are lists of Path objects pointing to Jinja2 template files.
+        # If more than one template is provided for a given output path, they should be rendered
+        # in order and concatenated together to produce the final output file.
         for relative_output_path, template_paths in self.template_map.items():
             log.debug(
                 "Rendering templates for output path '%s': %s",
@@ -81,11 +83,12 @@ class BaseFlavor(Protocol):
             rendered_content = ""
             for template_path in template_paths:
                 log.debug("Rendering template %s", template_path)
-                # Here you would load the template file, render it with the appropriate context (e.g. using Jinja2), and append the rendered content to rendered_content.
+                # Here you would load the template file, render it with the appropriate context
+                # (e.g. using Jinja2), and append the rendered content to rendered_content.
                 # For example:
                 template = jinja2.Environment(
-                    loader=jinja2.FileSystemLoader(template_path.parent)).get_template(
-                    template_path.name)
+                    loader=jinja2.FileSystemLoader(template_path.parent)
+                ).get_template(template_path.name)
                 rendered_content += template.render(cfg=self.cfg)
 
             output_file_path = output_dir / relative_output_path
@@ -97,7 +100,8 @@ class BaseFlavor(Protocol):
             output_file_path.chmod(output_file_path.stat().st_mode | 0o111)
 
     def copy_static_files(self, project_dir):
-        # Do a plain copy of all files in self.static_map to project_dir / relative_path, where relative_path is the key in self.static_map
+        # Do a plain copy of all files in self.static_map to project_dir / relative_path, where
+        # relative_path is the key in self.static_map
         for relative_path, source_path in self.static_map.items():
             destination_path = project_dir / relative_path
             log.debug("Copying static file from '%s' to '%s'", source_path, destination_path)

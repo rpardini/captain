@@ -21,19 +21,16 @@ class DebianCommonFlavor(BaseFlavor):
             cfg.arch_info.mkosi_arch,
             flavor_dir,
         )
-        this_flavor_dir = self.specific_flavor_dir('common-debian')
-        self.template_map["mkosi.conf"] = [
-            this_flavor_dir / "mkosi.conf.j2"]
-        self.template_map["mkosi.postinst"] = [
-            this_flavor_dir / "mkosi.postinst.sh.j2"]
-        self.template_map["mkosi.finalize"] = [
-            this_flavor_dir / "mkosi.finalize.sh.j2"]
+        this_flavor_dir = self.specific_flavor_dir("common-debian")
+        self.template_map["mkosi.conf"] = [this_flavor_dir / "mkosi.conf.j2"]
+        self.template_map["mkosi.postinst"] = [this_flavor_dir / "mkosi.postinst.sh.j2"]
+        self.template_map["mkosi.finalize"] = [this_flavor_dir / "mkosi.finalize.sh.j2"]
 
-        # Now, lets enumerate and add all the static files in self.specific_flavor_dir('common-debian') / "mkosi.extra"
-        # and add them to self.static_map with the key being the relative path from self.specific_flavor_dir('common-debian') / "mkosi.extra"
+        # Now, lets enumerate and add all the static files this flavor's mkosi.extra directory
+        # and add them to self.static_map with the key being the relative path from the flavor dir
         extra_dir = this_flavor_dir / "mkosi.extra"
         if extra_dir.exists() and extra_dir.is_dir():
-            for extra_file in extra_dir.rglob('*'):
+            for extra_file in extra_dir.rglob("*"):
                 if extra_file.is_file():
                     relative_path = extra_file.relative_to(this_flavor_dir)
                     self.static_map[str(relative_path)] = extra_file
