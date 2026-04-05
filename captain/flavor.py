@@ -87,9 +87,10 @@ class BaseFlavor(Protocol):
                 # (e.g. using Jinja2), and append the rendered content to rendered_content.
                 # For example:
                 template = jinja2.Environment(
-                    loader=jinja2.FileSystemLoader(template_path.parent)
+                    loader=jinja2.FileSystemLoader(template_path.parent),
+                    undefined=jinja2.StrictUndefined,
                 ).get_template(template_path.name)
-                rendered_content += template.render(cfg=self.cfg)
+                rendered_content += template.render(cfg=self.cfg, flavor=self)
 
             output_file_path = output_dir / relative_output_path
             log.debug("Writing rendered content to %s", output_file_path)
@@ -110,6 +111,7 @@ class BaseFlavor(Protocol):
 
 
 def create_and_setup_flavor_for_id(flavor_id: str, cfg: Config) -> BaseFlavor:
+    log.debug("Creating and setting up flavor for id '%s'", flavor_id)
     flavor_id_underscore = flavor_id.replace("-", "_")
     flavor_dir = cfg.project_dir / "captain" / "flavors" / flavor_id_underscore
 

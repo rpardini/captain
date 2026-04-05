@@ -62,10 +62,10 @@ class Config:
         self.arch_info = get_arch_info(self.arch)
         self.arch = self.arch_info.arch  # normalise aliases (x86_64 → amd64, etc.)
         for name, value in (
-            ("TOOLS_MODE", self.tools_mode),
-            ("MKOSI_MODE", self.mkosi_mode),
-            ("ISO_MODE", self.iso_mode),
-            ("RELEASE_MODE", self.release_mode),
+                ("TOOLS_MODE", self.tools_mode),
+                ("MKOSI_MODE", self.mkosi_mode),
+                ("ISO_MODE", self.iso_mode),
+                ("RELEASE_MODE", self.release_mode),
         ):
             if value not in VALID_MODES:
                 log.error("%s=%r is invalid. Valid values: %s", name, value, ", ".join(VALID_MODES))
@@ -96,6 +96,9 @@ class Config:
         if project_dir is None:
             raise ValueError("project_dir must be provided to Config.from_args")
 
+        log.debug("Creating Config from args: %s (env flavor: %s)", args,
+                  os.environ.get("FLAVOR_ID"))
+
         return cls(
             project_dir=project_dir,
             output_dir=project_dir / "out",
@@ -122,6 +125,9 @@ class Config:
         for any non-CLI callers (e.g. tests, scripts) that need a
         ``Config`` without going through argparse.
         """
+
+        log.debug("Creating Config from env: %s", os.environ)
+
         return cls(
             project_dir=project_dir,
             output_dir=project_dir / "out",

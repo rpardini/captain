@@ -27,3 +27,6 @@ class TrixieFullFlavor(DebianCommonFlavor):
             cfg.arch_info.mkosi_arch,
             flavor_dir,
         )
+
+    def kernel_packages(self) -> set[str]:
+        return {"linux-image-generic"}

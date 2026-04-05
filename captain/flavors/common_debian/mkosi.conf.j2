@@ -27,7 +27,7 @@ WithDocs=no
 # pivot_root(2) work for container runtimes (runc).
 
 Packages=
-    linux-image-generic
+    {{ ' '.join(flavor.kernel_packages()) }}
     tiny-initramfs # a tiny initrd builder to account for the linux-image dependency
     # systemd and core
     systemd

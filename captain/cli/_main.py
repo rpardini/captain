@@ -23,8 +23,6 @@ import captain.flavor
 from captain import docker
 from captain.config import Config
 from captain.util import run
-
-from ..flavor import BaseFlavor
 from ._commands import (
     _cmd_build,
     _cmd_checksums,
@@ -38,6 +36,7 @@ from ._commands import (
 )
 from ._parser import _build_parser, _extract_command
 from ._release import _cmd_release
+from ..flavor import BaseFlavor
 
 log = logging.getLogger(__name__)
 
@@ -87,10 +86,6 @@ def main(project_dir: Path | None = None) -> None:
     # 7. Instantiate the flavor (from cfg.flavor_id)
     flavor: BaseFlavor = captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
 
-    # 8. Have the flavor generate any necessary files in the project directory;
-    #    flavor is responsible for mkosi.conf and any extra trees, scripts, etc.
-    flavor.generate()
-
     # 8. Dispatch.
     dispatch: dict[str, object] = {
         "build": _cmd_build,
@@ -105,8 +100,13 @@ def main(project_dir: Path | None = None) -> None:
         "qemu-test": _cmd_qemu_test,
     }
 
+    log.debug("Dispatching command '%s', extra args: %s", command, extra)
     handler = dispatch.get(command)
     if handler is not None:
+        # If building, or doing initramfs (mkosi), generate the flavor first so the files are in place.
+        if command in ("build", "initramfs"):
+            flavor.generate()
+
         if command in ("qemu-test", "checksums", "release", "clean"):
             handler(cfg, extra, args=args)  # type: ignore[operator]
         else:
