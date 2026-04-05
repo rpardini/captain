@@ -24,15 +24,11 @@ class BaseFlavor(Protocol):
         if cfg is None:
             raise ValueError("cfg (Config) cannot be None")
         self.cfg = cfg
-        log.debug(
-            f"Called generic version of {self.__class__.__name__}.setup(), which does nothing."
-        )
+        log.debug("Called BaseFlavor.setup(), which does nothing.")
         pass
 
     def generate(self):
-        log.debug(
-            f"Called generic version of {self.__class__.__name__}.generate(), which does nothing."
-        )
+        log.debug("Called BaseFlavor.generate(), which does nothing.")
         pass
 
 
