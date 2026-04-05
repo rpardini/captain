@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 from captain.config import Config
@@ -12,6 +13,7 @@ def create_flavor() -> BaseFlavor:
     return TrixieFullFlavor()
 
 
+@dataclass
 class TrixieFullFlavor(DebianCommonFlavor):
     id = "trixie-full"
     name = "Trixie Full"
