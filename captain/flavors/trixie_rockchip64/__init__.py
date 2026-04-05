@@ -4,7 +4,7 @@ from pathlib import Path
 
 from captain.config import Config
 from captain.flavor import BaseFlavor
-from captain.flavors.trixie_full import TrixieFullFlavor
+from captain.flavors.common_armbian import ArmbianCommonFlavor
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ def create_flavor() -> BaseFlavor:
 
 
 @dataclass
-class TrixieRockchip64Flavor(TrixieFullFlavor):
+class TrixieRockchip64Flavor(ArmbianCommonFlavor):
     id = "trixie-rockchip64"
     name = "Trixie for Rockchip 64-bit ARM machines"
     description = "Debian Trixie based with Armbian's rockchip64-edge kernel"
@@ -29,4 +29,4 @@ class TrixieRockchip64Flavor(TrixieFullFlavor):
         )
 
     def kernel_packages(self) -> set[str]:
-        return {"linux-image-rockchip64-edge"}
+        return {"linux-image-edge-rockchip64"}

@@ -11,6 +11,7 @@ mkosi.conf
 mkosi.finalize
 mkosi.postinst
 mkosi.extra/
+mkosi.sandbox/
 
 # Editor
 *.swp
