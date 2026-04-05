@@ -121,7 +121,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Build initramfs
-        run: uv run ./build.py build # full build, incl initramfs and iso
+        run: uv run ./build.py --arch=${{ matrix.arch }} # full build, incl initramfs and iso
 
       - name: Upload initramfs artifacts
         uses: actions/upload-artifact@v6
