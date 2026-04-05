@@ -94,6 +94,7 @@ jobs:
         include:
           - { arch: amd64, output_arch: x86_64, iso: true, FLAVOR_ID: "trixie-full" }
           - { arch: arm64, output_arch: aarch64, iso: true, FLAVOR_ID: "trixie-full" }
+          - { arch: arm64, output_arch: aarch64, iso: false, FLAVOR_ID: "trixie-rockchip64" }
     env:
       ARCH: ${{ matrix.arch }}
       MKOSI_MODE: docker
