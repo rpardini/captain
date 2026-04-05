@@ -21,13 +21,13 @@ def _build_tools_stage(cfg: Config) -> None:
 
     # --- native -------------------------------------------------------
     if cfg.tools_mode == "native":
-        log.info("Downloading tools (nerdctl, containerd, etc.)...")
+        log.info("Downloading tools (nerdctl, containerd, etc.) native...")
         tools.download_all(cfg)
         return
 
     # --- docker -------------------------------------------------------
     docker.build_builder(cfg)
-    log.info("Downloading tools (nerdctl, containerd, etc.)...")
+    log.info("Downloading tools (nerdctl, containerd, etc.) docker...")
     docker.run_in_builder(
         cfg,
         "--entrypoint",
