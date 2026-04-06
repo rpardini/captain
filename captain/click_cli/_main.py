@@ -11,6 +11,8 @@ from typing import Any
 import click
 
 from captain.config import DEFAULT_FLAVOR_ID
+from captain.flavor import list_available_flavors
+from captain.util import detect_current_machine_arch
 
 log = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ def common_options(fn: Any) -> Any:
     @click.option(
         "--arch",
         envvar="ARCH",
-        default="amd64",
+        default=(detect_current_machine_arch()),
         show_default=True,
         type=click.Choice(["amd64", "arm64"], case_sensitive=False),
         metavar="ARCH",
@@ -37,6 +39,7 @@ def common_options(fn: Any) -> Any:
         envvar="FLAVOR_ID",
         default=DEFAULT_FLAVOR_ID,
         show_default=True,
+        type=click.Choice(list_available_flavors(), case_sensitive=False),
         help="Flavor (kernel/board config) to build.",
     )
     @click.option(
