@@ -22,9 +22,9 @@ from pathlib import Path
 import captain.flavor
 from captain import docker
 from captain.config import Config
+from captain.flavor import BaseFlavor
 from captain.util import run
 
-from ..flavor import BaseFlavor
 from ._commands import (
     _cmd_build,
     _cmd_checksums,
@@ -108,8 +108,8 @@ def main(project_dir: Path | None = None) -> None:
         # generate the flavor first so the files are in place.
         if command in ("build", "initramfs"):
             flavor.generate()
-
-        if command in ("qemu-test", "checksums", "release", "clean"):
+            handler(cfg, flavor, extra)  # type: ignore[operator]
+        elif command in ("qemu-test", "checksums", "release", "clean"):
             handler(cfg, extra, args=args)  # type: ignore[operator]
         else:
             handler(cfg, extra)  # type: ignore[operator]
