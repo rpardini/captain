@@ -50,6 +50,7 @@ class BaseFlavor(Protocol):
         shutil.rmtree(self.cfg.project_dir / "mkosi.finalize", ignore_errors=True)
         shutil.rmtree(self.cfg.project_dir / "mkosi.extra", ignore_errors=True)
         shutil.rmtree(self.cfg.project_dir / "mkosi.sandbox", ignore_errors=True)
+        shutil.rmtree(self.cfg.project_dir / "mkosi.skeleton", ignore_errors=True)
 
         self.copy_static_files(self.cfg.project_dir)
         self.render_templates(self.cfg.project_dir)  # For compatibility
