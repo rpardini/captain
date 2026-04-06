@@ -158,6 +158,22 @@ def create_and_setup_flavor_for_id(flavor_id: str, cfg: Config) -> BaseFlavor:
     log.debug("Calling setup() on flavor %s with config: %s", flavor, cfg)
     flavor.setup(cfg, flavor_dir)
 
+    # Ensure the current arch is supported by the flavor
+    if cfg.arch_info.arch not in flavor.supported_architectures:
+        log.error(
+            "Flavor '%s' does not support architecture '%s'. Supported architectures: %s",
+            flavor.id,
+            cfg.arch_info.arch,
+            flavor.supported_architectures,
+        )
+        raise SystemExit(1)
+    else:
+        log.debug(
+            "Flavor '%s' supports architecture '%s'",
+            flavor.id,
+            cfg.arch_info.arch,
+        )
+
     log.debug(
         "Flavor is setup; description: %s; supported_architectures: %s",
         flavor.description,
