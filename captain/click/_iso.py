@@ -1,4 +1,4 @@
-"""``captain tools`` — download tools (containerd, runc, nerdctl, CNI plugins)."""
+"""``captain iso`` — build a bootable ISO image for the specified flavor and architecture."""
 
 from __future__ import annotations
 
@@ -6,16 +6,20 @@ import logging
 
 import click
 
+import captain.flavor
+from captain import artifacts
 from captain.click._main import cli, common_options, resolve_project_dir
-from captain.click._stages import _build_tools_stage
+from captain.click._stages import (
+    _build_iso_stage,
+)
 from captain.config import Config
 
 log = logging.getLogger(__name__)
 
 
 @cli.command(
-    "tools",
-    short_help="Download tools (containerd, runc, nerdctl, CNI).",
+    "iso",
+    short_help="Build ISO image only. Part of build.",
 )
 @common_options
 @click.option(
@@ -33,22 +37,22 @@ log = logging.getLogger(__name__)
     help="Rebuild the builder image without Docker layer cache.",
 )
 @click.option(
-    "--tools-mode",
-    envvar="TOOLS_MODE",
+    "--iso-mode",
+    envvar="ISO_MODE",
     default="docker",
     show_default=True,
     type=click.Choice(["docker", "native", "skip"], case_sensitive=False),
     metavar="MODE",
-    help="Tools download stage execution mode (docker, native, skip).",
+    help="ISO build stage execution mode (docker, native, skip).",
 )
 @click.option(
-    "--force-tools",
-    envvar="FORCE_TOOLS",
+    "--force-iso",
+    envvar="FORCE_ISO",
     is_flag=True,
     default=False,
-    help="Re-download tools even if outputs already exist.",
+    help="Force ISO rebuild even if outputs already exist.",
 )
-def tools_cmd(
+def build_cmd(
     *,
     arch: str,
     flavor_id: str,
@@ -56,23 +60,10 @@ def tools_cmd(
     verbose: bool,
     builder_image: str,
     no_cache: bool,
-    tools_mode: str,
-    force_tools: bool,
+    iso_mode: str,
+    force_iso: bool,
 ) -> None:
-    """Download tools (containerd, runc, nerdctl, CNI plugins).
-
-    Fetches pre-built binaries for the target architecture and stages
-    them under ``mkosi.output/tools/{arch}/``.  The tools are later
-    merged into the initramfs by mkosi via ``--extra-tree``.
-
-    \b
-    Examples
-    --------
-      captain tools
-      captain tools --arch arm64
-      captain tools --tools-mode native
-      captain tools --force-tools
-    """
+    """Run the CaptainOS ISO build."""
     _configure_logging(verbose)
 
     proj = resolve_project_dir(project_dir)
@@ -84,12 +75,16 @@ def tools_cmd(
         flavor_id=flavor_id,
         builder_image=builder_image,
         no_cache=no_cache,
-        tools_mode=tools_mode,
-        force_tools=force_tools,
+        iso_mode=iso_mode,
+        force_iso=force_iso,
     )
 
-    _build_tools_stage(cfg)
-    log.info("Tools stage complete!")
+    # Instantiate the flavor
+    captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
+
+    _build_iso_stage(cfg)
+    artifacts.collect_iso(cfg)
+    log.info("ISO build complete!!!")
 
 
 def _configure_logging(verbose: bool) -> None:
