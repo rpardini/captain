@@ -63,7 +63,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Download tools
-        run: uv run ./build.py tools
+        run: uv run captain tools
 
       - name: Save tools cache
         if: github.ref == 'refs/heads/main' && steps.tools-cache.outputs.cache-hit != 'true'
@@ -123,7 +123,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Build initramfs
-        run: uv run ./build.py --arch=${{ matrix.arch }} # full build, incl initramfs and iso
+        run: uv run captain build --arch=${{ matrix.arch }} # full build, incl initramfs and iso when appropriate
 
       - name: Upload initramfs artifacts
         uses: actions/upload-artifact@v6
@@ -133,7 +133,7 @@ jobs:
           retention-days: 1
 
       # -------------------------------------------------------------------
-      # Build UEFI-bootable ISO (depends on initramfs)
+      # UEFI-bootable ISO - only for certain flavors (eg trixie-full)
       # -------------------------------------------------------------------
 
       - name: Upload ISO artifact
@@ -160,7 +160,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         env:
           TARGET: ${{ matrix.arch }}
-        run: uv run ./build.py release publish
+        run: uv run captain release publish
 
   # -------------------------------------------------------------------
   # Publish combined multi-arch image (reuses per-arch registry blobs)
@@ -219,4 +219,4 @@ jobs:
       - name: Publish combined image to GHCR
         env:
           FLAVOR_ID: "${{ env.DEFAULT_FLAVOR_ID }}"
-        run: uv run ./build.py release publish
+        run: uv run captain release publish
