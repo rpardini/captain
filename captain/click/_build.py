@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import logging
 
-import click
-
 import captain.flavor
-from captain.click_cli._main import cli, common_options, resolve_project_dir
+import click
+from captain import artifacts
+from captain.click._main import cli, common_options, resolve_project_dir
+from captain.click._stages import (
+    _build_iso_stage,
+    _build_mkosi_stage,
+    _build_tools_stage,
+)
 from captain.config import Config
 
 log = logging.getLogger(__name__)
@@ -134,14 +139,6 @@ def build_cmd(
     # Instantiate and generate the flavor.
     flavor = captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
     flavor.generate()
-
-    # Import build commands (reuse existing stage orchestration).
-    from captain import artifacts
-    from captain.cli._stages import (
-        _build_iso_stage,
-        _build_mkosi_stage,
-        _build_tools_stage,
-    )
 
     # Tools stage.
     _build_tools_stage(cfg)
