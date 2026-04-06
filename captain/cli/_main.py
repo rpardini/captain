@@ -106,10 +106,12 @@ def main(project_dir: Path | None = None) -> None:
     if handler is not None:
         # If building, or doing initramfs (mkosi),
         # generate the flavor first so the files are in place.
-        if command in ("build", "initramfs"):
+        if command in ("build", "initramfs", "publish"):
             flavor.generate()
             handler(cfg, flavor, extra)  # type: ignore[operator]
-        elif command in ("qemu-test", "checksums", "release", "clean"):
+        elif command in ("release"):
+            handler(cfg, flavor, extra, args=args)  # type: ignore[operator]
+        elif command in ("qemu-test", "checksums", "clean"):
             handler(cfg, extra, args=args)  # type: ignore[operator]
         else:
             handler(cfg, extra)  # type: ignore[operator]
