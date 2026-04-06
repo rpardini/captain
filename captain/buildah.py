@@ -13,6 +13,7 @@ problem caused by ``crane append`` rewriting tags per layer.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from captain.util import run
@@ -119,7 +120,17 @@ def manifest_push(
     dest: str,
 ) -> None:
     log.info("buildah manifest push → %s", dest)
-    run(["buildah", "manifest", "push", "--all", manifest, f"docker://{dest}"])
+    run(
+        [
+            "buildah",
+            "manifest",
+            "push",
+            *(("--tls-verify=false",) if os.environ.get("BUILDAH_INSECURE") == "1" else ()),
+            "--all",
+            manifest,
+            f"docker://{dest}",
+        ]
+    )
 
 
 def rmi(

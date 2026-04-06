@@ -122,6 +122,8 @@ def run_in_release(cfg: Config, *extra_args: str) -> None:
         "-e",
         "BUILDAH_ISOLATION=chroot",
         "-e",
+        f"BUILDAH_INSECURE={os.environ.get('BUILDAH_INSECURE', '')}",
+        "-e",
         f"TERM={os.environ.get('TERM', 'xterm-256color')}",
         "-e",
         "FORCE_COLOR=1",
