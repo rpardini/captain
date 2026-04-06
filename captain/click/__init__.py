@@ -15,6 +15,6 @@ Shell completion is available for bash and zsh::
     eval "$(_CAPTAIN_COMPLETE=zsh_source captain)"
 """
 
-from captain.click_cli._main import main
+from captain.click._main import main
 
 __all__ = ["main"]
