@@ -6,11 +6,10 @@ import logging
 import subprocess
 from pathlib import Path
 
-import click
-
 import captain.flavor
+import click
 from captain import oci
-from captain.click_cli._main import cli, common_options, resolve_project_dir
+from captain.click._main import cli, common_options, resolve_project_dir
 from captain.config import Config
 from captain.util import check_release_dependencies
 
