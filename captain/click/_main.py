@@ -117,6 +117,6 @@ def cli(ctx: click.Context) -> None:
 def main() -> None:
     """Console-script entry point."""
     # Import subcommand modules to register them on the group.
-    from captain.click import _build, _builder, _release_publish, _tools  # noqa: F401
+    from captain.click import _build, _builder, _release_publish, _tools, _iso  # noqa: F401
 
     cli()
