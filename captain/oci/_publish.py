@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from captain import buildah, skopeo
 from captain.config import Config
+from captain.flavor import BaseFlavor
 from captain.util import ensure_dir, get_arch_info
 
 from ._build import _build_platform_image, _collect_arch_artifacts, _deterministic_tar
@@ -152,6 +153,7 @@ def _publish_combined(
 
 def publish(
     cfg: Config,
+    flavor: BaseFlavor,
     *,
     target: str,
     registry: str,
@@ -191,10 +193,7 @@ def publish(
     arch_files: dict[str, list[Path]] = {}
     for arch in arches:
         arch_files[arch] = _collect_arch_artifacts(
-            cfg.project_dir,
-            out,
-            arch,
-            cfg.flavor_id,
+            cfg.project_dir, out, arch, cfg.flavor_id, has_iso=flavor.has_iso()
         )
 
     # Create deterministic layer tars (shared across manifest pushes).

@@ -40,6 +40,7 @@ def _collect_arch_artifacts(
     out: Path,
     arch: str,
     flavor_id: str,
+    has_iso: bool,
 ) -> list[Path]:
     """Collect and return the artifact files for a single architecture.
 
@@ -50,8 +51,11 @@ def _collect_arch_artifacts(
     arch_files = [
         out / f"vmlinuz-{flavor_id}-{oarch}",
         out / f"initramfs-{flavor_id}-{oarch}",
-        out / f"captainos-{flavor_id}-{oarch}.iso",
     ]
+
+    if has_iso:
+        arch_files += [out / f"captainos-{flavor_id}-{oarch}.iso"]
+
     checksums_path = out / f"sha256sums-{flavor_id}-{oarch}.txt"
     artifacts.collect_checksums(arch_files, checksums_path)
 
