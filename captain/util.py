@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import platform
 import subprocess
 import sys
 import tarfile
@@ -51,6 +52,16 @@ def get_arch_info(arch: str) -> ArchInfo:
         case _:
             log.error("Unsupported architecture: %s", arch)
             sys.exit(1)
+
+
+def detect_current_machine_arch() -> str:
+    machine = platform.machine().lower()
+    if machine in ("aarch64", "arm64"):
+        return "arm64"
+    elif machine in ("x86_64", "amd64"):
+        return "amd64"
+    else:
+        raise RuntimeError(f"Unsupported architecture: {machine}")
 
 
 def run(
