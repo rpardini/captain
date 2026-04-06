@@ -20,3 +20,7 @@ class TrixieFullFlavor(DebianCommonFlavor):
 
     def kernel_packages(self) -> set[str]:
         return {"linux-image-generic"}
+
+    # This flavor can produce working ISO images (generic UEFI/ACPI)
+    def has_iso(self) -> bool:
+        return True
