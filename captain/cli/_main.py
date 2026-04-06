@@ -34,7 +34,6 @@ from ._commands import (
     _cmd_qemu_test,
     _cmd_shell,
     _cmd_summary,
-    _cmd_tools,
 )
 from ._parser import _build_parser, _extract_command
 from ._release import _cmd_release
@@ -90,7 +89,6 @@ def main(project_dir: Path | None = None) -> None:
     # 8. Dispatch.
     dispatch: dict[str, object] = {
         "build": _cmd_build,
-        "tools": _cmd_tools,
         "initramfs": _cmd_initramfs,
         "iso": _cmd_iso,
         "checksums": _cmd_checksums,

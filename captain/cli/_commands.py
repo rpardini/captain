@@ -15,16 +15,9 @@ from captain.util import run
 from ._stages import (
     _build_iso_stage,
     _build_mkosi_stage,
-    _build_tools_stage,
 )
 
 log = logging.getLogger(__name__)
-
-
-def _cmd_tools(cfg: Config, _extra_args: list[str]) -> None:
-    """Download tools (containerd, runc, nerdctl, CNI plugins)."""
-    _build_tools_stage(cfg)
-    log.info("Tools stage complete!")
 
 
 def _cmd_initramfs(cfg: Config, flavor: BaseFlavor, extra_args: list[str]) -> None:
@@ -45,7 +38,6 @@ def _cmd_iso(cfg: Config, _extra_args: list[str]) -> None:
 
 def _cmd_build(cfg: Config, flavor: BaseFlavor, extra_args: list[str]) -> None:
     """Full build: tools → initramfs → iso → artifacts."""
-    _build_tools_stage(cfg)
     _cmd_initramfs(cfg, flavor, extra_args)  # delegate, so it also collects
 
     if flavor.has_iso():

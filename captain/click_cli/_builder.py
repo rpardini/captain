@@ -9,6 +9,7 @@ import click
 from captain.click_cli._main import cli, common_options, resolve_project_dir
 from captain.config import Config
 from captain.docker import build_builder
+from captain.util import run
 
 log = logging.getLogger(__name__)
 
@@ -107,8 +108,6 @@ def builder_cmd(
                 "--registry and --registry-path are required when --push is set."
             )
         import hashlib
-
-        from captain.util import run
 
         if push_tag is None:
             # Use the Dockerfile content hash (same logic as docker.py)

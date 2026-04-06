@@ -4,41 +4,11 @@ from __future__ import annotations
 
 import logging
 
-from captain import docker, iso, tools
+from captain import docker, iso
 from captain.config import Config
 from captain.util import check_mkosi_dependencies, run
 
 log = logging.getLogger(__name__)
-
-
-def _build_tools_stage(cfg: Config) -> None:
-    """Run the tools download stage according to *cfg.tools_mode*."""
-
-    # --- skip ---------------------------------------------------------
-    if cfg.tools_mode == "skip":
-        log.info("TOOLS_MODE=skip — skipping tools download")
-        return
-
-    # --- native -------------------------------------------------------
-    if cfg.tools_mode == "native":
-        log.info("Downloading tools (nerdctl, containerd, etc.) native...")
-        tools.download_all(cfg)
-        return
-
-    # --- docker -------------------------------------------------------
-    docker.build_builder(cfg)
-    log.info("Downloading tools (nerdctl, containerd, etc.) docker...")
-    docker.run_in_builder(
-        cfg,
-        "--entrypoint",
-        "/usr/bin/uv",
-        cfg.builder_image,
-        *(["--verbose"] if log.isEnabledFor(logging.DEBUG) else []),
-        "run",
-        "/work/build.py",
-        "tools",
-    )
-    docker.fix_docker_ownership(cfg, ["/work/mkosi.output"])
 
 
 def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:

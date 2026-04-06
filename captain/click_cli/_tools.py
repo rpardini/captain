@@ -6,6 +6,7 @@ import logging
 
 import click
 
+from captain import docker, tools
 from captain.click_cli._main import cli, common_options, resolve_project_dir
 from captain.config import Config
 
@@ -87,10 +88,33 @@ def tools_cmd(
         force_tools=force_tools,
     )
 
-    from captain.cli._stages import _build_tools_stage
+    # --- skip ---------------------------------------------------------
+    if cfg.tools_mode == "skip":
+        log.info("TOOLS_MODE=skip — skipping tools download")
+        return
 
-    _build_tools_stage(cfg)
-    log.info("Tools stage complete!")
+    # --- native -------------------------------------------------------
+    if cfg.tools_mode == "native":
+        log.info("Downloading tools (nerdctl, containerd, etc.) native...")
+        tools.download_all(cfg)
+        return
+
+    # --- docker -------------------------------------------------------
+    docker.build_builder(cfg)
+    log.info("Downloading tools (nerdctl, containerd, etc.) docker...")
+    docker.run_in_builder(
+        cfg,
+        "--entrypoint",
+        "/usr/bin/uv",
+        cfg.builder_image,
+        *(["--verbose"] if log.isEnabledFor(logging.DEBUG) else []),
+        "run",
+        "/work/build.py",
+        "tools",
+    )
+    docker.fix_docker_ownership(cfg, ["/work/mkosi.output"])
+
+    log.info("Tools command complete!")
 
 
 def _configure_logging(verbose: bool) -> None:
