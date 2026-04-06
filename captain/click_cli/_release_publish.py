@@ -157,12 +157,18 @@ def release_publish_cmd(
         sha = _resolve_git_sha(git_sha, proj)
 
         env_args: list[str] = [
-            "-e", f"FLAVOR_ID={cfg.flavor_id}",
-            "-e", f"REGISTRY={registry}",
-            "-e", f"GITHUB_REPOSITORY={repository}",
-            "-e", f"OCI_ARTIFACT_NAME={oci_artifact_name}",
-            "-e", f"GITHUB_SHA={sha}",
-            "-e", f"TARGET={target}",
+            "-e",
+            f"FLAVOR_ID={cfg.flavor_id}",
+            "-e",
+            f"REGISTRY={registry}",
+            "-e",
+            f"GITHUB_REPOSITORY={repository}",
+            "-e",
+            f"OCI_ARTIFACT_NAME={oci_artifact_name}",
+            "-e",
+            f"GITHUB_SHA={sha}",
+            "-e",
+            f"TARGET={target}",
         ]
         if version_exclude:
             env_args += ["-e", f"VERSION_EXCLUDE={version_exclude}"]
@@ -175,7 +181,8 @@ def release_publish_cmd(
             docker.run_in_release(
                 cfg,
                 *env_args,
-                "--entrypoint", "/usr/bin/uv",
+                "--entrypoint",
+                "/usr/bin/uv",
                 docker.RELEASE_IMAGE,
                 *(["--verbose"] if log.isEnabledFor(logging.DEBUG) else []),
                 "run",
@@ -216,6 +223,7 @@ def release_publish_cmd(
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _resolve_git_sha(sha: str | None, project_dir: Path) -> str:
     """Return the provided SHA or auto-detect via ``git rev-parse HEAD``."""
     if sha:
@@ -233,6 +241,3 @@ def _resolve_git_sha(sha: str | None, project_dir: Path) -> str:
 def _configure_logging(verbose: bool) -> None:
     level = logging.DEBUG if verbose else logging.INFO
     logging.getLogger("captain").setLevel(level)
-
-
-

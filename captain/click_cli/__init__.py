@@ -18,4 +18,3 @@ Shell completion is available for bash and zsh::
 from captain.click_cli._main import main
 
 __all__ = ["main"]
-

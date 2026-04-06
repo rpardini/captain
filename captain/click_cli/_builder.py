@@ -81,7 +81,7 @@ def builder_cmd(
       captain builder
       captain builder --no-cache
       captain builder --push --registry ghcr.io --registry-path tinkerbell/captain/builder
-      captain builder --push --registry ghcr.io --registry-path tinkerbell/captain/builder --tag latest
+      captain builder --push --registry ghcr.io --registry-path tinkerbell/captain/builder --tag lt
     """
     _configure_logging(verbose)
 
@@ -106,9 +106,9 @@ def builder_cmd(
             raise click.UsageError(
                 "--registry and --registry-path are required when --push is set."
             )
-        from captain.util import run
-
         import hashlib
+
+        from captain.util import run
 
         if push_tag is None:
             # Use the Dockerfile content hash (same logic as docker.py)
@@ -128,4 +128,3 @@ def _configure_logging(verbose: bool) -> None:
     """Set the captain logger level based on the --verbose flag."""
     level = logging.DEBUG if verbose else logging.INFO
     logging.getLogger("captain").setLevel(level)
-

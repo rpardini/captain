@@ -136,12 +136,12 @@ def build_cmd(
     flavor.generate()
 
     # Import build commands (reuse existing stage orchestration).
+    from captain import artifacts
     from captain.cli._stages import (
         _build_iso_stage,
         _build_mkosi_stage,
         _build_tools_stage,
     )
-    from captain import artifacts
 
     # Tools stage.
     _build_tools_stage(cfg)
@@ -167,4 +167,3 @@ def build_cmd(
 def _configure_logging(verbose: bool) -> None:
     level = logging.DEBUG if verbose else logging.INFO
     logging.getLogger("captain").setLevel(level)
-

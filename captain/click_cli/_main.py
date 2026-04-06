@@ -19,8 +19,10 @@ log = logging.getLogger(__name__)
 # Shared option decorators
 # ---------------------------------------------------------------------------
 
+
 def common_options(fn: Any) -> Any:
     """Decorate a click command with options shared by every subcommand."""
+
     @click.option(
         "--arch",
         envvar="ARCH",
@@ -45,7 +47,8 @@ def common_options(fn: Any) -> Any:
         help="Project root directory (auto-detected when omitted).",
     )
     @click.option(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         is_flag=True,
         default=False,
         help="Enable debug-level logging.",
@@ -60,6 +63,7 @@ def common_options(fn: Any) -> Any:
 # ---------------------------------------------------------------------------
 # Resolve project directory
 # ---------------------------------------------------------------------------
+
 
 def resolve_project_dir(project_dir: str | None) -> Path:
     """Return an absolute ``Path`` for the project root."""
@@ -90,8 +94,8 @@ CONTEXT_SETTINGS = dict(
         "CaptainOS build system.\n\n"
         "Run 'captain COMMAND --help' for details on each subcommand.\n\n"
         "Shell completion (bash/zsh):\n\n"
-        "  eval \"$(_CAPTAIN_COMPLETE=bash_source captain)\"   # bash\n\n"
-        "  eval \"$(_CAPTAIN_COMPLETE=zsh_source captain)\"    # zsh"
+        '  eval "$(_CAPTAIN_COMPLETE=bash_source captain)"   # bash\n\n'
+        '  eval "$(_CAPTAIN_COMPLETE=zsh_source captain)"    # zsh'
     ),
 )
 @click.version_option(package_name="captain")
@@ -106,10 +110,10 @@ def cli(ctx: click.Context) -> None:
 # Register subcommands (imported lazily to avoid circular imports)
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     """Console-script entry point."""
     # Import subcommand modules to register them on the group.
-    from captain.click_cli import _builder, _build, _release_publish  # noqa: F401
+    from captain.click_cli import _build, _builder, _release_publish  # noqa: F401
 
     cli()
-
