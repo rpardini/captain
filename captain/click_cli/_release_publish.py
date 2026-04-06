@@ -72,7 +72,8 @@ log = logging.getLogger(__name__)
     default=None,
     type=click.Choice(["amd64", "arm64", "combined"], case_sensitive=False),
     metavar="TARGET",
-    help="Artifact target: amd64, arm64, or combined (default: value of --arch).",
+    help="Artifact target: amd64, arm64, or combined (default: value of --arch); "
+    "combined requires trixie-full or equivalent flavor with both architectures' outputs present.",
 )
 @click.option(
     "--git-sha",
