@@ -50,7 +50,7 @@ def build_builder(cfg: Config) -> None:
     tagged_image = f"{cfg.builder_image}:{tag}"
 
     if not cfg.no_cache and _image_exists(tagged_image):
-        log.info("Docker image '%s' is up to date.", cfg.builder_image)
+        log.info("Docker image '%s' is up to date with %s.", cfg.builder_image, tagged_image)
         # Ensure the un-hashed tag exists so later docker-run calls that
         # reference cfg.builder_image (without the hash suffix) succeed.
         # This matters when the hashed tag was pre-loaded by CI.
