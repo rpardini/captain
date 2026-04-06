@@ -21,12 +21,6 @@ from ._stages import (
 log = logging.getLogger(__name__)
 
 
-def _cmd_tools(cfg: Config, _extra_args: list[str]) -> None:
-    """Download tools (containerd, runc, nerdctl, CNI plugins)."""
-    _build_tools_stage(cfg)
-    log.info("Tools stage complete!")
-
-
 def _cmd_initramfs(cfg: Config, flavor: BaseFlavor, extra_args: list[str]) -> None:
     """Build only the initramfs via mkosi, then collect artifacts."""
     _build_mkosi_stage(cfg, extra_args)

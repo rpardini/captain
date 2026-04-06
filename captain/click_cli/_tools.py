@@ -6,6 +6,7 @@ import logging
 
 import click
 
+from captain.cli._stages import _build_tools_stage
 from captain.click_cli._main import cli, common_options, resolve_project_dir
 from captain.config import Config
 
@@ -86,8 +87,6 @@ def tools_cmd(
         tools_mode=tools_mode,
         force_tools=force_tools,
     )
-
-    from captain.cli._stages import _build_tools_stage
 
     _build_tools_stage(cfg)
     log.info("Tools stage complete!")
