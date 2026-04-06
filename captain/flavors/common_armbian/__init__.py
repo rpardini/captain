@@ -16,11 +16,6 @@ class ArmbianCommonFlavor(DebianCommonFlavor):
 
     def setup(self, cfg: Config, flavor_dir: Path) -> None:
         super().setup(cfg, flavor_dir)
-        log.warning(
-            "ArmbianCommonFlavor setting up; mkosi arch: %s; flavor_dir: %s",
-            cfg.arch_info.mkosi_arch,
-            flavor_dir,
-        )
         this_flavor_dir = self.specific_flavor_dir("common-armbian")
 
         # Now, lets enumerate and add all the static files this flavor's mkosi.sandbox directory
@@ -31,6 +26,3 @@ class ArmbianCommonFlavor(DebianCommonFlavor):
                 if extra_file.is_file():
                     relative_path = extra_file.relative_to(this_flavor_dir)
                     self.static_map[str(relative_path)] = extra_file
-
-    def extra_mkosi_conf_distribution(self) -> str:
-        return "# frak this"
