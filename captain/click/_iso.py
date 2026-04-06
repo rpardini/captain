@@ -79,8 +79,8 @@ def build_cmd(
         force_iso=force_iso,
     )
 
-    # Instantiate and generate the flavor.
-    flavor = captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
+    # Instantiate the flavor
+    captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
 
     _build_iso_stage(cfg)
     artifacts.collect_iso(cfg)
