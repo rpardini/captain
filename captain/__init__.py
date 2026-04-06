@@ -45,7 +45,7 @@ if not _root.handlers:
         show_time=False,
         show_level=True,
         show_path=True,
-        markup=True, # interprets [braket]stuff[/bracket] in log messages, beware
+        markup=True,  # interprets [braket]stuff[/bracket] in log messages, beware
         rich_tracebacks=True,
         tracebacks_show_locals=True,
     )
