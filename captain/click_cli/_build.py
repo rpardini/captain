@@ -140,6 +140,7 @@ def build_cmd(
     from captain.cli._stages import (
         _build_iso_stage,
         _build_mkosi_stage,
+        _build_tools_stage,
     )
 
     # Tools stage.
