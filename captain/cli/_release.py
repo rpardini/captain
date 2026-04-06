@@ -11,6 +11,7 @@ import configargparse
 
 from captain import docker, oci
 from captain.config import Config
+from captain.flavor import BaseFlavor
 from captain.util import check_release_dependencies
 
 from ._parser import (
@@ -85,7 +86,9 @@ def _resolve_git_sha(args: object, project_dir: Path) -> str:
     return result.stdout.strip()
 
 
-def _cmd_release(cfg: Config, extra_args: list[str], args: object = None) -> None:
+def _cmd_release(
+    cfg: Config, flavor: BaseFlavor, extra_args: list[str], args: object = None
+) -> None:
     """OCI artifact operations: publish, pull, tag."""
 
     # Peel the release subcommand from extra_args.
@@ -202,6 +205,7 @@ def _cmd_release(cfg: Config, extra_args: list[str], args: object = None) -> Non
         force = getattr(args, "force", False)
         oci.publish(
             cfg,
+            flavor,
             target=target,
             registry=registry,
             repository=repository,
