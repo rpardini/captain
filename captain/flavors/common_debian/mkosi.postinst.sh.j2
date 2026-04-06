@@ -5,45 +5,73 @@
 # creating directories and dropping config files.
 set -euo pipefail
 
-echo "==> CaptainOS post-install: dump env at $(hostname)..."
+log info "CaptainOS post-install: dump env at $(hostname)..."
 env
 
-echo "==> CaptainOS post-install: show mounts at $(hostname)..."
+log info "CaptainOS post-install: show mounts at $(hostname)..."
 mount || true
-
-echo "==> CaptainOS post-install: configuring services..."
 
 # Ensure CA certificate bundle is generated (dpkg triggers may not
 # fire reliably in mkosi's chroot).
+log info "Generating fresh CA certificate bundle..."
 update-ca-certificates --fresh 2>/dev/null || true
 
+# @TODO: this is the wrong place to do any systemd enablement/disablement/masking: mkosi will
+# after this still apply systemd "presets" which will change the game completely.
+# This is better done in a finalize.chroot script which would run after that.
+# alternatively: adopt/introduce systemd presets, but that's a can of worms.
+
+log info "Listing all systemd units..."
+systemctl list-unit-files --no-pager || true
+
+log info "CaptainOS post-install: configuring services..."
 # Enable core services
-for unit in systemd-networkd systemd-resolved systemd-timesyncd containerd captainos-banner \
-            captainos-static-network tink-agent-setup tink-agent rsyslog rsyslog-hostname-reload.path; do
-    systemctl enable "$unit" 2>/dev/null || true
+declare -a units_to_enable=(
+     systemd-networkd systemd-resolved systemd-timesyncd containerd captainos-banner
+     systemd-time-wait-sync # wait for time sync
+     captainos-static-network tink-agent-setup tink-agent rsyslog rsyslog-hostname-reload.path
+)
+declare unit
+for unit in "${units_to_enable[@]}"; do
+    log info "Enabling systemd unit ${unit}..."
+    if systemctl enable "${unit}"; then
+        log info "    ${unit} enabled successfully."
+    else
+        log warning "    Failed to enable ${unit}, but continuing anyway..."
+    fi
 done
 
 # Root password is set via mkosi.conf RootPassword= setting
 
 # Disable unnecessary systemd units to speed up boot
-for unit in \
-    apt-daily.timer \
-    apt-daily-upgrade.timer \
-    e2scrub_all.timer \
-    e2scrub_reap.service \
-    fstrim.timer \
-    logrotate.timer \
-    man-db.timer \
-    remote-fs.target \
-    systemd-firstboot.service; do
-    systemctl disable "$unit" 2>/dev/null || true
-    systemctl mask "$unit" 2>/dev/null || true
+declare -a units_to_disable=(
+    apt-daily.timer
+    apt-daily-upgrade.timer
+    e2scrub_all.timer
+    e2scrub_reap.service
+    fstrim.timer
+    logrotate.timer
+    man-db.timer
+    remote-fs.target
+    systemd-firstboot.service
+)
+for unit in "${units_to_disable[@]}"; do
+    log info "Disabling and masking systemd unit ${unit}..."
+    if systemctl disable "${unit}"; then
+        log info "    ${unit} disabled successfully."
+    else
+        log warning "    Failed to disable ${unit}, but continuing anyway..."
+    fi
+
+    if systemctl mask "${unit}"; then
+        log info "    ${unit} masked successfully."
+    else
+        log warning "    Failed to mask ${unit}, but continuing anyway..."
+    fi
 done
 
 # Set default target to multi-user (no graphical)
-systemctl set-default multi-user.target 2>/dev/null || true
+log info "Setting default systemd target to multi-user.target (no graphical)..."
+systemctl set-default multi-user.target || true
 
-echo "==> List installed packages..."
-dpkg -l --no-pager || true
-
-echo "==> CaptainOS post-install complete."
+log info "CaptainOS post-install complete."
