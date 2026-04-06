@@ -29,11 +29,10 @@ class _StageFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         name = record.name
-        stage = name.split(".", 1)[1] if name.startswith("captain.") else name
-        record.__dict__["stage"] = stage
+        record.__dict__["stage"] = name
         if os.environ.get("CAPTAIN_IN_DOCKER", "") == "docker":
-            # Running on host: show stage names in green for visual clarity.
-            record.__dict__["stage"] = f"[bold][blue]in-docker[/bold]: [/blue]{stage}"
+            # Running on host: show stage names in blue for visual clarity.
+            record.__dict__["stage"] = f"[bold][blue]in-docker[/bold]: [/blue]{name}"
         return super().format(record)
 
 
@@ -46,7 +45,7 @@ if not _root.handlers:
         show_time=False,
         show_level=True,
         show_path=True,
-        markup=True,
+        markup=True, # interprets [braket]stuff[/bracket] in log messages, beware
         rich_tracebacks=True,
         tracebacks_show_locals=True,
     )
