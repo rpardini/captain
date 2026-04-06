@@ -12,6 +12,7 @@ out/
 /mkosi.postinst
 /mkosi.extra
 /mkosi.sandbox
+/mkosi.skeleton
 
 # Editor
 *.swp
