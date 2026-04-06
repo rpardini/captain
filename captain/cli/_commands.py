@@ -9,6 +9,7 @@ from pathlib import Path
 
 from captain import artifacts, docker, qemu
 from captain.config import Config
+from captain.flavor import BaseFlavor
 from captain.util import run
 
 from ._stages import (
@@ -26,7 +27,7 @@ def _cmd_tools(cfg: Config, _extra_args: list[str]) -> None:
     log.info("Tools stage complete!")
 
 
-def _cmd_initramfs(cfg: Config, extra_args: list[str]) -> None:
+def _cmd_initramfs(cfg: Config, flavor: BaseFlavor, extra_args: list[str]) -> None:
     """Build only the initramfs via mkosi, then collect artifacts."""
     _build_mkosi_stage(cfg, extra_args)
     artifacts.collect_initramfs(cfg)
@@ -42,11 +43,16 @@ def _cmd_iso(cfg: Config, _extra_args: list[str]) -> None:
     log.info("ISO build complete!")
 
 
-def _cmd_build(cfg: Config, extra_args: list[str]) -> None:
+def _cmd_build(cfg: Config, flavor: BaseFlavor, extra_args: list[str]) -> None:
     """Full build: tools → initramfs → iso → artifacts."""
     _build_tools_stage(cfg)
-    _cmd_initramfs(cfg, extra_args)  # delegate, so it also collects
-    _build_iso_stage(cfg)  # TODO also conditional... / and/or include dtb's for arm64
+    _cmd_initramfs(cfg, flavor, extra_args)  # delegate, so it also collects
+
+    if flavor.has_iso():
+        _build_iso_stage(cfg)
+    else:
+        log.info("Flavor '%s' does not have an ISO stage; skipping.", flavor.id)
+
     artifacts.collect(cfg)
     log.info("Build complete!")
 

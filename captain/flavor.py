@@ -111,6 +111,9 @@ class BaseFlavor(Protocol):
             destination_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_path, destination_path)
 
+    def has_iso(self) -> bool:
+        return False
+
 
 def create_and_setup_flavor_for_id(flavor_id: str, cfg: Config) -> BaseFlavor:
     log.debug("Creating and setting up flavor for id '%s'", flavor_id)
