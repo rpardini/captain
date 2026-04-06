@@ -6,7 +6,6 @@ import hashlib
 import logging
 import os
 import platform
-import sys
 from pathlib import Path
 
 from captain.config import Config
@@ -108,9 +107,6 @@ def run_in_release(cfg: Config, *extra_args: str) -> None:
         "--rm",
         # Buildah needs mount/remount capabilities for layer operations.
         "--privileged",
-        # interactive if running in a terminal
-        *(["-i"] if sys.stdout.isatty() and sys.stdin.isatty() else []),
-        "-t",  # terminal
         "-v",
         f"{cfg.project_dir}:/work",
         "-w",
@@ -153,9 +149,6 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "run",
         "--rm",
         "--privileged",
-        # interactive if running in a terminal
-        *(["-i"] if sys.stdout.isatty() and sys.stdin.isatty() else []),
-        "-t",  # terminal
         "-w",
         "/work",
         "-e",
