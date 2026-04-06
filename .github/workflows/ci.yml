@@ -11,6 +11,7 @@ permissions:
 
 env:
   DEFAULT_FLAVOR_ID: "trixie-full"
+  FORCE_COLOR: "1"
 
 jobs:
   # -------------------------------------------------------------------
