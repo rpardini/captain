@@ -23,8 +23,10 @@ class DebianCommonFlavor(BaseFlavor):
         )
         this_flavor_dir = self.specific_flavor_dir("common-debian")
         self.template_map["mkosi.conf"] = [this_flavor_dir / "mkosi.conf.j2"]
-        self.template_map["mkosi.postinst"] = [this_flavor_dir / "mkosi.postinst.sh.j2"]
-        self.template_map["mkosi.finalize"] = [this_flavor_dir / "mkosi.finalize.sh.j2"]
+        self.template_map["mkosi.postinst"] = [this_flavor_dir / "bash.header.sh",
+                                               this_flavor_dir / "mkosi.postinst.sh.j2"]
+        self.template_map["mkosi.finalize"] = [this_flavor_dir / "bash.header.sh",
+                                               this_flavor_dir / "mkosi.finalize.sh.j2"]
 
         # Now, lets enumerate and add all the static files this flavor's mkosi.extra directory
         # and add them to self.static_map with the key being the relative path from the flavor dir
