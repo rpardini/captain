@@ -115,6 +115,31 @@ class BaseFlavor(Protocol):
         return False
 
 
+def list_available_flavors() -> list[str]:
+    import importlib
+    import pkgutil
+
+    package = importlib.import_module("captain.flavors")
+    # iter_modules finds immediate children; walk_packages recurses
+    ret = []
+    for _finder, module_name, _is_pkg in pkgutil.walk_packages(
+        package.__path__, prefix=f"{package.__name__}."
+    ):
+        try:
+            module = importlib.import_module(module_name)
+        except Exception as exc:
+            log.debug(f"Skipping {module_name}: {exc}")
+            continue
+
+        fn = getattr(module, "create_flavor", None)
+        if fn is not None and callable(fn):
+            flavor_id = module_name.rsplit(".", 1)[-1].replace("_", "-")
+            ret.append(flavor_id)
+            log.debug("Discovered flavor '%s' via module %s", flavor_id, module_name)
+
+    return sorted(ret)
+
+
 def create_and_setup_flavor_for_id(flavor_id: str, cfg: Config) -> BaseFlavor:
     log.debug("Creating and setting up flavor for id '%s'", flavor_id)
     flavor_id_underscore = flavor_id.replace("-", "_")
