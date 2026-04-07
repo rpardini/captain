@@ -28,7 +28,6 @@ _install_rich_traceback(
 
 
 class _StageFormatter(logging.Formatter):
-
     def format(self, record: logging.LogRecord) -> str:
         name = record.name
         record.__dict__["stage"] = name
