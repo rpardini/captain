@@ -50,13 +50,6 @@ def common_options(fn: Any) -> Any:
         help="Project root directory (auto-detected when omitted).",
     )
     @click.option(
-        "--verbose",
-        "-v",
-        is_flag=True,
-        default=False,
-        help="Enable debug-level logging.",
-    )
-    @click.option(
         "--builder-registry",
         envvar="REGISTRY",
         default="ghcr.io",
