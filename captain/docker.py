@@ -144,6 +144,31 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
 
     *extra_args* are appended after the docker run flags and image name.
     """
+
+    docker_envs: dict[str, str] = {
+        "CAPTAIN_IN_DOCKER": "docker",
+        "ARCH": cfg.arch,
+        "FLAVOR_ID": cfg.flavor_id,
+        "FORCE_TOOLS": str(int(cfg.force_tools)),
+        "FORCE_ISO": str(int(cfg.force_iso)),
+        "BUILDAH_ISOLATION": "chroot",
+        "BUILDAH_INSECURE": os.environ.get("BUILDAH_INSECURE", ""),
+        "RELEASE_MODE": "native",
+        "TOOLS_MODE": "native",
+        "MKOSI_MODE": "native",
+        "ISO_MODE": "native",
+        "TERM": os.environ.get("TERM", "xterm-256color"),
+        "FORCE_COLOR": "1",
+        "COLUMNS": os.environ.get("COLUMNS", "200"),
+        "GITHUB_ACTIONS": os.environ.get("GITHUB_ACTIONS", ""),
+        # Forward host registry credentials so buildah/skopeo can authenticate.
+        # The caller sets these env vars on the host (e.g. via docker login or
+        # CI secrets); they are passed through to the container as-is.
+        "REGISTRY_AUTH_FILE": os.environ.get("REGISTRY_AUTH_FILE", ""),
+        "REGISTRY_USERNAME": os.environ.get("REGISTRY_USERNAME", ""),
+        "REGISTRY_PASSWORD": os.environ.get("REGISTRY_PASSWORD", ""),
+    }
+
     docker_args: list[str] = [
         "docker",
         "run",
@@ -151,50 +176,10 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "--privileged",  # yes, this is required for both buildah and mkosi in the container
         "-w",
         "/work",
-        "-e",
-        "CAPTAIN_IN_DOCKER=docker",
-        "-e",
-        f"ARCH={cfg.arch}",
-        "-e",
-        f"FLAVOR_ID={cfg.flavor_id}",
-        "-e",
-        f"FORCE_TOOLS={int(cfg.force_tools)}",
-        "-e",
-        f"FORCE_ISO={int(cfg.force_iso)}",
-        # Chroot isolation lets buildah work inside an unprivileged container
-        # (no user namespaces needed — we only assemble scratch images).
-        "-e",
-        "BUILDAH_ISOLATION=chroot",
-        "-e",
-        f"BUILDAH_INSECURE={os.environ.get('BUILDAH_INSECURE', '')}",
-        "-e",
-        "RELEASE_MODE=native",
-        "-e",
-        "TOOLS_MODE=native",
-        "-e",
-        "MKOSI_MODE=native",
-        "-e",
-        "ISO_MODE=native",
-        "-e",
-        "RELEASE_MODE=native",
-        "-e",
-        f"TERM={os.environ.get('TERM', 'xterm-256color')}",
-        "-e",
-        "FORCE_COLOR=1",
-        "-e",
-        f"COLUMNS={os.environ.get('COLUMNS', '200')}",
-        "-e",
-        f"GITHUB_ACTIONS={os.environ.get('GITHUB_ACTIONS', '')}",
     ]
 
-    # Forward host registry credentials so buildah/skopeo can authenticate.
-    # The caller sets these env vars on the host (e.g. via docker login or
-    # CI secrets); they are passed through to the container as-is.
-    for var in ("REGISTRY_AUTH_FILE", "REGISTRY_USERNAME", "REGISTRY_PASSWORD"):
-        val = os.environ.get(var)
-        if val:
-            docker_args += ["-e", f"{var}={val}"]
-    docker_args.extend(extra_args)
+    for k, v in docker_envs.items():
+        docker_args += ["-e", f"{k}={v}"]
 
     docker_args += ["--mount", "type=volume,source=captain-workdir,target=/work"]
 
@@ -218,12 +203,26 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
     run(docker_args)
 
 
-def run_mkosi(cfg: Config, *mkosi_args: str) -> None:
+def run_captain_in_builder(cfg: Config, *extra_args: str):
+    log.debug("Running 'captain %s' in builder container...", extra_args)
+    run_in_builder(
+        cfg,
+        cfg.builder_image,
+        "/usr/bin/uv",
+        *(["--verbose"] if log.isEnabledFor(logging.DEBUG) else []),
+        "run",
+        "captain",
+        *extra_args,
+    )
+
+
+def run_mkosi_in_builder(cfg: Config, *mkosi_args: str) -> None:
     """Run mkosi inside the builder container."""
     ensure_binfmt(cfg)
     run_in_builder(
         cfg,
         cfg.builder_image,
+        "/usr/bin/mkosi",
         f"--architecture={cfg.arch_info.mkosi_arch}",
         *mkosi_args,
     )
