@@ -13,6 +13,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.traceback import install as _install_rich_traceback
 
+import click
+
 # Rich console — writes to stderr so log output never pollutes piped stdout.
 # If running under GHA, force colors.
 if os.environ.get("GITHUB_ACTIONS", "") == "":
@@ -21,7 +23,9 @@ else:
     console: Console = Console(stderr=True, color_system="standard", width=160, highlight=False)
 
 # Install Rich traceback handler globally (once, at import time).
-_install_rich_traceback(console=console, show_locals=True, width=None)
+_install_rich_traceback(
+    console=console, show_locals=False, width=None, suppress=[click], max_frames=2
+)
 
 
 class _StageFormatter(logging.Formatter):
@@ -36,20 +40,21 @@ class _StageFormatter(logging.Formatter):
         return super().format(record)
 
 
-# Configure the ``captain`` logger hierarchy once.
-_root = logging.getLogger("captain")
+_handler = RichHandler(
+    console=console,
+    show_time=False,
+    show_level=True,
+    show_path=True,
+    markup=True,  # interprets [braket]stuff[/bracket] in log messages, beware
+    rich_tracebacks=True,
+    tracebacks_show_locals=False,
+    tracebacks_max_frames=2,  # too many frames and we get confused
+    tracebacks_suppress=[click]  # don't wanna see click infra code in traces
+)
+_handler.setFormatter(_StageFormatter("%(stage)s: %(message)s"))
 
-if not _root.handlers:
-    _handler = RichHandler(
-        console=console,
-        show_time=False,
-        show_level=True,
-        show_path=True,
-        markup=True,  # interprets [braket]stuff[/bracket] in log messages, beware
-        rich_tracebacks=True,
-        tracebacks_show_locals=True,
-    )
-    _handler.setFormatter(_StageFormatter("%(stage)s: %(message)s"))
-    _root.addHandler(_handler)
-    _root.setLevel(logging.DEBUG)
-    _root.propagate = False
+logging.basicConfig(
+    level="DEBUG",
+    datefmt="[%X]",
+    handlers=[_handler]
+)
