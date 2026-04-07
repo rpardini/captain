@@ -6,7 +6,7 @@ import logging
 
 import click
 
-from captain.click._main import cli, common_options, resolve_project_dir
+from captain.cli._main import cli, common_options, resolve_project_dir
 from captain.config import Config
 from captain.docker import obtain_builder
 
