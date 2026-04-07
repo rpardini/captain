@@ -8,10 +8,8 @@ import os
 import platform
 from pathlib import Path
 
-import util
-
 from captain.config import Config
-from captain.util import run
+from captain.util import detect_current_machine_arch, run
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +31,7 @@ def _dockerfile_hash(cfg: Config) -> str:
     automatically.
     """
     dockerfile = cfg.project_dir / "Dockerfile"
-    local_arch = util.detect_current_machine_arch()
+    local_arch = detect_current_machine_arch()
     hex_digest = hashlib.sha256(dockerfile.read_bytes()).hexdigest()
     return f"{local_arch}-{hex_digest}"
 
@@ -45,7 +43,7 @@ def obtain_builder(cfg: Config) -> None:
     changes are detected even when the base image name stays the same.
     """
     tag = _dockerfile_hash(cfg)
-    remote_tagged_image = f"{cfg.builder_registry}/{cfg.builder_repository}:{tag}"
+    remote_tagged_image = f"{cfg.builder_registry}/{cfg.builder_repository}/builder:{tag}"
     local_tagged_image = f"{cfg.builder_image}:{tag}"
 
     log.debug(
