@@ -28,16 +28,7 @@ def _build_tools_stage(cfg: Config) -> None:
     # --- docker -------------------------------------------------------
     docker.obtain_builder(cfg)
     log.info("Downloading tools (nerdctl, containerd, etc.) docker...")
-    docker.run_in_builder(
-        cfg,
-        "--entrypoint",
-        "/usr/bin/uv",
-        cfg.builder_image,
-        *(["--verbose"] if log.isEnabledFor(logging.DEBUG) else []),
-        "run",
-        "/work/build.py",
-        "tools",
-    )
+    docker.run_captain_in_builder(cfg, "tools")
     docker.fix_docker_ownership(cfg, ["/work/mkosi.output"])
 
 
@@ -86,7 +77,7 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
     log.info("Building initrd with mkosi (docker)...")
     tools_tree = f"/work/mkosi.output/tools/{cfg.arch}"
     output_dir = f"/work/mkosi.output/initramfs/{cfg.flavor_id}/{cfg.arch}"
-    docker.run_mkosi(
+    docker.run_mkosi_in_builder(
         cfg,
         f"--extra-tree={tools_tree}",
         f"--output-dir={output_dir}",
@@ -126,16 +117,7 @@ def _build_iso_stage(cfg: Config) -> None:
     # --- docker -------------------------------------------------------
     docker.obtain_builder(cfg)
     log.info("Building ISO (docker)...")
-    docker.run_in_builder(
-        cfg,
-        "--entrypoint",
-        "/usr/bin/uv",
-        cfg.builder_image,
-        *(["--verbose"] if log.isEnabledFor(logging.DEBUG) else []),
-        "run",
-        "/work/build.py",
-        "iso",
-    )
+    docker.run_captain_in_builder(cfg, "iso")
     docker.fix_docker_ownership(
         cfg,
         [
