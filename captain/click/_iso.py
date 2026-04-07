@@ -84,7 +84,7 @@ def build_cmd(
 
     _build_iso_stage(cfg)
     artifacts.collect_iso(cfg)
-    log.info("ISO build complete!")
+    log.info("ISO build complete!!!")
 
 
 def _configure_logging(verbose: bool) -> None:
