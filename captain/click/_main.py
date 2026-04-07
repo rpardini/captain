@@ -50,11 +50,32 @@ def common_options(fn: Any) -> Any:
         help="Project root directory (auto-detected when omitted).",
     )
     @click.option(
-        "-v",
         "--verbose",
+        "-v",
         is_flag=True,
         default=False,
         help="Enable debug-level logging.",
+    )
+    @click.option(
+        "--builder-registry",
+        envvar="REGISTRY",
+        default="ghcr.io",
+        show_default=True,
+        help="OCI registry hostname for the Docker builder image",
+    )
+    @click.option(
+        "--builder-repository",
+        envvar="GITHUB_REPOSITORY",
+        default="tinkerbell/captain",
+        show_default=True,
+        help="Repository path (owner/name) for the Docker builder image",
+    )
+    @click.option(
+        "--builder-image",
+        envvar="BUILDER_IMAGE",
+        default="captainos-builder",
+        show_default=True,
+        help="Local name/tag of Docker builder image name",
     )
     @functools.wraps(fn)
     def wrapper(**kwargs: Any) -> Any:
