@@ -25,20 +25,6 @@ log = logging.getLogger(__name__)
 )
 @common_options
 @click.option(
-    "--builder-image",
-    envvar="BUILDER_IMAGE",
-    default="captainos-builder",
-    show_default=True,
-    help="Docker builder image name.",
-)
-@click.option(
-    "--no-cache",
-    envvar="NO_CACHE",
-    is_flag=True,
-    default=False,
-    help="Rebuild the builder image without Docker layer cache.",
-)
-@click.option(
     "--mkosi-mode",
     envvar="MKOSI_MODE",
     default="docker",
@@ -91,7 +77,6 @@ def build_cmd(
     arch: str,
     flavor_id: str,
     project_dir: str | None,
-    verbose: bool,
     builder_registry: str | None,
     builder_repository: str | None,
     builder_image: str,
@@ -117,7 +102,6 @@ def build_cmd(
       captain build --mkosi-mode native --tools-mode native
       captain build --force --force-tools
     """
-    _configure_logging(verbose)
 
     proj = resolve_project_dir(project_dir)
 
@@ -162,8 +146,3 @@ def build_cmd(
     # Final artifact collection.
     artifacts.collect(cfg)
     log.info("Build complete!")
-
-
-def _configure_logging(verbose: bool) -> None:
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.getLogger("captain").setLevel(level)
