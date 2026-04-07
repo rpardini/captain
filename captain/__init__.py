@@ -9,11 +9,10 @@ from __future__ import annotations
 import logging
 import os
 
+import click
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.traceback import install as _install_rich_traceback
-
-import click
 
 # Rich console — writes to stderr so log output never pollutes piped stdout.
 # If running under GHA, force colors.
@@ -29,7 +28,6 @@ _install_rich_traceback(
 
 
 class _StageFormatter(logging.Formatter):
-    """Show the module path relative to the ``captain`` package as a prefix."""
 
     def format(self, record: logging.LogRecord) -> str:
         name = record.name
@@ -49,12 +47,8 @@ _handler = RichHandler(
     rich_tracebacks=True,
     tracebacks_show_locals=False,
     tracebacks_max_frames=2,  # too many frames and we get confused
-    tracebacks_suppress=[click]  # don't wanna see click infra code in traces
+    tracebacks_suppress=[click],  # don't wanna see click infra code in traces
 )
 _handler.setFormatter(_StageFormatter("%(stage)s: %(message)s"))
 
-logging.basicConfig(
-    level="DEBUG",
-    datefmt="[%X]",
-    handlers=[_handler]
-)
+logging.basicConfig(level="DEBUG", datefmt="[%X]", handlers=[_handler])
