@@ -3,10 +3,10 @@
 
 Requires: Python >= 3.13 and a lot of dependencies; Use Astral's ``uv`` to run::
 
-    uv run click_cli.py --help
-    uv run click_cli.py builder
-    uv run click_cli.py build --arch arm64
-    uv run click_cli.py release-publish --target combined
+    uv run build.py --help
+    uv run build.py builder
+    uv run build.py build --arch arm64
+    uv run build.py release-publish --target combined
 """
 
 import sys
@@ -16,7 +16,7 @@ if sys.version_info < (3, 13):
     sys.exit(1)
 
 try:
-    from captain.click import main
+    from captain.cli import main
 except ImportError as exc:
     print(f"ERROR: {exc}", file=sys.stderr)
     uv_url = "https://docs.astral.sh/uv/getting-started/installation/"
