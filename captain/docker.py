@@ -181,13 +181,12 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
     for k, v in docker_envs.items():
         docker_args += ["-e", f"{k}={v}"]
 
-    docker_args += ["--mount", "type=volume,source=captain-workdir,target=/work"]
-
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.output:/work/mkosi.output"]
+    docker_args += ["-v", f"{cfg.project_dir}/out:/work/out"]
+
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.extra:/work/mkosi.extra"]
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.sandbox:/work/mkosi.sandbox"]
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.skeleton:/work/mkosi.skeleton"]
-    docker_args += ["-v", f"{cfg.project_dir}/out:/work/out"]
 
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.conf:/work/mkosi.conf"]
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.finalize:/work/mkosi.finalize"]
@@ -222,7 +221,7 @@ def run_mkosi_in_builder(cfg: Config, *mkosi_args: str) -> None:
     run_in_builder(
         cfg,
         cfg.builder_image,
-        "/usr/bin/mkosi",
+        "/usr/local/bin/mkosi",
         f"--architecture={cfg.arch_info.mkosi_arch}",
         *mkosi_args,
     )
