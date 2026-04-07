@@ -102,6 +102,31 @@ def obtain_builder(cfg: Config) -> None:
         ]
     )
 
+    # Show the layer size distribution for the built image to help with debugging and optimization.
+    log.info("Docker image '%s' built successfully. Layer size distribution:", local_tagged_image)
+    layer_sizes_lines = run(
+        [
+            "docker",
+            "history",
+            "--no-trunc",
+            "--format",
+            '-> {{.Size}} :: \'{{.CreatedBy}}\'',
+            local_tagged_image,
+        ]
+        , capture=True, check=True
+    )
+    layers = []
+    for line in layer_sizes_lines.stdout.strip().splitlines():
+        line = line.strip()
+        if line.startswith("-> "):
+            # remove double whitespace chars to make it easier to read
+            line = ' '.join(line.split())
+            layers.append(line)
+    # reverse the array to match the order
+    layers.reverse()
+    for layer in layers:
+        log.info("Layer info: %s", layer)
+
     # Optionally push the image after building it
     if cfg.builder_push:
         log.info(
