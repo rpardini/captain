@@ -85,7 +85,6 @@ def release_publish_cmd(
     arch: str,
     flavor_id: str,
     project_dir: str | None,
-    verbose: bool,
     builder_registry: str | None,
     builder_repository: str | None,
     builder_image: str,
@@ -115,7 +114,6 @@ def release_publish_cmd(
       captain release-publish --target combined --force
       captain release-publish --registry ghcr.io --repository tinkerbell/captain
     """
-    _configure_logging(verbose)
 
     proj = resolve_project_dir(project_dir)
 
@@ -225,8 +223,3 @@ def _resolve_git_sha(sha: str | None, project_dir: Path) -> str:
         cwd=project_dir,
     )
     return result.stdout.strip()
-
-
-def _configure_logging(verbose: bool) -> None:
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.getLogger("captain").setLevel(level)
