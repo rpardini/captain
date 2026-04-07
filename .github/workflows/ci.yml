@@ -63,7 +63,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Download tools
-        run: uv run captain tools
+        run: uv run captain tools --tools-mode=native
 
       - name: Save tools cache
         if: github.ref == 'refs/heads/main' && steps.tools-cache.outputs.cache-hit != 'true'
