@@ -19,20 +19,6 @@ log = logging.getLogger(__name__)
 )
 @common_options
 @click.option(
-    "--builder-image",
-    envvar="BUILDER_IMAGE",
-    default="captainos-builder",
-    show_default=True,
-    help="Docker builder image name.",
-)
-@click.option(
-    "--no-cache",
-    envvar="NO_CACHE",
-    is_flag=True,
-    default=False,
-    help="Rebuild the builder image without Docker layer cache.",
-)
-@click.option(
     "--tools-mode",
     envvar="TOOLS_MODE",
     default="docker",
@@ -53,7 +39,6 @@ def tools_cmd(
     arch: str,
     flavor_id: str,
     project_dir: str | None,
-    verbose: bool,
     builder_registry: str | None,
     builder_repository: str | None,
     builder_image: str,
@@ -74,7 +59,6 @@ def tools_cmd(
       captain tools --tools-mode native
       captain tools --force-tools
     """
-    _configure_logging(verbose)
 
     proj = resolve_project_dir(project_dir)
 
@@ -92,8 +76,3 @@ def tools_cmd(
 
     _build_tools_stage(cfg)
     log.info("Tools stage complete!")
-
-
-def _configure_logging(verbose: bool) -> None:
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.getLogger("captain").setLevel(level)
