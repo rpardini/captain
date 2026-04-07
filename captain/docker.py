@@ -9,7 +9,7 @@ import platform
 from pathlib import Path
 
 from captain.config import Config
-from captain.util import run
+from captain.util import detect_current_machine_arch, run
 
 log = logging.getLogger(__name__)
 
@@ -28,71 +28,95 @@ def _dockerfile_hash(cfg: Config) -> str:
     """Return the SHA-256 hex digest of the Dockerfile content.
 
     This is used as an image tag so that Dockerfile changes are detected
-    automatically.  The value intentionally matches what GitHub Actions
-    ``hashFiles('Dockerfile')`` produces, allowing the CI
-    ``docker/build-push-action`` step to pre-load an image with the same
-    tag that ``build_builder`` will look for.
+    automatically.
     """
     dockerfile = cfg.project_dir / "Dockerfile"
-    return hashlib.sha256(dockerfile.read_bytes()).hexdigest()
+    local_arch = detect_current_machine_arch()
+    hex_digest = hashlib.sha256(dockerfile.read_bytes()).hexdigest()
+    return f"{local_arch}-{hex_digest}"
 
 
-def build_builder(cfg: Config) -> None:
+def obtain_builder(cfg: Config) -> None:
     """Build the Docker builder image when the Dockerfile has changed.
 
     The image is tagged with a content hash of the Dockerfile so that
     changes are detected even when the base image name stays the same.
-    When the matching tag already exists locally (e.g. pre-loaded by a CI
-    ``docker/build-push-action`` step with ``load: true``), we skip the
-    build entirely.  Use ``NO_CACHE=1`` to force a full rebuild.
     """
     tag = _dockerfile_hash(cfg)
-    tagged_image = f"{cfg.builder_image}:{tag}"
+    remote_tagged_image = f"{cfg.builder_registry}/{cfg.builder_repository}/builder:{tag}"
+    local_tagged_image = f"{cfg.builder_image}:{tag}"
 
-    if not cfg.no_cache and _image_exists(tagged_image):
-        log.info("Docker image '%s' is up to date with %s.", cfg.builder_image, tagged_image)
+    log.debug(
+        "Checking for existing builder image with tag '%s' or remote image '%s'",
+        local_tagged_image,
+        remote_tagged_image,
+    )
+
+    if _image_exists(local_tagged_image):
+        log.info("Docker image '%s' is up to date with %s.", cfg.builder_image, local_tagged_image)
         # Ensure the un-hashed tag exists so later docker-run calls that
         # reference cfg.builder_image (without the hash suffix) succeed.
-        # This matters when the hashed tag was pre-loaded by CI.
-        run(["docker", "tag", tagged_image, cfg.builder_image], check=False)
+        run(["docker", "tag", local_tagged_image, cfg.builder_image], check=False)
         return
 
+    # Check if the remote name exists locally... (was pre-pulled somehow)
+    if _image_exists(remote_tagged_image):
+        log.info(
+            "Docker image '%s' already exists locally (pre-pulled). Tagging as '%s'.",
+            remote_tagged_image,
+            cfg.builder_image,
+        )
+        run(["docker", "tag", remote_tagged_image, cfg.builder_image], check=False)
+        return
+
+    # Check if we can pull the remote image (exists in registry and matches our Dockerfile hash)
+    if (
+        run(
+            ["docker", "pull", remote_tagged_image],
+            check=False,
+            capture=False,
+        ).returncode
+        == 0
+    ):
+        log.info(
+            "Pulled Docker image '%s' from registry. Tagging as '%s'.",
+            remote_tagged_image,
+            cfg.builder_image,
+        )
+        run(["docker", "tag", remote_tagged_image, cfg.builder_image], check=False)
+        return
+
+    # build locally if no existing image was found.
     log.info("Building Docker image '%s'...", cfg.builder_image)
-    cmd = ["docker", "buildx", "build"]
-    if cfg.no_cache:
-        cmd.append("--no-cache")
-    cmd.extend(
-        ["--progress=plain", "-t", tagged_image, "-t", cfg.builder_image, str(cfg.project_dir)]
+    run(
+        [
+            "docker",
+            "buildx",
+            "build",
+            "--progress=plain",
+            "-t",
+            local_tagged_image,
+            "-t",
+            cfg.builder_image,
+            str(cfg.project_dir),
+        ]
     )
-    run(cmd)
 
-
-RELEASE_IMAGE = "captainos-release"
+    # Optionally push the image after building it
+    if cfg.builder_push:
+        log.info(
+            "Pushing Docker image '%s' to registry as '%s'...",
+            cfg.builder_image,
+            remote_tagged_image,
+        )
+        run(["docker", "tag", local_tagged_image, remote_tagged_image], check=False)
+        run(["docker", "push", remote_tagged_image])
 
 
 def _release_dockerfile_hash(cfg: Config) -> str:
     """Return the SHA-256 hex digest of the Dockerfile.release content."""
     dockerfile = cfg.project_dir / "Dockerfile.release"
     return hashlib.sha256(dockerfile.read_bytes()).hexdigest()
-
-
-def build_release_image(cfg: Config) -> None:
-    """Build the release Docker image from ``Dockerfile.release``."""
-    tag = _release_dockerfile_hash(cfg)
-    tagged_image = f"{RELEASE_IMAGE}:{tag}"
-
-    if not cfg.no_cache and _image_exists(tagged_image):
-        log.info("Docker image '%s' is up to date.", RELEASE_IMAGE)
-        run(["docker", "tag", tagged_image, RELEASE_IMAGE])
-        return
-
-    log.info("Building Docker image '%s'...", RELEASE_IMAGE)
-    cmd = ["docker", "buildx", "build", "-f", str(cfg.project_dir / "Dockerfile.release")]
-    if cfg.no_cache:
-        cmd.append("--no-cache")
-    cmd.extend(["--progress=plain"])
-    cmd.extend(["-t", tagged_image, "-t", RELEASE_IMAGE, str(cfg.project_dir)])
-    run(cmd)
 
 
 def run_in_release(cfg: Config, *extra_args: str) -> None:
