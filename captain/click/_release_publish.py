@@ -23,20 +23,6 @@ log = logging.getLogger(__name__)
 )
 @common_options
 @click.option(
-    "--builder-image",
-    envvar="BUILDER_IMAGE",
-    default="captainos-builder",
-    show_default=True,
-    help="Docker builder image name.",
-)
-@click.option(
-    "--no-cache",
-    envvar="NO_CACHE",
-    is_flag=True,
-    default=False,
-    help="Rebuild images without Docker layer cache.",
-)
-@click.option(
     "--release-mode",
     envvar="RELEASE_MODE",
     default="native",
@@ -100,8 +86,9 @@ def release_publish_cmd(
     flavor_id: str,
     project_dir: str | None,
     verbose: bool,
+    builder_registry: str | None,
+    builder_repository: str | None,
     builder_image: str,
-    no_cache: bool,
     release_mode: str,
     registry: str,
     repository: str,
@@ -140,8 +127,9 @@ def release_publish_cmd(
         output_dir=proj / "out",
         arch=arch,
         flavor_id=flavor_id,
+        builder_registry=builder_registry,
+        builder_repository=builder_repository,
         builder_image=builder_image,
-        no_cache=no_cache,
         release_mode=release_mode,
     )
 
@@ -154,7 +142,7 @@ def release_publish_cmd(
     if cfg.release_mode == "docker":
         from captain import docker
 
-        docker.build_release_image(cfg)
+        docker.obtain_builder(cfg)
         sha = _resolve_git_sha(git_sha, proj)
 
         env_args: list[str] = [
@@ -179,12 +167,12 @@ def release_publish_cmd(
         inner_cmd = ["/work/build.py", "release", "publish"]
 
         try:
-            docker.run_in_release(
+            docker.run_in_builder(
                 cfg,
                 *env_args,
                 "--entrypoint",
                 "/usr/bin/uv",
-                docker.RELEASE_IMAGE,
+                cfg.builder_image,
                 *(["--verbose"] if log.isEnabledFor(logging.DEBUG) else []),
                 "run",
                 *inner_cmd,
