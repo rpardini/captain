@@ -110,17 +110,18 @@ def obtain_builder(cfg: Config) -> None:
             "history",
             "--no-trunc",
             "--format",
-            '-> {{.Size}} :: \'{{.CreatedBy}}\'',
+            "-> {{.Size}} :: '{{.CreatedBy}}'",
             local_tagged_image,
-        ]
-        , capture=True, check=True
+        ],
+        capture=True,
+        check=True,
     )
     layers = []
     for line in layer_sizes_lines.stdout.strip().splitlines():
         line = line.strip()
         if line.startswith("-> "):
             # remove double whitespace chars to make it easier to read
-            line = ' '.join(line.split())
+            line = " ".join(line.split())
             layers.append(line)
     # reverse the array to match the order
     layers.reverse()
@@ -138,60 +139,6 @@ def obtain_builder(cfg: Config) -> None:
         run(["docker", "push", remote_tagged_image])
 
 
-def _release_dockerfile_hash(cfg: Config) -> str:
-    """Return the SHA-256 hex digest of the Dockerfile.release content."""
-    dockerfile = cfg.project_dir / "Dockerfile.release"
-    return hashlib.sha256(dockerfile.read_bytes()).hexdigest()
-
-
-def run_in_release(cfg: Config, *extra_args: str) -> None:
-    """Run a command inside the release container.
-
-    Similar to :func:`run_in_builder` but uses the lightweight release
-    image which has buildah, skopeo, Python, and git.
-    """
-    docker_args: list[str] = [
-        "docker",
-        "run",
-        "--rm",
-        # Buildah needs mount/remount capabilities for layer operations.
-        "--privileged",
-        "-v",
-        f"{cfg.project_dir}:/work",
-        "-w",
-        "/work",
-        "-e",
-        "CAPTAIN_IN_DOCKER=docker",
-        "-e",
-        f"ARCH={cfg.arch}",
-        "-e",
-        "RELEASE_MODE=native",
-        # Chroot isolation lets buildah work inside an unprivileged container
-        # (no user namespaces needed — we only assemble scratch images).
-        "-e",
-        "BUILDAH_ISOLATION=chroot",
-        "-e",
-        f"BUILDAH_INSECURE={os.environ.get('BUILDAH_INSECURE', '')}",
-        "-e",
-        f"TERM={os.environ.get('TERM', 'xterm-256color')}",
-        "-e",
-        "FORCE_COLOR=1",
-        "-e",
-        f"COLUMNS={os.environ.get('COLUMNS', '200')}",
-        "-e",
-        f"GITHUB_ACTIONS={os.environ.get('GITHUB_ACTIONS', '')}",
-    ]
-    # Forward host registry credentials so buildah/skopeo can authenticate.
-    # The caller sets these env vars on the host (e.g. via docker login or
-    # CI secrets); they are passed through to the container as-is.
-    for var in ("REGISTRY_AUTH_FILE", "REGISTRY_USERNAME", "REGISTRY_PASSWORD"):
-        val = os.environ.get(var)
-        if val:
-            docker_args += ["-e", f"{var}={val}"]
-    docker_args.extend(extra_args)
-    run(docker_args)
-
-
 def run_in_builder(cfg: Config, *extra_args: str) -> None:
     """Run a command inside the Docker builder container.
 
@@ -201,7 +148,7 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "docker",
         "run",
         "--rm",
-        "--privileged",
+        "--privileged",  # yes, this is required for both buildah and mkosi in the container
         "-w",
         "/work",
         "-e",
@@ -214,6 +161,14 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         f"FORCE_TOOLS={int(cfg.force_tools)}",
         "-e",
         f"FORCE_ISO={int(cfg.force_iso)}",
+        # Chroot isolation lets buildah work inside an unprivileged container
+        # (no user namespaces needed — we only assemble scratch images).
+        "-e",
+        "BUILDAH_ISOLATION=chroot",
+        "-e",
+        f"BUILDAH_INSECURE={os.environ.get('BUILDAH_INSECURE', '')}",
+        "-e",
+        "RELEASE_MODE=native",
         "-e",
         "TOOLS_MODE=native",
         "-e",
@@ -231,6 +186,15 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "-e",
         f"GITHUB_ACTIONS={os.environ.get('GITHUB_ACTIONS', '')}",
     ]
+
+    # Forward host registry credentials so buildah/skopeo can authenticate.
+    # The caller sets these env vars on the host (e.g. via docker login or
+    # CI secrets); they are passed through to the container as-is.
+    for var in ("REGISTRY_AUTH_FILE", "REGISTRY_USERNAME", "REGISTRY_PASSWORD"):
+        val = os.environ.get(var)
+        if val:
+            docker_args += ["-e", f"{var}={val}"]
+    docker_args.extend(extra_args)
 
     docker_args += ["--mount", "type=volume,source=captain-workdir,target=/work"]
 
