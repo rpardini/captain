@@ -160,7 +160,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         env:
           TARGET: ${{ matrix.arch }}
-        run: uv run captain release publish
+        run: uv run captain release-publish
 
   # -------------------------------------------------------------------
   # Publish combined multi-arch image (reuses per-arch registry blobs)
@@ -219,4 +219,4 @@ jobs:
       - name: Publish combined image to GHCR
         env:
           FLAVOR_ID: "${{ env.DEFAULT_FLAVOR_ID }}"
-        run: uv run captain release publish
+        run: uv run captain release-publish
