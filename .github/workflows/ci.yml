@@ -84,11 +84,39 @@ jobs:
           retention-days: 1
 
   # -------------------------------------------------------------------
+  # Build Docker builder image, per-arch; pushes to ghcr.io.
+  # -------------------------------------------------------------------
+  build-dockerfile:
+    needs: [ lint ]
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix: { arch: [ amd64, arm64 ] }
+    env:
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Dockerfile and push
+        run: uv run captain builder --push
+
+  # -------------------------------------------------------------------
   # Build initramfs via mkosi (depends on tools)
   # -------------------------------------------------------------------
   build-all:
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    needs: [ download-tools ]
+    needs: [ download-tools, build-dockerfile ]
     strategy:
       fail-fast: false
       matrix:
