@@ -105,8 +105,11 @@ RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends \
     upx-ucl \
     xorriso
 
-RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends \
-    buildah
+# Buildah is pretty huge, gets its own layer.
+RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends buildah
+
+# This is just to appease mkosi's later stages.
+RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends python3 python3-pip python3-pefile
 
 RUN <<-CONFIG_FRAG
 ## A few small config fragments to make life easier
@@ -123,17 +126,15 @@ chmod +x /usr/libexec/podman/netavark
 CONFIG_FRAG
 
 # Install astral-sh's uv with a script - install to /usr for global access
-RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/bin" sh && uv --version
+RUN echo -n 'System Python: ' && python3 --version && curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/bin" sh && uv --version
 
-# Install mkosi from GitHub (not on PyPI) via uv; symlink to /usr/bin for global access
+# Install mkosi from GitHub (not on PyPI) via the system pip3
 ARG MKOSI_VERSION=v26
-RUN uv tool install "git+https://github.com/systemd/mkosi.git@${MKOSI_VERSION}" && ln -sf ~/.local/bin/mkosi /usr/bin/mkosi && mkosi --version
+RUN pip3 install --break-system-packages --root-user-action=ignore "git+https://github.com/systemd/mkosi.git@${MKOSI_VERSION}" && mkosi --version && command -v mkosi
 
 # Prime uv's cache with our pyproject.toml to speed up runtime
-COPY pyproject.toml /tmp/pyproject.toml
-COPY captain /tmp/captain
-COPY build.py /tmp/build.py
-WORKDIR /tmp
-RUN uv --verbose run captain --version
-
+COPY pyproject.toml /work/pyproject.toml
+COPY captain /work/captain
+COPY build.py /work/build.py
 WORKDIR /work
+RUN uv --verbose run captain --version
