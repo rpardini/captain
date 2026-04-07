@@ -6,8 +6,8 @@ import logging
 
 import click
 
-from captain.click._main import cli, common_options, resolve_project_dir
-from captain.click._stages import _build_tools_stage
+from captain.cli._main import cli, common_options, resolve_project_dir
+from captain.cli._stages import _build_tools_stage
 from captain.config import Config
 
 log = logging.getLogger(__name__)
