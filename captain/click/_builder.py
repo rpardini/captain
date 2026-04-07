@@ -29,7 +29,6 @@ def builder_cmd(
     arch: str,
     flavor_id: str,
     project_dir: str | None,
-    verbose: bool,
     builder_registry: str | None,
     builder_repository: str | None,
     builder_image: str,
@@ -47,8 +46,6 @@ def builder_cmd(
       captain builder --no-cache
       captain builder --push
     """
-    _configure_logging(verbose)
-
     proj = resolve_project_dir(project_dir)
 
     cfg = Config(
@@ -65,9 +62,3 @@ def builder_cmd(
     # 1. Build the image.
     obtain_builder(cfg)
     log.info("Builder image '%s' is ready.", cfg.builder_image)
-
-
-def _configure_logging(verbose: bool) -> None:
-    """Set the captain logger level based on the --verbose flag."""
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.getLogger("captain").setLevel(level)
