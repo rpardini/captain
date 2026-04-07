@@ -58,8 +58,9 @@ def build_cmd(
     flavor_id: str,
     project_dir: str | None,
     verbose: bool,
+    builder_registry: str | None,
+    builder_repository: str | None,
     builder_image: str,
-    no_cache: bool,
     iso_mode: str,
     force_iso: bool,
 ) -> None:
@@ -73,8 +74,9 @@ def build_cmd(
         output_dir=proj / "out",
         arch=arch,
         flavor_id=flavor_id,
+        builder_registry=builder_registry,
+        builder_repository=builder_repository,
         builder_image=builder_image,
-        no_cache=no_cache,
         iso_mode=iso_mode,
         force_iso=force_iso,
     )

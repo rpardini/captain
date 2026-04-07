@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import argparse
 import logging
-import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,8 +32,10 @@ class Config:
     flavor_id: str = DEFAULT_FLAVOR_ID
 
     # Docker
+    builder_registry: str | None = None
+    builder_repository: str | None = None
     builder_image: str = "captainos-builder"
-    no_cache: bool = False
+    builder_push: bool = False
 
     # Per-stage mode: "docker" | "native" | "skip"
     tools_mode: str = "docker"
@@ -70,82 +70,6 @@ class Config:
             if value not in VALID_MODES:
                 log.error("%s=%r is invalid. Valid values: %s", name, value, ", ".join(VALID_MODES))
                 sys.exit(1)
-
-    @property
-    def needs_docker(self) -> bool:
-        """True if any stage requires Docker."""
-        return (
-            self.tools_mode == "docker"
-            or self.mkosi_mode == "docker"
-            or self.iso_mode == "docker"
-            or self.release_mode == "docker"
-        )
-
-    @classmethod
-    def from_args(cls, args: argparse.Namespace, project_dir: Path | None) -> Config:
-        """Create a Config from a parsed :class:`argparse.Namespace`.
-
-        The *args* namespace is produced by :mod:`configargparse` which
-        has already resolved the priority chain:
-        CLI flags > environment variables > defaults.
-
-        ``getattr`` with fallbacks is used because per-subcommand
-        parsers only define the flags relevant to that subcommand.
-        """
-
-        if project_dir is None:
-            raise ValueError("project_dir must be provided to Config.from_args")
-
-        log.debug(
-            "Creating Config from args: %s (env flavor: %s)", args, os.environ.get("FLAVOR_ID")
-        )
-
-        return cls(
-            project_dir=project_dir,
-            output_dir=project_dir / "out",
-            arch=getattr(args, "arch", "amd64"),
-            flavor_id=getattr(args, "flavor_id", DEFAULT_FLAVOR_ID),
-            builder_image=getattr(args, "builder_image", "captainos-builder"),
-            no_cache=getattr(args, "no_cache", False),
-            tools_mode=getattr(args, "tools_mode", "docker"),
-            mkosi_mode=getattr(args, "mkosi_mode", "docker"),
-            iso_mode=getattr(args, "iso_mode", "docker"),
-            release_mode=getattr(args, "release_mode", "docker"),
-            force_tools=getattr(args, "force_tools", False),
-            force_iso=getattr(args, "force_iso", False),
-            qemu_append=getattr(args, "qemu_append", ""),
-            qemu_mem=getattr(args, "qemu_mem", "2G"),
-            qemu_smp=getattr(args, "qemu_smp", "2"),
-        )
-
-    @classmethod
-    def from_env(cls, project_dir: Path) -> Config:
-        """Create a Config from environment variables (legacy helper).
-
-        Prefer :meth:`from_args` in the CLI path.  This method remains
-        for any non-CLI callers (e.g. tests, scripts) that need a
-        ``Config`` without going through argparse.
-        """
-
-        log.debug("Creating Config from env: %s", os.environ)
-
-        return cls(
-            project_dir=project_dir,
-            output_dir=project_dir / "out",
-            arch=os.environ.get("ARCH", "amd64"),
-            flavor_id=os.environ.get("FLAVOR_ID", DEFAULT_FLAVOR_ID),
-            builder_image=os.environ.get("BUILDER_IMAGE", "captainos-builder"),
-            no_cache=os.environ.get("NO_CACHE") == "1",
-            tools_mode=os.environ.get("TOOLS_MODE", "docker"),
-            mkosi_mode=os.environ.get("MKOSI_MODE", "docker"),
-            iso_mode=os.environ.get("ISO_MODE", "docker"),
-            release_mode=os.environ.get("RELEASE_MODE", "docker"),
-            force_tools=os.environ.get("FORCE_TOOLS") == "1",
-            force_iso=os.environ.get("FORCE_ISO") == "1",
-            qemu_append=os.environ.get("QEMU_APPEND", ""),
-            qemu_mem=os.environ.get("QEMU_MEM", "2G"),
-            qemu_smp=os.environ.get("QEMU_SMP", "2"),
-        )
 
     @property
     def tools_output(self) -> Path:
