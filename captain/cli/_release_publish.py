@@ -59,7 +59,7 @@ log = logging.getLogger(__name__)
     type=click.Choice(["amd64", "arm64", "combined"], case_sensitive=False),
     metavar="TARGET",
     help="Artifact target: amd64, arm64, or combined (default: value of --arch); "
-    "combined requires trixie-full or equivalent flavor with both architectures' outputs present.",
+    "combined requires trixie-full or equivalent flavor with both arch's outputs present.",
 )
 @click.option(
     "--git-sha",
@@ -162,7 +162,7 @@ def release_publish_cmd(
         if force:
             env_args += ["-e", "FORCE=true"]
 
-        inner_cmd = ["/work/build.py", "release", "publish"]
+        inner_cmd = ["captain", "release-publish"]
 
         try:
             docker.run_in_builder(
