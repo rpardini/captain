@@ -54,8 +54,9 @@ def tools_cmd(
     flavor_id: str,
     project_dir: str | None,
     verbose: bool,
+    builder_registry: str | None,
+    builder_repository: str | None,
     builder_image: str,
-    no_cache: bool,
     tools_mode: str,
     force_tools: bool,
 ) -> None:
@@ -82,8 +83,9 @@ def tools_cmd(
         output_dir=proj / "out",
         arch=arch,
         flavor_id=flavor_id,
+        builder_registry=builder_registry,
+        builder_repository=builder_repository,
         builder_image=builder_image,
-        no_cache=no_cache,
         tools_mode=tools_mode,
         force_tools=force_tools,
     )

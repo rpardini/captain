@@ -26,7 +26,7 @@ def _build_tools_stage(cfg: Config) -> None:
         return
 
     # --- docker -------------------------------------------------------
-    docker.build_builder(cfg)
+    docker.obtain_builder(cfg)
     log.info("Downloading tools (nerdctl, containerd, etc.) docker...")
     docker.run_in_builder(
         cfg,
@@ -75,7 +75,7 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
         return
 
     # --- docker -------------------------------------------------------
-    docker.build_builder(cfg)
+    docker.obtain_builder(cfg)
     log.info("Building initrd with mkosi (docker)...")
     tools_tree = f"/work/mkosi.output/tools/{cfg.arch}"
     output_dir = f"/work/mkosi.output/initramfs/{cfg.flavor_id}/{cfg.arch}"
@@ -117,7 +117,7 @@ def _build_iso_stage(cfg: Config) -> None:
         return
 
     # --- docker -------------------------------------------------------
-    docker.build_builder(cfg)
+    docker.obtain_builder(cfg)
     log.info("Building ISO (docker)...")
     docker.run_in_builder(
         cfg,
