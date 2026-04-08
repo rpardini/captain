@@ -8,6 +8,9 @@ import os
 import platform
 from pathlib import Path
 
+from rich.table import Table
+
+import captain
 from captain.config import Config
 from captain.util import detect_current_machine_arch, run
 
@@ -159,7 +162,7 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "ISO_MODE": "native",
         "TERM": os.environ.get("TERM", "xterm-256color"),
         "FORCE_COLOR": "1",
-        "COLUMNS": os.environ.get("COLUMNS", "200"),
+        "COLUMNS": str(captain.env_columns),
         "GITHUB_ACTIONS": os.environ.get("GITHUB_ACTIONS", ""),
         # Forward host registry credentials so buildah/skopeo can authenticate.
         # The caller sets these env vars on the host (e.g. via docker login or
@@ -177,6 +180,16 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "-w",
         "/work",
     ]
+
+    if log.isEnabledFor(logging.DEBUG):
+        table = Table(
+            title="Docker Environment Variables", show_header=True, header_style="bold cyan"
+        )
+        table.add_column("Environment Variable", style="green")
+        table.add_column("Value", style="yellow")
+        for key, value in sorted(docker_envs.items()):
+            table.add_row(key, value)
+        captain.console.print(table)
 
     for k, v in docker_envs.items():
         docker_args += ["-e", f"{k}={v}"]
@@ -208,7 +221,7 @@ def run_captain_in_builder(cfg: Config, *extra_args: str):
         cfg,
         cfg.builder_image,
         "/usr/bin/uv",
-        *(["--verbose"] if log.isEnabledFor(logging.DEBUG) else []),
+        *(["--verbose"] if cfg.verbose_uv else ["--quiet"]),
         "run",
         "captain",
         *extra_args,
