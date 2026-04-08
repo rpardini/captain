@@ -63,7 +63,9 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Download tools
-        run: uv run captain tools --tools-mode=native
+        env:
+          TOOLS_MODE: native
+        run: uv run captain tools
 
       - name: Save tools cache
         if: github.ref == 'refs/heads/main' && steps.tools-cache.outputs.cache-hit != 'true'
@@ -151,7 +153,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Build initramfs
-        run: uv run captain build --arch=${{ matrix.arch }} # full build, incl initramfs and iso when appropriate
+        run: uv run captain build # full build, incl initramfs and iso when appropriate
 
       - name: Upload initramfs artifacts
         uses: actions/upload-artifact@v6
