@@ -10,8 +10,7 @@ import click
 
 import captain.flavor
 from captain import oci
-from captain.cli._main import cli, common_options, resolve_project_dir
-from captain.config import Config
+from captain.cli._main import CliContext, cli
 from captain.util import check_release_dependencies
 
 log = logging.getLogger(__name__)
@@ -21,7 +20,6 @@ log = logging.getLogger(__name__)
     "release-publish",
     short_help="Publish build artifacts as a multi-arch OCI image.",
 )
-@common_options
 @click.option(
     "--release-mode",
     envvar="RELEASE_MODE",
@@ -80,14 +78,10 @@ log = logging.getLogger(__name__)
     default=False,
     help="Publish even if the image already exists in the registry.",
 )
+@click.pass_obj
 def release_publish_cmd(
+    cli_ctx: CliContext,
     *,
-    arch: str,
-    flavor_id: str,
-    project_dir: str | None,
-    builder_registry: str | None,
-    builder_repository: str | None,
-    builder_image: str,
     release_mode: str,
     registry: str,
     repository: str,
@@ -115,21 +109,11 @@ def release_publish_cmd(
       captain release-publish --registry ghcr.io --repository tinkerbell/captain
     """
 
-    proj = resolve_project_dir(project_dir)
-
     if target is None:
-        target = arch
+        target = cli_ctx.arch
+    assert isinstance(target, str)
 
-    cfg = Config(
-        project_dir=proj,
-        output_dir=proj / "out",
-        arch=arch,
-        flavor_id=flavor_id,
-        builder_registry=builder_registry,
-        builder_repository=builder_repository,
-        builder_image=builder_image,
-        release_mode=release_mode,
-    )
+    cfg = cli_ctx.make_config(release_mode=release_mode)
 
     # --- skip mode --------------------------------------------------------
     if cfg.release_mode == "skip":
@@ -141,7 +125,7 @@ def release_publish_cmd(
         from captain import docker
 
         docker.obtain_builder(cfg)
-        sha = _resolve_git_sha(git_sha, proj)
+        sha = _resolve_git_sha(git_sha, cfg.project_dir)
 
         env_args: list[str] = [
             "-e",
@@ -187,8 +171,8 @@ def release_publish_cmd(
         log.error("Install them or set --release-mode=docker.")
         raise SystemExit(1)
 
-    sha = _resolve_git_sha(git_sha, proj)
-    tag = oci.compute_version_tag(proj, sha, exclude=version_exclude)
+    sha = _resolve_git_sha(git_sha, cfg.project_dir)
+    tag = oci.compute_version_tag(cfg.project_dir, sha, exclude=version_exclude)
     tag = f"{tag}-{cfg.flavor_id}"
 
     flavor = captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
