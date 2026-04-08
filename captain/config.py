@@ -58,6 +58,9 @@ class Config:
     # Derived (set in __post_init__)
     arch_info: ArchInfo = field(init=False)
 
+    # Call uv (eg in Docker) using its own --verbose flag
+    verbose_uv: bool = False
+
     def __post_init__(self) -> None:
         self.arch_info = get_arch_info(self.arch)
         self.arch = self.arch_info.arch  # normalise aliases (x86_64 → amd64, etc.)
