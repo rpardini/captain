@@ -6,9 +6,8 @@ import logging
 
 import click
 
-from captain.cli._main import cli, common_options, resolve_project_dir
+from captain.cli._main import CliContext, cli
 from captain.cli._stages import _build_tools_stage
-from captain.config import Config
 
 log = logging.getLogger(__name__)
 
@@ -17,7 +16,6 @@ log = logging.getLogger(__name__)
     "tools",
     short_help="Download tools (containerd, runc, nerdctl, CNI).",
 )
-@common_options
 @click.option(
     "--tools-mode",
     envvar="TOOLS_MODE",
@@ -34,14 +32,10 @@ log = logging.getLogger(__name__)
     default=False,
     help="Re-download tools even if outputs already exist.",
 )
+@click.pass_obj
 def tools_cmd(
+    cli_ctx: CliContext,
     *,
-    arch: str,
-    flavor_id: str,
-    project_dir: str | None,
-    builder_registry: str | None,
-    builder_repository: str | None,
-    builder_image: str,
     tools_mode: str,
     force_tools: bool,
 ) -> None:
@@ -60,16 +54,7 @@ def tools_cmd(
       captain tools --force-tools
     """
 
-    proj = resolve_project_dir(project_dir)
-
-    cfg = Config(
-        project_dir=proj,
-        output_dir=proj / "out",
-        arch=arch,
-        flavor_id=flavor_id,
-        builder_registry=builder_registry,
-        builder_repository=builder_repository,
-        builder_image=builder_image,
+    cfg = cli_ctx.make_config(
         tools_mode=tools_mode,
         force_tools=force_tools,
     )

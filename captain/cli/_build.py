@@ -8,13 +8,12 @@ import click
 
 import captain.flavor
 from captain import artifacts
-from captain.cli._main import cli, common_options, resolve_project_dir
+from captain.cli._main import CliContext, cli
 from captain.cli._stages import (
     _build_iso_stage,
     _build_mkosi_stage,
     _build_tools_stage,
 )
-from captain.config import Config
 
 log = logging.getLogger(__name__)
 
@@ -23,7 +22,6 @@ log = logging.getLogger(__name__)
     "build",
     short_help="Run the full build pipeline via mkosi.",
 )
-@common_options
 @click.option(
     "--mkosi-mode",
     envvar="MKOSI_MODE",
@@ -72,14 +70,10 @@ log = logging.getLogger(__name__)
     default=False,
     help="Force ISO rebuild even if outputs already exist.",
 )
+@click.pass_obj
 def build_cmd(
+    cli_ctx: CliContext,
     *,
-    arch: str,
-    flavor_id: str,
-    project_dir: str | None,
-    builder_registry: str | None,
-    builder_repository: str | None,
-    builder_image: str,
     mkosi_mode: str,
     tools_mode: str,
     iso_mode: str,
@@ -103,16 +97,7 @@ def build_cmd(
       captain build --force --force-tools
     """
 
-    proj = resolve_project_dir(project_dir)
-
-    cfg = Config(
-        project_dir=proj,
-        output_dir=proj / "out",
-        arch=arch,
-        flavor_id=flavor_id,
-        builder_registry=builder_registry,
-        builder_repository=builder_repository,
-        builder_image=builder_image,
+    cfg = cli_ctx.make_config(
         tools_mode=tools_mode,
         mkosi_mode=mkosi_mode,
         iso_mode=iso_mode,
