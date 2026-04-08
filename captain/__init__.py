@@ -17,15 +17,11 @@ from rich.traceback import install as _install_rich_traceback
 # Rich console — writes to stderr so log output never pollutes piped stdout.
 # Install Rich traceback handler globally (once, at import time).
 if os.environ.get("FORCE_COLOR", "0") == "1":
-    console: Console = Console(stderr=True, color_system="standard", width=160, highlight=False)
-    _install_rich_traceback(
-        console=console, show_locals=False, width=160, suppress=[click], max_frames=2
-    )
+    console: Console = Console(stderr=True, color_system="standard", width=160)
+    _install_rich_traceback(console=console, show_locals=True, width=160, suppress=[click])
 else:
     console: Console = Console(stderr=True)
-    _install_rich_traceback(
-        console=console, show_locals=False, width=None, suppress=[click], max_frames=2
-    )
+    _install_rich_traceback(console=console, show_locals=True, width=None, suppress=[click])
 
 
 class _StageFormatter(logging.Formatter):
@@ -45,8 +41,7 @@ _handler = RichHandler(
     show_path=True,
     markup=True,  # interprets [braket]stuff[/bracket] in log messages, beware
     rich_tracebacks=True,
-    tracebacks_show_locals=False,
-    tracebacks_max_frames=2,  # too many frames and we get confused
+    tracebacks_show_locals=True,
     tracebacks_suppress=[click],  # don't wanna see click infra code in traces
 )
 _handler.setFormatter(_StageFormatter("%(stage)s: %(message)s"))
