@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import click
+from trogon import tui
 
 from captain.config import DEFAULT_FLAVOR_ID, Config
 from captain.flavor import list_available_flavors
@@ -67,6 +68,8 @@ def resolve_project_dir(project_dir: str | None) -> Path:
 # ---------------------------------------------------------------------------
 # Top-level Click group
 # ---------------------------------------------------------------------------
+# Important: decorator order matters here.  The @tui() decorator must be outermost
+#            to properly wrap the entire CLI, including subcommands.
 
 CONTEXT_SETTINGS = dict(
     help_option_names=["-h", "--help"],
@@ -74,6 +77,7 @@ CONTEXT_SETTINGS = dict(
 )
 
 
+@tui()
 @click.group(
     context_settings=CONTEXT_SETTINGS,
     invoke_without_command=True,
