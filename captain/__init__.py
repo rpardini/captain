@@ -51,4 +51,4 @@ _handler = RichHandler(
 )
 _handler.setFormatter(_StageFormatter("%(stage)s: %(message)s"))
 
-logging.basicConfig(level="DEBUG", datefmt="[%X]", handlers=[_handler])
+logging.basicConfig(level="INFO", datefmt="[%X]", handlers=[_handler])

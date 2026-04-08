@@ -8,11 +8,10 @@ import click
 
 import captain.flavor
 from captain import artifacts
-from captain.cli._main import cli, common_options, resolve_project_dir
+from captain.cli._main import CliContext, cli
 from captain.cli._stages import (
     _build_iso_stage,
 )
-from captain.config import Config
 
 log = logging.getLogger(__name__)
 
@@ -21,7 +20,6 @@ log = logging.getLogger(__name__)
     "iso",
     short_help="Build ISO image only. Part of build.",
 )
-@common_options
 @click.option(
     "--iso-mode",
     envvar="ISO_MODE",
@@ -38,29 +36,16 @@ log = logging.getLogger(__name__)
     default=False,
     help="Force ISO rebuild even if outputs already exist.",
 )
+@click.pass_obj
 def build_cmd(
+    cli_ctx: CliContext,
     *,
-    arch: str,
-    flavor_id: str,
-    project_dir: str | None,
-    builder_registry: str | None,
-    builder_repository: str | None,
-    builder_image: str,
     iso_mode: str,
     force_iso: bool,
 ) -> None:
     """Run the CaptainOS ISO build."""
 
-    proj = resolve_project_dir(project_dir)
-
-    cfg = Config(
-        project_dir=proj,
-        output_dir=proj / "out",
-        arch=arch,
-        flavor_id=flavor_id,
-        builder_registry=builder_registry,
-        builder_repository=builder_repository,
-        builder_image=builder_image,
+    cfg = cli_ctx.make_config(
         iso_mode=iso_mode,
         force_iso=force_iso,
     )
