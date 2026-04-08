@@ -155,7 +155,7 @@ def release_publish_cmd(
                 "--entrypoint",
                 "/usr/bin/uv",
                 cfg.builder_image,
-                *(["--verbose"] if log.isEnabledFor(logging.DEBUG) else []),
+                *(["--verbose"] if cfg.verbose_uv else ["--quiet"]),
                 "run",
                 *inner_cmd,
             )
