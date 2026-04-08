@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+from abc import abstractmethod
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -69,6 +70,14 @@ class BaseFlavor(Protocol):
             raise SystemExit(1)
         return flavor_dir
 
+    def add_static_dir(self, dir_to_include: str, flavor_dir: Path):
+        extra_dir = flavor_dir / dir_to_include
+        if extra_dir.exists() and extra_dir.is_dir():
+            for extra_file in extra_dir.rglob("*"):
+                if extra_file.is_file():
+                    relative_path = extra_file.relative_to(flavor_dir)
+                    self.static_map[str(relative_path)] = extra_file
+
     def render_templates(self, output_dir: Path):
         log.debug("Called BaseFlavor.render_templates() with output_dir: %s", output_dir)
         # Use jinja2 to render all templates in self.template_map, writing output to output_dir
@@ -111,6 +120,7 @@ class BaseFlavor(Protocol):
             destination_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_path, destination_path)
 
+    @abstractmethod
     def has_iso(self) -> bool:
         return False
 
