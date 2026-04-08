@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-import functools
 import logging
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import click
 
-from captain.config import DEFAULT_FLAVOR_ID
+from captain.config import DEFAULT_FLAVOR_ID, Config
 from captain.flavor import list_available_flavors
 from captain.util import detect_current_machine_arch
 
@@ -18,63 +18,33 @@ log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Shared option decorators
+# CLI context object — shared state for all subcommands
 # ---------------------------------------------------------------------------
 
 
-def common_options(fn: Any) -> Any:
-    """Decorate a click command with options shared by every subcommand."""
+@dataclass(slots=True)
+class CliContext:
+    """Resolved common CLI options, passed to subcommands via ``@click.pass_obj``."""
 
-    @click.option(
-        "--arch",
-        envvar="ARCH",
-        default=(detect_current_machine_arch()),
-        show_default=True,
-        type=click.Choice(["amd64", "arm64"], case_sensitive=False),
-        metavar="ARCH",
-        help="Target architecture (amd64, arm64).",
-    )
-    @click.option(
-        "--flavor-id",
-        envvar="FLAVOR_ID",
-        default=DEFAULT_FLAVOR_ID,
-        show_default=True,
-        type=click.Choice(list_available_flavors(), case_sensitive=False),
-        help="Flavor (kernel/board config) to build.",
-    )
-    @click.option(
-        "--project-dir",
-        envvar="CAPTAIN_PROJECT_DIR",
-        default=None,
-        type=click.Path(exists=True, file_okay=False, resolve_path=True),
-        help="Project root directory (auto-detected when omitted).",
-    )
-    @click.option(
-        "--builder-registry",
-        envvar="REGISTRY",
-        default="ghcr.io",
-        show_default=True,
-        help="OCI registry hostname for the Docker builder image",
-    )
-    @click.option(
-        "--builder-repository",
-        envvar="GITHUB_REPOSITORY",
-        default="tinkerbell/captain",
-        show_default=True,
-        help="Repository path (owner/name) for the Docker builder image",
-    )
-    @click.option(
-        "--builder-image",
-        envvar="BUILDER_IMAGE",
-        default="captainos-builder",
-        show_default=True,
-        help="Local name/tag of Docker builder image name",
-    )
-    @functools.wraps(fn)
-    def wrapper(**kwargs: Any) -> Any:
-        return fn(**kwargs)
+    project_dir: Path
+    arch: str
+    flavor_id: str
+    builder_registry: str | None
+    builder_repository: str | None
+    builder_image: str
 
-    return wrapper
+    def make_config(self, **overrides: Any) -> Config:
+        """Build a :class:`Config` from the common options plus per-command *overrides*."""
+        return Config(
+            project_dir=self.project_dir,
+            output_dir=self.project_dir / "out",
+            arch=self.arch,
+            flavor_id=self.flavor_id,
+            builder_registry=self.builder_registry,
+            builder_repository=self.builder_repository,
+            builder_image=self.builder_image,
+            **overrides,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -116,11 +86,88 @@ CONTEXT_SETTINGS = dict(
     ),
 )
 @click.version_option(package_name="captain")
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    default=False,
+    envvar="CAPTAIN_VERBOSE",
+    help="Enable verbose (DEBUG-level) logging.",
+)
+@click.option(
+    "--arch",
+    envvar="ARCH",
+    default=(detect_current_machine_arch()),
+    show_default=True,
+    type=click.Choice(["amd64", "arm64"], case_sensitive=False),
+    metavar="ARCH",
+    help="Target architecture (amd64, arm64).",
+)
+@click.option(
+    "--flavor-id",
+    envvar="FLAVOR_ID",
+    default=DEFAULT_FLAVOR_ID,
+    show_default=True,
+    type=click.Choice(list_available_flavors(), case_sensitive=False),
+    help="Flavor (kernel/board config) to build.",
+)
+@click.option(
+    "--project-dir",
+    envvar="CAPTAIN_PROJECT_DIR",
+    default=None,
+    type=click.Path(exists=True, file_okay=False, resolve_path=True),
+    help="Project root directory (auto-detected when omitted).",
+)
+@click.option(
+    "--builder-registry",
+    envvar="REGISTRY",
+    default="ghcr.io",
+    show_default=True,
+    help="OCI registry hostname for the Docker builder image",
+)
+@click.option(
+    "--builder-repository",
+    envvar="GITHUB_REPOSITORY",
+    default="tinkerbell/captain",
+    show_default=True,
+    help="Repository path (owner/name) for the Docker builder image",
+)
+@click.option(
+    "--builder-image",
+    envvar="BUILDER_IMAGE",
+    default="captainos-builder",
+    show_default=True,
+    help="Local name/tag of Docker builder image name",
+)
 @click.pass_context
-def cli(ctx: click.Context) -> None:
+def cli(
+    ctx: click.Context,
+    *,
+    verbose: bool,
+    arch: str,
+    flavor_id: str,
+    project_dir: str | None,
+    builder_registry: str | None,
+    builder_repository: str | None,
+    builder_image: str,
+) -> None:
     """CaptainOS build system — click CLI."""
+    # Configure log level based on --verbose.
+    logging.getLogger().setLevel(logging.DEBUG if verbose else logging.INFO)
+
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
+        return
+
+    # Build the shared context object for subcommands.
+    ctx.obj = CliContext(
+        project_dir=resolve_project_dir(project_dir),
+        arch=arch,
+        flavor_id=flavor_id,
+        builder_registry=builder_registry,
+        builder_repository=builder_repository,
+        builder_image=builder_image,
+    )
 
 
 # ---------------------------------------------------------------------------
