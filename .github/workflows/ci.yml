@@ -159,8 +159,12 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: initramfs-${{ matrix.FLAVOR_ID }}-${{ matrix.arch }}
-          path: out/
+          # The full 'out/' directory contents, but not any .iso files (if any) since those are uploaded later
+          path: |
+            out/
+            !out/**/*.iso
           retention-days: 1
+          # do not upload any .iso files (exclude)
 
       # -------------------------------------------------------------------
       # UEFI-bootable ISO - only for certain flavors (eg trixie-full)
