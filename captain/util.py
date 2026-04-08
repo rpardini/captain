@@ -13,6 +13,7 @@ from pathlib import Path
 
 from rich.panel import Panel
 from rich.rule import Rule
+from rich.syntax import Syntax
 
 import captain
 
@@ -79,7 +80,15 @@ def run(
 
     # If not capturing, and debugging, emit a Rich separator line, for visual clarity.
     if not capture and log.isEnabledFor(logging.DEBUG):
-        captain.console.print(Panel(f"Running command: {' '.join(cmd)}", style="green"))
+        syntax = Syntax(
+            " ".join(cmd), "bash", theme="monokai", word_wrap=True, background_color="default"
+        )
+        panel = Panel(
+            syntax,
+            title="Executing shell command",
+            width=captain.console.width,
+        )
+        captain.console.print(panel)
         captain.console.print(Rule(f"⮕ Starting subprocess: {cmd} ⮕", style="green"))
 
     proc = subprocess.run(
