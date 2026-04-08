@@ -1,4 +1,5 @@
 import logging
+from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,39 +19,25 @@ class DebianCommonFlavor(BaseFlavor):
         super().setup(cfg, flavor_dir)
 
         this_flavor_dir = self.specific_flavor_dir("common-debian")
+
+        # Templates
         self.template_map["mkosi.conf"] = [this_flavor_dir / "mkosi.conf.j2"]
+
         self.template_map["mkosi.postinst"] = [
             this_flavor_dir / "bash.header.sh",
             this_flavor_dir / "mkosi.postinst.sh.j2",
         ]
+
         self.template_map["mkosi.finalize"] = [
             this_flavor_dir / "bash.header.sh",
             this_flavor_dir / "mkosi.finalize.sh.j2",
         ]
 
-        # Now, lets enumerate and add all the static files this flavor's mkosi.extra directory
-        # and add them to self.static_map with the key being the relative path from the flavor dir
-        extra_dir = this_flavor_dir / "mkosi.extra"
-        if extra_dir.exists() and extra_dir.is_dir():
-            for extra_file in extra_dir.rglob("*"):
-                if extra_file.is_file():
-                    relative_path = extra_file.relative_to(this_flavor_dir)
-                    self.static_map[str(relative_path)] = extra_file
+        # Static files
+        self.add_static_dir("mkosi.extra", this_flavor_dir)
+        self.add_static_dir("mkosi.sandbox", this_flavor_dir)
+        self.add_static_dir("mkosi.skeleton", this_flavor_dir)
 
-        # Now, lets enumerate and add all the static files this flavor's mkosi.sandbox directory
-        # and add them to self.static_map with the key being the relative path from the flavor dir
-        extra_dir = this_flavor_dir / "mkosi.sandbox"
-        if extra_dir.exists() and extra_dir.is_dir():
-            for extra_file in extra_dir.rglob("*"):
-                if extra_file.is_file():
-                    relative_path = extra_file.relative_to(this_flavor_dir)
-                    self.static_map[str(relative_path)] = extra_file
-
-        # Now, lets enumerate and add all the static files this flavor's mkosi.skeleton directory
-        # and add them to self.static_map with the key being the relative path from the flavor dir
-        extra_dir = this_flavor_dir / "mkosi.skeleton"
-        if extra_dir.exists() and extra_dir.is_dir():
-            for extra_file in extra_dir.rglob("*"):
-                if extra_file.is_file():
-                    relative_path = extra_file.relative_to(this_flavor_dir)
-                    self.static_map[str(relative_path)] = extra_file
+    @abstractmethod
+    def kernel_packages(self) -> set[str]:
+        pass
