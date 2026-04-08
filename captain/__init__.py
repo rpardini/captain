@@ -8,17 +8,21 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 
 import click
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.traceback import install as _install_rich_traceback
 
+# Obtain terminal width
+env_columns = shutil.get_terminal_size(fallback=(161, 24)).columns
+
 # Rich console — writes to stderr so log output never pollutes piped stdout.
 # Install Rich traceback handler globally (once, at import time).
 if os.environ.get("FORCE_COLOR", "0") == "1":
-    console: Console = Console(stderr=True, color_system="standard", width=160)
-    _install_rich_traceback(console=console, show_locals=True, width=160, suppress=[click])
+    console: Console = Console(stderr=True, color_system="standard", width=env_columns)
+    _install_rich_traceback(console=console, show_locals=True, width=env_columns, suppress=[click])
 else:
     console: Console = Console(stderr=True)
     _install_rich_traceback(console=console, show_locals=True, width=None, suppress=[click])
@@ -26,11 +30,10 @@ else:
 
 class _StageFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        name = record.name
+        name = record.name.replace("captain.", "")
         record.__dict__["stage"] = name
         if os.environ.get("CAPTAIN_IN_DOCKER", "") == "docker":
-            # Running on host: show stage names in blue for visual clarity.
-            record.__dict__["stage"] = f"[bold][blue]in-docker[/bold]: [/blue]{name}"
+            record.__dict__["stage"] = f"🐳 {name}"
         return super().format(record)
 
 
@@ -44,6 +47,6 @@ _handler = RichHandler(
     tracebacks_show_locals=True,
     tracebacks_suppress=[click],  # don't wanna see click infra code in traces
 )
-_handler.setFormatter(_StageFormatter("%(stage)s: %(message)s"))
+_handler.setFormatter(_StageFormatter("[bold][cyan]%(stage)s[/cyan][/bold]: %(message)s"))
 
 logging.basicConfig(level="INFO", datefmt="[%X]", handlers=[_handler])
