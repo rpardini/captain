@@ -1,7 +1,7 @@
 [Unit]
 Description=Tink Agent Setup (pull image and extract binary)
-After=containerd.service network-online.target systemd-resolved.service time-set.target
-Wants=network-online.target time-set.target
+After=containerd.service network-online.target systemd-resolved.service time-sync.target
+Wants=network-online.target time-sync.target
 Requires=containerd.service
 # Only start when Tinkerbell parameters are on the kernel command line
 ConditionKernelCommandLine=|tink_worker_image
