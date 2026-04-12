@@ -16,59 +16,14 @@ mount || true
 log info "Generating fresh CA certificate bundle..."
 update-ca-certificates --fresh 2>/dev/null || true
 
-# @TODO: this is the wrong place to do any systemd enablement/disablement/masking: mkosi will
-# after this still apply systemd "presets" which will change the game completely.
-# This is better done in a finalize.chroot script which would run after that.
-# alternatively: adopt/introduce systemd presets, but that's a can of worms.
-
-log info "Listing all systemd units..."
-systemctl list-unit-files --no-pager || true
-
-log info "CaptainOS post-install: configuring services..."
-# Enable core services
-declare -a units_to_enable=(
-     systemd-networkd systemd-resolved systemd-timesyncd containerd captainos-banner
-     systemd-time-wait-sync # wait for time sync
-     captainos-static-network tink-agent-setup tink-agent rsyslog rsyslog-hostname-reload.path
-)
-declare unit
-for unit in "${units_to_enable[@]}"; do
-    log info "Enabling systemd unit ${unit}..."
-    if systemctl enable "${unit}"; then
-        log info "    ${unit} enabled successfully."
-    else
-        log warning "    Failed to enable ${unit}, but continuing anyway..."
-    fi
-done
+# Service enablement/disablement is handled via systemd preset files:
+#   - mkosi.extra/etc/systemd/system-preset/10-captainos-tink.preset  (tink-agent and CaptainOS services)
+#   - mkosi.extra/etc/systemd/system-preset/20-captainos-base.preset  (base system services and cleanup)
+# mkosi applies presets automatically after post-install, so no manual
+# systemctl enable/disable calls are needed here.
 
 # Root password is set via mkosi.conf RootPassword= setting
 
-# Disable unnecessary systemd units to speed up boot
-declare -a units_to_disable=(
-    apt-daily.timer
-    apt-daily-upgrade.timer
-    e2scrub_all.timer
-    e2scrub_reap.service
-    fstrim.timer
-    logrotate.timer
-    man-db.timer
-    remote-fs.target
-    systemd-firstboot.service
-)
-for unit in "${units_to_disable[@]}"; do
-    log info "Disabling and masking systemd unit ${unit}..."
-    if systemctl disable "${unit}"; then
-        log info "    ${unit} disabled successfully."
-    else
-        log warning "    Failed to disable ${unit}, but continuing anyway..."
-    fi
-
-    if systemctl mask "${unit}"; then
-        log info "    ${unit} masked successfully."
-    else
-        log warning "    Failed to mask ${unit}, but continuing anyway..."
-    fi
-done
 
 # Set default target to multi-user (no graphical)
 log info "Setting default systemd target to multi-user.target (no graphical)..."
