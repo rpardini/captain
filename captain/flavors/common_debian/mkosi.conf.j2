@@ -19,6 +19,9 @@ CleanPackageMetadata=yes
 Autologin=yes
 # Skips installing documentation/man pages
 WithDocs=no
+# Adds .deb's found in those directories to a local apt repo that can be installed from.
+PackageDirectories=
+    {{ ' '.join(flavor.package_directories()) }}
 
 # Do NOT set MakeInitrd=yes — that adds /etc/initrd-release which causes
 # systemd to enter initrd mode and try switch-root to a real rootfs.
