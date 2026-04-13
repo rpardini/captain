@@ -11,12 +11,18 @@ from captain.util import ArchInfo, get_arch_info
 
 log = logging.getLogger(__name__)
 
-# Valid values for ISO_MODE and MKOSI_MODE.
+# Valid values for KERNEL_MODE and MKOSI_MODE.
 VALID_MODES = ("docker", "native", "skip")
 
 # The single source of truth for the default flavor.
 # Override at runtime via --flavor-id or FLAVOR_ID env var.
 DEFAULT_FLAVOR_ID = "trixie-full"
+
+# Fallback for the default kernel version.
+# The latest version can be obtained and passed as --kernel-version/KERNEL_VERSION
+# via <@TODO cmd for listing from cached releases.json
+# Override at runtime via --kernel-version or KERNEL_VERSION env var.
+DEFAULT_KERNEL_VERSION = "6.18.22"
 
 
 @dataclass(slots=True)
@@ -31,6 +37,13 @@ class Config:
     arch: str = "amd64"
     flavor_id: str = DEFAULT_FLAVOR_ID
 
+    # For kernel build
+    build_kernel: bool = False
+    kernel_version: str = DEFAULT_KERNEL_VERSION
+    kernel_config: str | None = None
+    kernel_src: str | None = None
+    force_kernel: bool = False
+
     # Docker
     builder_registry: str | None = None
     builder_repository: str | None = None
@@ -42,6 +55,7 @@ class Config:
     mkosi_mode: str = "docker"
     iso_mode: str = "docker"
     release_mode: str = "docker"
+    kernel_mode: str = "docker"
 
     # Force flags
     force_tools: bool = False
@@ -69,6 +83,7 @@ class Config:
             ("MKOSI_MODE", self.mkosi_mode),
             ("ISO_MODE", self.iso_mode),
             ("RELEASE_MODE", self.release_mode),
+            ("KERNEL_MODE", self.kernel_mode),
         ):
             if value not in VALID_MODES:
                 log.error("%s=%r is invalid. Valid values: %s", name, value, ", ".join(VALID_MODES))
@@ -83,6 +98,27 @@ class Config:
         Kernel modules are stored separately under :attr:`kernel_output`.
         """
         return self.project_dir / "mkosi.output" / "tools" / self.arch
+
+    @property
+    def kernel_output(self) -> Path:
+        """Per-version, per-arch directory for all kernel build artifacts.
+
+        Contains the vmlinuz image (loaded separately by iPXE) and
+        a ``modules/`` subtree that mirrors a root filesystem layout
+        (``usr/lib/modules/{kver}/``) so it can be passed directly
+        as an ``--extra-tree=`` to mkosi.
+        """
+        return self.project_dir / "mkosi.output" / "kernel" / self.kernel_version / self.arch
+
+    @property
+    def modules_output(self) -> Path:
+        """Per-version, per-arch root for kernel modules.
+
+        Returns ``kernel/{version}/{arch}/modules`` which contains a
+        merged-usr tree (``usr/lib/modules/{kver}/``) suitable for
+        passing as ``--extra-tree=`` to mkosi.
+        """
+        return self.kernel_output / "modules"
 
     @property
     def mkosi_output(self) -> Path:
