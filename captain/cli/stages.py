@@ -11,7 +11,7 @@ from captain.util import check_kernel_dependencies, check_mkosi_dependencies, ru
 log = logging.getLogger(__name__)
 
 
-def _build_kernel_stage(cfg: Config) -> None:
+def build_kernel_stage(cfg: Config) -> None:
     """Run the kernel build stage according to *cfg.kernel_mode*."""
     log.warning("Building kernel stage in mode %s", cfg.kernel_mode)
 
@@ -91,8 +91,13 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
         mkosi_conf_path = cfg.project_dir / "mkosi.conf"
         if mkosi_conf_path.is_file():
             mkosi_conf_content = mkosi_conf_path.read_text()
-            syntax = Syntax(mkosi_conf_content, "ini", theme="monokai", line_numbers=True,
-                            background_color="default")
+            syntax = Syntax(
+                mkosi_conf_content,
+                "ini",
+                theme="monokai",
+                line_numbers=True,
+                background_color="default",
+            )
             panel = Panel(syntax, title="mkosi.conf", border_style="blue")
             print(panel)
         else:
