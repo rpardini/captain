@@ -7,7 +7,7 @@ import logging
 import click
 
 from captain.cli._main import CliContext, cli
-from captain.cli._stages import _build_tools_stage
+from captain.cli.stages import _build_tools_stage
 
 log = logging.getLogger(__name__)
 
