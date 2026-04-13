@@ -6,7 +6,7 @@ import click
 
 from captain import config
 from captain.cli._main import CliContext, cli
-from captain.cli._stages import _build_kernel_stage
+from captain.cli.stages import build_kernel_stage
 
 log = logging.getLogger(__name__)
 
@@ -55,5 +55,5 @@ def kernel_cmd(
         build_kernel=True,
     )
 
-    _build_kernel_stage(cfg)
+    build_kernel_stage(cfg)
     log.info("Kernel build stage complete!")
