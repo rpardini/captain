@@ -33,6 +33,7 @@ class CliContext:
     builder_registry: str | None
     builder_repository: str | None
     builder_image: str
+    verbose_docker: bool
 
     def make_config(self, **overrides: Any) -> Config:
         """Build a :class:`Config` from the common options plus per-command *overrides*."""
@@ -44,6 +45,7 @@ class CliContext:
             builder_registry=self.builder_registry,
             builder_repository=self.builder_repository,
             builder_image=self.builder_image,
+            verbose_docker=self.verbose_docker,
             **overrides,
         )
 
@@ -171,6 +173,7 @@ def cli(
         builder_registry=builder_registry,
         builder_repository=builder_repository,
         builder_image=builder_image,
+        verbose_docker=verbose,
     )
 
 
