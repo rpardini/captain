@@ -9,7 +9,7 @@ import click
 import captain.flavor
 from captain import artifacts
 from captain.cli._main import CliContext, cli
-from captain.cli._stages import (
+from captain.cli.stages import (
     _build_iso_stage,
 )
 
