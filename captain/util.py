@@ -26,9 +26,14 @@ class ArchInfo:
 
     arch: str  # canonical name: amd64 | arm64
     output_arch: str  # user-facing name in artifact filenames: x86_64 | aarch64
+    kernel_arch: str  # kernel ARCH value
+    cross_compile: str  # CROSS_COMPILE prefix (empty for native)
+    image_target: str  # kernel image make target
+    kernel_image_path: str  # relative path to built kernel image
     dl_arch: str  # architecture name in download URLs
     mkosi_arch: str  # mkosi --architecture value
     qemu_binary: str  # QEMU system emulator binary
+    strip_prefix: str  # prefix for strip command
 
 
 def get_arch_info(arch: str) -> ArchInfo:
@@ -38,17 +43,27 @@ def get_arch_info(arch: str) -> ArchInfo:
             return ArchInfo(
                 arch="amd64",
                 output_arch="x86_64",
+                kernel_arch="x86_64",
+                cross_compile="",
+                image_target="bzImage",
+                kernel_image_path="arch/x86/boot/bzImage",
                 dl_arch="amd64",
                 mkosi_arch="x86-64",
                 qemu_binary="qemu-system-x86_64",
+                strip_prefix="",
             )
         case "arm64" | "aarch64":
             return ArchInfo(
                 arch="arm64",
                 output_arch="aarch64",
+                kernel_arch="arm64",
+                cross_compile="aarch64-linux-gnu-",
+                image_target="Image",
+                kernel_image_path="arch/arm64/boot/Image",
                 dl_arch="arm64",
                 mkosi_arch="arm64",
                 qemu_binary="qemu-system-aarch64",
+                strip_prefix="aarch64-linux-gnu-",
             )
         case _:
             log.error("Unsupported architecture: %s", arch)
@@ -162,6 +177,17 @@ def _missing(cmds: list[str]) -> list[str]:
     return [cmd for cmd in cmds if _shutil.which(cmd) is None]
 
 
+def check_kernel_dependencies(arch: str) -> list[str]:
+    """Check host tools required for a native kernel build.
+
+    Returns a list of missing command names (empty if all found).
+    """
+    required = ["make", "gcc", "flex", "bison", "bc", "rsync", "strip", "zstd", "depmod"]
+    if arch in ("arm64", "aarch64"):
+        required += ["aarch64-linux-gnu-gcc", "aarch64-linux-gnu-strip"]
+    return _missing(required)
+
+
 def check_mkosi_dependencies() -> list[str]:
     """Check host tools required for a native mkosi image build.
 
@@ -192,4 +218,4 @@ def check_dependencies(arch: str) -> list[str]:
 
     Returns a list of missing command names (empty if all found).
     """
-    return check_mkosi_dependencies()
+    return check_kernel_dependencies(arch) + check_mkosi_dependencies()
