@@ -163,28 +163,21 @@ jobs:
           retention-days: 1
 
 
-  # -------------------------------------------------------------------
-  # Build initramfs via mkosi (depends on tools)
-  # -------------------------------------------------------------------
-  build-captainos:
+  build-captainos-with-kernel: # only for flavors that require the custom CaptainOS kernel; otherwise, just build-captainos
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     needs: [ download-tools, build-dockerfile, build-captainos-kernel ]
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { arch: amd64, output_arch: x86_64, captainos_kernel: true, iso: true, FLAVOR_ID: "trixie-full" }
-          - { arch: arm64, output_arch: aarch64, captainos_kernel: true, iso: true, FLAVOR_ID: "trixie-full" }
-          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-rockchip64" }
-          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-rockchip64-vendor" }
-          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-meson64" }
-          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-armbian-rpi" }
-    env:
+          - { arch: amd64, output_arch: x86_64, captainos_kernel: true, iso: true, FLAVOR_ID: "trixie-slim" }
+          - { arch: arm64, output_arch: aarch64, captainos_kernel: true, iso: true, FLAVOR_ID: "trixie-slim" }
+    env: &build_env
       ARCH: ${{ matrix.arch }}
       MKOSI_MODE: docker
       ISO_MODE: docker
       FLAVOR_ID: ${{ matrix.FLAVOR_ID }}
-    steps:
+    steps: &build_steps
       - name: Checkout code
         uses: actions/checkout@v6
 
@@ -194,7 +187,7 @@ jobs:
           name: tools-${{ matrix.arch }}
           path: mkosi.output/tools/${{ matrix.arch }}
 
-      - name: Download kernel artifacts
+      - name: Download kernel artifacts == ${{ matrix.captainos_kernel }}
         uses: actions/download-artifact@v8
         if: ${{ matrix.captainos_kernel }} # only if matrix entry had captainos_kernel: true
         with:
@@ -254,6 +247,22 @@ jobs:
         env:
           TARGET: ${{ matrix.arch }}
         run: uv run captain release-publish
+
+  build-captainos: # those use regular Debian apt repos for kernels
+    steps: *build_steps
+    env: *build_env
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    needs: [ download-tools, build-dockerfile ]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, output_arch: x86_64, captainos_kernel: false, iso: true, FLAVOR_ID: "trixie-full" }
+          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: true, FLAVOR_ID: "trixie-full" }
+          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-rockchip64" }
+          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-rockchip64-vendor" }
+          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-meson64" }
+          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-armbian-rpi" }
 
   # -------------------------------------------------------------------
   # Publish combined multi-arch image (reuses per-arch registry blobs)
