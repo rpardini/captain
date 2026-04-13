@@ -17,6 +17,7 @@ apt-get -o "Dpkg::Use-Pty=0" update
 apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends \
     "grub-efi-${NATIVE_ARCH}-bin" \
     "grub-efi-${FOREIGN_ARCH}-bin:${FOREIGN_ARCH}" \
+    "libssl-dev:${FOREIGN_ARCH}" \
     grub-common \
     apt \
     dpkg \
@@ -108,14 +109,21 @@ RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends \
 # Buildah is pretty huge, gets its own layer.
 RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends buildah
 
-# This is just to appease mkosi's later stages.
-RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends python3 python3-pip python3-pefile
+# FYI: Rust stuff for kernel build is about 1.3gb
+# RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends rustc rust-src bindgen rustfmt rust-clippy
 
-# Rust stuff for kernel build.
-RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends rustc rust-src bindgen rustfmt rust-clippy
+RUN <<-EXTRA_FRAG
+# Extra packages for mkosi and kernel builds
+
+# This is just to appease mkosi's later stages, as it re-launches itself using the system Python
+apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends python3 python3-pip python3-pefile
 
 # For kernel's bindeb-pkg and menuconfig
-RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends debhelper libdw-dev lsb-release libncurses-dev
+apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends debhelper libdw-dev lsb-release libncurses-dev
+
+# For mkosi using Content.PackageDirectories (creating local repo)
+apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends apt-utils
+EXTRA_FRAG
 
 RUN <<-CONFIG_FRAG
 ## A few small config fragments to make life easier
