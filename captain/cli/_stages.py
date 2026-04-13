@@ -4,11 +4,65 @@ from __future__ import annotations
 
 import logging
 
-from captain import docker, iso, tools
+from captain import docker, iso, kernel, tools
 from captain.config import Config
-from captain.util import check_mkosi_dependencies, run
+from captain.util import check_kernel_dependencies, check_mkosi_dependencies, run
 
 log = logging.getLogger(__name__)
+
+
+def _build_kernel_stage(cfg: Config) -> None:
+    """Run the kernel build stage according to *cfg.kernel_mode*."""
+    log.warning("Building kernel stage in mode %s", cfg.kernel_mode)
+
+    # --- skip ---------------------------------------------------------
+    if cfg.kernel_mode == "skip":
+        log.info("KERNEL_MODE=skip — skipping kernel build")
+        return
+
+    # --- idempotency --------------------------------------------------
+    modules_dir = cfg.modules_output / "usr" / "lib" / "modules"
+    vmlinuz_dir = cfg.kernel_output
+    has_vmlinuz = vmlinuz_dir.is_dir() and any(vmlinuz_dir.glob("vmlinuz-*"))
+    log.debug("Kernel build idempotency check: modules_dir=%s exists=%s", modules_dir,
+              modules_dir.is_dir())
+    log.debug("Kernel build idempotency check: vmlinuz_dir=%s exists=%s", vmlinuz_dir,
+              vmlinuz_dir.is_dir())
+    log.debug(
+        "Checking kernel build idempotency: modules_dir=%s, has_vmlinuz=%s",
+        modules_dir,
+        has_vmlinuz,
+    )
+
+    if modules_dir.is_dir() and has_vmlinuz and not cfg.force_kernel:
+        log.info("Kernel already built (use --force-kernel to rebuild)")
+        return
+
+    if modules_dir.is_dir() and not has_vmlinuz:
+        log.warning("Modules exist but vmlinuz is missing — rebuilding kernel")
+
+    # --- native -------------------------------------------------------
+    if cfg.kernel_mode == "native":
+        missing = check_kernel_dependencies(cfg.arch)
+        if missing:
+            log.error("Missing kernel build tools: %s", ", ".join(missing))
+            log.error("Install them or set --kernel-mode=docker.")
+            raise SystemExit(1)
+        log.info("Building kernel (native)...")
+        kernel.build(cfg)
+        return
+
+    # --- docker -------------------------------------------------------
+    docker.obtain_builder(cfg)
+    log.info("Building kernel (docker relaunch)...")
+    docker.run_captain_in_builder(cfg, "kernel")
+    docker.fix_docker_ownership(
+        cfg,
+        [
+            f"/work/mkosi.output/kernel/{cfg.kernel_version}/{cfg.arch}",
+            "/work/out",
+        ],
+    )
 
 
 def _build_tools_stage(cfg: Config) -> None:
