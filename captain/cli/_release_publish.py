@@ -151,13 +151,15 @@ def release_publish_cmd(
         try:
             docker.run_in_builder(
                 cfg,
-                *env_args,
-                "--entrypoint",
-                "/usr/bin/uv",
-                cfg.builder_image,
-                *(["--verbose"] if cfg.verbose_uv else ["--quiet"]),
-                "run",
-                *inner_cmd,
+                command_and_args=[
+                    "--entrypoint",
+                    "/usr/bin/uv",
+                    cfg.builder_image,
+                    *(["--verbose"] if cfg.verbose_uv else ["--quiet"]),
+                    "run",
+                    *inner_cmd,
+                ],
+                extra_docker_args=env_args,
             )
         except subprocess.CalledProcessError as exc:
             raise SystemExit(exc.returncode) from None
