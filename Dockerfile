@@ -111,6 +111,12 @@ RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends buildah
 # This is just to appease mkosi's later stages.
 RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends python3 python3-pip python3-pefile
 
+# Rust stuff for kernel build.
+RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends rustc rust-src bindgen rustfmt rust-clippy
+
+# For kernel's bindeb-pkg and menuconfig
+RUN apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends debhelper libdw-dev lsb-release libncurses-dev
+
 RUN <<-CONFIG_FRAG
 ## A few small config fragments to make life easier
 # git: Ignore owner mismatches in /work, which will be bind-mounted from the host
