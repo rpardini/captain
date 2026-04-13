@@ -14,6 +14,7 @@ from pathlib import Path
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.syntax import Syntax
+from rich.table import Table
 
 import captain
 
@@ -104,6 +105,15 @@ def run(
             width=captain.console.width,
         )
         captain.console.print(panel)
+        if env:
+            # add a Rich Table with the env vars, two columns
+            table = Table(show_header=True, header_style="bold magenta")
+            table.add_column("Env Var", style="cyan", no_wrap=True)
+            table.add_column("Value", style="white")
+            for k, v in env.items():
+                table.add_row(k, v)
+            captain.console.print(table)
+
         captain.console.print(Rule(f"⮕ Starting subprocess: {cmd} ⮕", style="green"))
 
     proc = subprocess.run(
