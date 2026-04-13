@@ -124,6 +124,9 @@ class BaseFlavor(Protocol):
     def has_iso(self) -> bool:
         return False
 
+    def pre_mkosi_stage(self):
+        pass
+
 
 def list_available_flavors() -> list[str]:
     import importlib
