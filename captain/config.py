@@ -40,15 +40,15 @@ class Config:
     # For kernel build
     build_kernel: bool = False
     kernel_version: str = DEFAULT_KERNEL_VERSION
-    kernel_config: str | None = None
-    kernel_src: str | None = None
     force_kernel: bool = False
+    kernel_clean: bool = False
 
     # Docker
     builder_registry: str | None = None
     builder_repository: str | None = None
     builder_image: str = "captainos-builder"
     builder_push: bool = False
+    verbose_docker: bool = False  # Pass --verbose to captain when re-launched in Docker
 
     # Per-stage mode: "docker" | "native" | "skip"
     tools_mode: str = "docker"
@@ -108,17 +108,7 @@ class Config:
         (``usr/lib/modules/{kver}/``) so it can be passed directly
         as an ``--extra-tree=`` to mkosi.
         """
-        return self.project_dir / "mkosi.output" / "kernel" / self.kernel_version / self.arch
-
-    @property
-    def modules_output(self) -> Path:
-        """Per-version, per-arch root for kernel modules.
-
-        Returns ``kernel/{version}/{arch}/modules`` which contains a
-        merged-usr tree (``usr/lib/modules/{kver}/``) suitable for
-        passing as ``--extra-tree=`` to mkosi.
-        """
-        return self.kernel_output / "modules"
+        return self.project_dir / "mkosi.output" / "kernel" / self.arch
 
     @property
     def mkosi_output(self) -> Path:

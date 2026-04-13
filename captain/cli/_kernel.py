@@ -1,12 +1,10 @@
-"""``captain tools`` — download tools (containerd, runc, nerdctl, CNI plugins)."""
-
 from __future__ import annotations
 
 import logging
 
 import click
 
-from captain import artifacts, config
+from captain import config
 from captain.cli._main import CliContext, cli
 from captain.cli._stages import _build_kernel_stage
 
@@ -41,7 +39,7 @@ log = logging.getLogger(__name__)
     help="Kernel version to build. Must match an official tarball.",
 )
 @click.pass_obj
-def tools_cmd(
+def kernel_cmd(
     cli_ctx: CliContext,
     *,
     kernel_mode: str,
@@ -58,5 +56,4 @@ def tools_cmd(
     )
 
     _build_kernel_stage(cfg)
-    artifacts.collect_kernel(cfg)
     log.info("Kernel build stage complete!")
