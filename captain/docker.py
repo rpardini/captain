@@ -12,6 +12,7 @@ from rich.table import Table
 
 import captain
 from captain.config import Config
+from captain.kernel import KERNEL_BUILD_BASE_PATH
 from captain.util import detect_current_machine_arch, run
 
 log = logging.getLogger(__name__)
@@ -152,10 +153,13 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "CAPTAIN_IN_DOCKER": "docker",
         "ARCH": cfg.arch,
         "FLAVOR_ID": cfg.flavor_id,
+        "KERNEL_VERSION": cfg.kernel_version,
         "FORCE_TOOLS": str(int(cfg.force_tools)),
         "FORCE_ISO": str(int(cfg.force_iso)),
+        "FORCE_KERNEL": f"{int(cfg.force_kernel)!s}",
         "BUILDAH_ISOLATION": "chroot",
         "BUILDAH_INSECURE": os.environ.get("BUILDAH_INSECURE", ""),
+        "KERNEL_MODE": "native",
         "RELEASE_MODE": "native",
         "TOOLS_MODE": "native",
         "MKOSI_MODE": "native",
@@ -194,6 +198,7 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
     for k, v in docker_envs.items():
         docker_args += ["-e", f"{k}={v}"]
 
+    docker_args += ["-v", f"{cfg.project_dir}/kernel.configs:/work/kernel.configs"]
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.output:/work/mkosi.output"]
     docker_args += ["-v", f"{cfg.project_dir}/out:/work/out"]
 
@@ -210,6 +215,10 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
     docker_args += ["-v", f"{cfg.project_dir}/build.py:/work/build.py"]
 
     docker_args += ["--mount", "type=volume,source=captain-cache-packages,target=/cache/packages"]
+    docker_args += [
+        "--mount",
+        f"type=volume,source=captain-kernel-build,target={KERNEL_BUILD_BASE_PATH}",
+    ]
 
     docker_args.extend(extra_args)
     run(docker_args)
