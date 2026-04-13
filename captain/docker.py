@@ -143,7 +143,9 @@ def obtain_builder(cfg: Config) -> None:
         run(["docker", "push", remote_tagged_image])
 
 
-def run_in_builder(cfg: Config, *extra_args: str) -> None:
+def run_in_builder(
+    cfg: Config, command_and_args: list[str], extra_docker_args: list[str] | None = None
+) -> None:
     """Run a command inside the Docker builder container.
 
     *extra_args* are appended after the docker run flags and image name.
@@ -174,6 +176,7 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "REGISTRY_AUTH_FILE": os.environ.get("REGISTRY_AUTH_FILE", ""),
         "REGISTRY_USERNAME": os.environ.get("REGISTRY_USERNAME", ""),
         "REGISTRY_PASSWORD": os.environ.get("REGISTRY_PASSWORD", ""),
+        "CAPTAIN_VERBOSE": "1" if cfg.verbose_docker else "0",
     }
 
     docker_args: list[str] = [
@@ -184,6 +187,10 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "-w",
         "/work",
     ]
+
+    if extra_docker_args is not None:
+        log.debug("Adding extra Docker args: %s", extra_docker_args)
+        docker_args.extend(extra_docker_args)
 
     if log.isEnabledFor(logging.DEBUG):
         table = Table(
@@ -219,8 +226,9 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
         "--mount",
         f"type=volume,source=captain-kernel-build,target={KERNEL_BUILD_BASE_PATH}",
     ]
+    docker_args += [cfg.builder_image]
 
-    docker_args.extend(extra_args)
+    docker_args.extend(command_and_args)
     run(docker_args)
 
 
@@ -228,12 +236,14 @@ def run_captain_in_builder(cfg: Config, *extra_args: str):
     log.debug("Running 'captain %s' in builder container...", extra_args)
     run_in_builder(
         cfg,
-        cfg.builder_image,
-        "/usr/bin/uv",
-        *(["--verbose"] if cfg.verbose_uv else ["--quiet"]),
-        "run",
-        "captain",
-        *extra_args,
+        [
+            "/usr/bin/uv",
+            *(["--verbose"] if cfg.verbose_uv else ["--quiet"]),
+            "run",
+            "captain",
+            *extra_args,
+        ],
+        extra_docker_args=[],
     )
 
 
@@ -242,10 +252,11 @@ def run_mkosi_in_builder(cfg: Config, *mkosi_args: str) -> None:
     ensure_binfmt(cfg)
     run_in_builder(
         cfg,
-        cfg.builder_image,
-        "/usr/local/bin/mkosi",
-        f"--architecture={cfg.arch_info.mkosi_arch}",
-        *mkosi_args,
+        command_and_args=[
+            "/usr/local/bin/mkosi",
+            f"--architecture={cfg.arch_info.mkosi_arch}",
+            *mkosi_args,
+        ],
     )
 
 
