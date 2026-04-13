@@ -159,7 +159,11 @@ def cli(
 ) -> None:
     """CaptainOS build system — click CLI."""
     # Configure log level based on --verbose.
-    logging.getLogger().setLevel(logging.DEBUG if verbose else logging.INFO)
+    # Configure the root logger (configged via basicLogging() in captain __init__)
+    # since subcommands and imported modules will use it.
+    log_level = logging.DEBUG if verbose else logging.INFO
+    logging.getLogger().setLevel(log_level)
+    logging.getLogger("captain").setLevel(log_level)
 
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
