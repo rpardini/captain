@@ -41,3 +41,6 @@ class DebianCommonFlavor(BaseFlavor):
     @abstractmethod
     def kernel_packages(self) -> set[str]:
         pass
+
+    def package_directories(self) -> set[str]:
+        return set({})
