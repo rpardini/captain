@@ -182,6 +182,6 @@ def cli(
 def main() -> None:
     """Console-script entry point."""
     # Import subcommand modules to register them on the group.
-    from captain.cli import _build, _builder, _iso, _release_publish, _tools  # noqa: F401
+    from captain.cli import _build, _builder, _iso, _kernel, _release_publish, _tools  # noqa: F401
 
     cli()
