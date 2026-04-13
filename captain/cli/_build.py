@@ -115,6 +115,9 @@ def build_cmd(
     # Tools stage.
     _build_tools_stage(cfg)
 
+    # Delegate to flavor, for eg obtaining it's own dependencies.
+    flavor.pre_mkosi_stage()
+
     # Initramfs (mkosi) stage + artifact collection.
     _build_mkosi_stage(cfg, list(cfg.mkosi_args))
     artifacts.collect_initramfs(cfg)
