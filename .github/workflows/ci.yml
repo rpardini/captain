@@ -114,21 +114,71 @@ jobs:
         run: uv run captain builder --push
 
   # -------------------------------------------------------------------
+  # Download tools (containerd, runc, nerdctl, CNI plugins)
+  # -------------------------------------------------------------------
+  build-captainos-kernel:
+    needs: [ build-dockerfile ]
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [ amd64, arm64 ]
+    env:
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Restore kernel cache
+        id: kernel-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            mkosi.output/kernel/${{ matrix.arch }}
+          key: kernel-${{ matrix.arch }}-${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+          # any "previous" cache can also be useful; we'll just churn cache misses more often, but that's better than a complete cache miss and rebuild every time
+          restore-keys: |
+            kernel-${{ matrix.arch }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Build kernel
+        run: uv run captain --verbose kernel
+
+      - name: Save kernel cache
+        if: github.ref == 'refs/heads/main' && steps.tools-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            mkosi.output/kernel/${{ matrix.arch }}
+          key: kernel-${{ matrix.arch }}-${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+
+      - name: Upload kernel artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: kernel-${{ matrix.arch }}
+          path: |
+            mkosi.output/kernel/${{ matrix.arch }}
+          retention-days: 1
+
+
+  # -------------------------------------------------------------------
   # Build initramfs via mkosi (depends on tools)
   # -------------------------------------------------------------------
-  build-all:
+  build-captainos:
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    needs: [ download-tools, build-dockerfile ]
+    needs: [ download-tools, build-dockerfile, build-captainos-kernel ]
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { arch: amd64, output_arch: x86_64, iso: true, FLAVOR_ID: "trixie-full" }
-          - { arch: arm64, output_arch: aarch64, iso: true, FLAVOR_ID: "trixie-full" }
-          - { arch: arm64, output_arch: aarch64, iso: false, FLAVOR_ID: "trixie-rockchip64" }
-          - { arch: arm64, output_arch: aarch64, iso: false, FLAVOR_ID: "trixie-rockchip64-vendor" }
-          - { arch: arm64, output_arch: aarch64, iso: false, FLAVOR_ID: "trixie-meson64" }
-          - { arch: arm64, output_arch: aarch64, iso: false, FLAVOR_ID: "trixie-armbian-rpi" }
+          - { arch: amd64, output_arch: x86_64, captainos_kernel: true, iso: true, FLAVOR_ID: "trixie-full" }
+          - { arch: arm64, output_arch: aarch64, captainos_kernel: true, iso: true, FLAVOR_ID: "trixie-full" }
+          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-rockchip64" }
+          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-rockchip64-vendor" }
+          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-meson64" }
+          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-armbian-rpi" }
     env:
       ARCH: ${{ matrix.arch }}
       MKOSI_MODE: docker
@@ -143,6 +193,13 @@ jobs:
         with:
           name: tools-${{ matrix.arch }}
           path: mkosi.output/tools/${{ matrix.arch }}
+
+      - name: Download kernel artifacts
+        uses: actions/download-artifact@v8
+        if: ${{ matrix.captainos_kernel }} # only if matrix entry had captainos_kernel: true
+        with:
+          name: kernel-${{ matrix.arch }}
+          path: mkosi.output/kernel/${{ matrix.arch }}
 
       - name: Restore tool binary permissions
         run: |
@@ -205,7 +262,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     name: "publish-combined"
     runs-on: ubuntu-latest
-    needs: [ build-all ]
+    needs: [ build-captainos ]
     env:
       ARCH: amd64
       TARGET: combined
