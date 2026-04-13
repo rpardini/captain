@@ -89,6 +89,22 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
 
     mkosi_args = list(cfg.mkosi_args) + list(extra_args)
 
+    # Use a Rich Syntax and Rich Panel to display mkosi.conf before running it if debugging:
+    if log.isEnabledFor(logging.DEBUG):
+        from rich import print
+        from rich.panel import Panel
+        from rich.syntax import Syntax
+
+        mkosi_conf_path = cfg.project_dir / "mkosi.conf"
+        if mkosi_conf_path.is_file():
+            mkosi_conf_content = mkosi_conf_path.read_text()
+            syntax = Syntax(mkosi_conf_content, "ini", theme="monokai", line_numbers=True,
+                            background_color="default")
+            panel = Panel(syntax, title="mkosi.conf", border_style="blue")
+            print(panel)
+        else:
+            log.debug("No mkosi.conf found at %s", mkosi_conf_path)
+
     # --- native -------------------------------------------------------
     if cfg.mkosi_mode == "native":
         missing = check_mkosi_dependencies()
