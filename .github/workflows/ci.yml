@@ -110,8 +110,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build Dockerfile
+        run: uv run captain builder
+        # only if a PR, since we don't want to push images for PRs from forks
+        if: github.event_name == 'pull_request'
+
       - name: Build Dockerfile and push
         run: uv run captain builder --push
+        # only if not a PR, since we don't want to push images for PRs from forks (no perms to push)
+        if: github.event_name != 'pull_request'
 
   # -------------------------------------------------------------------
   # Download tools (containerd, runc, nerdctl, CNI plugins)
@@ -244,7 +251,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish artifacts to GHCR
-        if: github.ref == 'refs/heads/main'
+        # only pushes to main, and not PR workflows, should try to push to OCI registry
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           TARGET: ${{ matrix.arch }}
         run: uv run captain release-publish
@@ -322,6 +330,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish combined image to GHCR
+        # only pushes to main, and not PR workflows, should try to push to OCI registry
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           FLAVOR_ID: "${{ env.DEFAULT_FLAVOR_ID }}"
         run: uv run captain release-publish
