@@ -140,6 +140,26 @@ def configure_kernel(cfg: Config, src_dir: Path) -> None:
     log.info("Using defconfig: %s", defconfig)
     shutil.copy2(defconfig, src_dir / ".config")
     run(["make", "olddefconfig"], env=make_env, cwd=src_dir)
+
+    log.warning(
+        "Considering whether to launch menuconfig for manual config tweaks... %s",
+        cfg.kernel_menuconfig,
+    )
+
+    if cfg.kernel_menuconfig:
+        log.info("Launching menuconfig...")
+        run(["make", "menuconfig"], env=make_env, cwd=src_dir)
+
+        # run `make savedefconfig`
+        log.info("Saving modified config...")
+        run(["make", "savedefconfig"], env=make_env, cwd=src_dir)
+
+        # copy the 'defconfig' back to the source - ready to commit
+        shutil.copy(src_dir / "defconfig", defconfig)
+        log.info("Updated defconfig saved to %s", defconfig)
+
+        raise SystemExit(0)  # exit after menuconfig - no build
+
     branch = _kernel_branch(cfg.kernel_version)
     resolved = cfg.project_dir / "kernel.configs" / f".config.resolved.{branch}.{ai.arch}"
     shutil.copy2(src_dir / ".config", resolved)
