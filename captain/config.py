@@ -42,6 +42,7 @@ class Config:
     kernel_version: str = DEFAULT_KERNEL_VERSION
     force_kernel: bool = False
     kernel_clean: bool = False
+    kernel_menuconfig: bool = False
 
     # Docker
     builder_registry: str | None = None
