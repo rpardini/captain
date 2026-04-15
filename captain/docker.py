@@ -177,6 +177,7 @@ def run_in_builder(
         "REGISTRY_USERNAME": os.environ.get("REGISTRY_USERNAME", ""),
         "REGISTRY_PASSWORD": os.environ.get("REGISTRY_PASSWORD", ""),
         "CAPTAIN_VERBOSE": "1" if cfg.verbose_docker else "0",
+        "CONFIG_KERNEL": "1" if cfg.kernel_menuconfig else "0",
     }
 
     docker_args: list[str] = [
@@ -232,8 +233,10 @@ def run_in_builder(
     run(docker_args)
 
 
-def run_captain_in_builder(cfg: Config, *extra_args: str):
-    log.debug("Running 'captain %s' in builder container...", extra_args)
+def run_captain_in_builder(
+    cfg: Config, command_and_args: list[str], extra_docker_args: list[str] | None = None
+):
+    log.debug("Running 'captain %s' in builder container...", command_and_args)
     run_in_builder(
         cfg,
         [
@@ -241,9 +244,9 @@ def run_captain_in_builder(cfg: Config, *extra_args: str):
             *(["--verbose"] if cfg.verbose_uv else ["--quiet"]),
             "run",
             "captain",
-            *extra_args,
+            *command_and_args,
         ],
-        extra_docker_args=[],
+        extra_docker_args=extra_docker_args,
     )
 
 
