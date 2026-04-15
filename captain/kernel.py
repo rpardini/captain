@@ -8,6 +8,7 @@ the CLI with all modes forced to native).
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
@@ -141,7 +142,7 @@ def configure_kernel(cfg: Config, src_dir: Path) -> None:
     shutil.copy2(defconfig, src_dir / ".config")
     run(["make", "olddefconfig"], env=make_env, cwd=src_dir)
 
-    log.warning(
+    log.debug(
         "Considering whether to launch menuconfig for manual config tweaks... %s",
         cfg.kernel_menuconfig,
     )
@@ -220,9 +221,21 @@ def build_kernel(cfg: Config, src_dir: Path) -> str:
 def obtain_target_artifact_path(cfg, ensure_parent: bool = False) -> Path:
     if ensure_parent:
         ensure_dir(cfg.kernel_output)
+
+    # let's hash:
+    # 1) the input defconfig
+    defconfig = _find_defconfig(cfg)
+    hex_digest_defconfig = hashlib.sha256(defconfig.read_bytes()).hexdigest()
+    # 2) the contents of this script (as an imperfect proxy for the build logic)
+    script_path = Path(__file__)
+    hex_digest_script = hashlib.sha256(script_path.read_bytes()).hexdigest()
+    # Combine and shorten to 8 chars for the final version hash
+    version_hash = hashlib.sha256((hex_digest_defconfig + hex_digest_script).encode()).hexdigest()
+    version_hash_shorten = version_hash[:8]
+
     return (
         cfg.kernel_output / f"linux-image-{cfg.kernel_version}-captainos"
-        f"_{cfg.kernel_version}-1_"
+        f"_{cfg.kernel_version}-1-{version_hash_shorten}_"
         f"{cfg.arch_info.kernel_arch}.deb"
     )
 
