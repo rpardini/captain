@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 
 from captain import docker, iso, kernel, tools
 from captain.config import Config
@@ -26,6 +27,10 @@ def build_kernel_stage(cfg: Config) -> None:
     if image_deb_package.is_file() and not cfg.force_kernel:
         log.info("Kernel already built (use --force-kernel to rebuild)")
         return
+
+    # Cleanup any existing outputs so that caches don't grow forever.
+    if cfg.kernel_output.is_dir():
+        shutil.rmtree(cfg.kernel_output)
 
     # --- native -------------------------------------------------------
     if cfg.kernel_mode == "native":
