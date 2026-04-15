@@ -41,7 +41,11 @@ def build_kernel_stage(cfg: Config) -> None:
     # --- docker -------------------------------------------------------
     docker.obtain_builder(cfg)
     log.info("Building kernel (docker relaunch)...")
-    docker.run_captain_in_builder(cfg, "kernel")
+    if cfg.kernel_menuconfig:
+        log.info("Launching interactive kernel configuration (menuconfig)...")
+        docker.run_captain_in_builder(cfg, ["kernel"], extra_docker_args=["-i", "-t"])
+    else:
+        docker.run_captain_in_builder(cfg, ["kernel"])
     docker.fix_docker_ownership(
         cfg,
         [
@@ -68,7 +72,7 @@ def _build_tools_stage(cfg: Config) -> None:
     # --- docker -------------------------------------------------------
     docker.obtain_builder(cfg)
     log.info("Downloading tools (nerdctl, containerd, etc.) docker...")
-    docker.run_captain_in_builder(cfg, "tools")
+    docker.run_captain_in_builder(cfg, ["tools"])
     docker.fix_docker_ownership(cfg, ["/work/mkosi.output"])
 
 
@@ -171,7 +175,7 @@ def _build_iso_stage(cfg: Config) -> None:
     # --- docker -------------------------------------------------------
     docker.obtain_builder(cfg)
     log.info("Building ISO (docker)...")
-    docker.run_captain_in_builder(cfg, "iso")
+    docker.run_captain_in_builder(cfg, ["iso"])
     docker.fix_docker_ownership(
         cfg,
         [
