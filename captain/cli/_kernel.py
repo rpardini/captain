@@ -38,21 +38,25 @@ log = logging.getLogger(__name__)
     show_default=True,
     help="Kernel version to build. Must match an official tarball.",
 )
+@click.option(
+    "--config",
+    envvar="CONFIG_KERNEL",
+    is_flag=True,
+    default=False,
+    help="Skip building and instead do interactive kernel configuration (menuconfig).",
+)
 @click.pass_obj
 def kernel_cmd(
-    cli_ctx: CliContext,
-    *,
-    kernel_mode: str,
-    force_kernel: bool,
-    kernel_version: str,
+    cli_ctx: CliContext, *, kernel_mode: str, force_kernel: bool, kernel_version: str, config: bool
 ) -> None:
     log.warning("CLI kernel mode: %s", kernel_mode)
 
     cfg = cli_ctx.make_config(
-        force_kernel=force_kernel,
+        force_kernel=force_kernel or config,
         kernel_version=kernel_version,
         kernel_mode=kernel_mode,
         build_kernel=True,
+        kernel_menuconfig=config,
     )
 
     build_kernel_stage(cfg)
