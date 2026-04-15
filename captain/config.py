@@ -63,7 +63,6 @@ class Config:
     force_iso: bool = False
 
     # QEMU
-    qemu_append: str = ""
     qemu_mem: str = "2G"
     qemu_smp: str = "2"
 

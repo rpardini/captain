@@ -194,6 +194,7 @@ def main() -> None:
         _builder,
         _iso,
         _kernel,
+        _qemu,
         _release_publish,
         _shell,
         _tools,
