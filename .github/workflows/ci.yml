@@ -10,7 +10,6 @@ permissions:
   packages: write
 
 env:
-  DEFAULT_FLAVOR_ID: "trixie-slim"
   FORCE_COLOR: "1"
 
 jobs:
@@ -279,11 +278,17 @@ jobs:
   # -------------------------------------------------------------------
   publish-combined:
     if: github.ref == 'refs/heads/main'
-    name: "publish-combined"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { combined_flavor: "trixie-full" }
+          - { combined_flavor: "trixie-slim" }
+    name: "publish-combined ${{ matrix.combined_flavor }}"
     runs-on: ubuntu-latest
-    needs: [ build-captainos-with-kernel ] # if trixie-slim is the default
-    #needs: [ build-captainos ] # if trixie-full is the default
+    needs: [ build-captainos, build-captainos-with-kernel ] # depend on all flavors being built
     env:
+      FLAVOR_ID: ${{ matrix.combined_flavor }}
       ARCH: amd64
       TARGET: combined
     steps:
@@ -298,25 +303,25 @@ jobs:
       - name: Download initramfs artifacts (amd64)
         uses: actions/download-artifact@v8
         with:
-          name: initramfs-${{ env.DEFAULT_FLAVOR_ID }}-amd64
+          name: initramfs-${{ matrix.combined_flavor }}-amd64
           path: out
 
       - name: Download ISO artifact (amd64)
         uses: actions/download-artifact@v8
         with:
-          name: iso-${{ env.DEFAULT_FLAVOR_ID }}-amd64
+          name: iso-${{ matrix.combined_flavor }}-amd64
           path: out
 
       - name: Download initramfs artifacts (arm64)
         uses: actions/download-artifact@v8
         with:
-          name: initramfs-${{ env.DEFAULT_FLAVOR_ID }}-arm64
+          name: initramfs-${{ matrix.combined_flavor }}-arm64
           path: out
 
       - name: Download ISO artifact (arm64)
         uses: actions/download-artifact@v8
         with:
-          name: iso-${{ env.DEFAULT_FLAVOR_ID }}-arm64
+          name: iso-${{ matrix.combined_flavor }}-arm64
           path: out
 
       - name: Install uv
@@ -332,6 +337,4 @@ jobs:
       - name: Publish combined image to GHCR
         # only pushes to main, and not PR workflows, should try to push to OCI registry
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        env:
-          FLAVOR_ID: "${{ env.DEFAULT_FLAVOR_ID }}"
         run: uv run captain release-publish
