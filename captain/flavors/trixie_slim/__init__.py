@@ -25,8 +25,8 @@ class TrixieSlimFlavor(TrixieACPIFlavor):
         # call the kernel build stage, to ensure kernel .deb is in mkosi.output/kernel/<arch>
         stages.build_kernel_stage(self.cfg)
 
-    def kernel_packages(self) -> set[str]:
-        return {f"linux-image-{self.cfg.kernel_version}-captainos"}
+    def flavor_packages(self) -> set[str]:
+        return {f"linux-image-{self.cfg.kernel_version}-captainos"}.union(super().flavor_packages())
 
     def package_directories(self) -> set[str]:
         return {str(obtain_target_artifact_path(self.cfg).parent.relative_to(self.cfg.project_dir))}
