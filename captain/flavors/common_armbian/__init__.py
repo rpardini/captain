@@ -22,3 +22,6 @@ class ArmbianCommonFlavor(DebianCommonFlavor):
 
     def has_iso(self) -> bool:
         return False
+
+    def flavor_packages(self) -> set[str]:
+        return {"tiny-initramfs"}.union(super().flavor_packages())
