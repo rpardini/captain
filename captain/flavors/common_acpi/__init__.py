@@ -26,3 +26,6 @@ class TrixieACPIFlavor(DebianCommonFlavor):
     # This flavor can produce working ISO images (generic UEFI/ACPI)
     def has_iso(self) -> bool:
         return True
+
+    def flavor_packages(self) -> set[str]:
+        return {"acpid", "efibootmgr"}.union(super().flavor_packages())
