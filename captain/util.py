@@ -92,9 +92,14 @@ def run(
         run_env = {**os.environ, **env}
 
     # If not capturing, and debugging, emit a Rich separator line, for visual clarity.
-    if not capture and log.isEnabledFor(logging.DEBUG):
+    if log.isEnabledFor(logging.DEBUG):
+        # join cmd into a single string; elements with spaces or special chars should be quoted
+        special = ('"', "'", "\\", "$", ",", "=", "/")
+        cmd_joined = " ".join(
+            f'"{c}"' if " " in c or any(s in c for s in special) else c for c in cmd
+        )
         syntax = Syntax(
-            " ".join(cmd), "bash", theme="monokai", word_wrap=True, background_color="default"
+            cmd_joined, "bash", theme="monokai", word_wrap=True, background_color="default"
         )
         panel = Panel(
             syntax,
@@ -111,7 +116,8 @@ def run(
                 table.add_row(k, v)
             captain.console.print(table)
 
-        captain.console.print(Rule(f"⮕ Starting subprocess: {cmd} ⮕", style="green"))
+        if not capture:
+            captain.console.print(Rule(f"⮕ Starting subprocess: {cmd} ⮕", style="green"))
 
     proc = subprocess.run(
         cmd,
