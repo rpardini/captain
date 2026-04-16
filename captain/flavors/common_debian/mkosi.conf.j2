@@ -15,7 +15,11 @@ CacheDirectory=mkosi.cache.for.incremental
 
 [Content]
 Bootable=no
+{% if flavor.include_working_apt() %}
+CleanPackageMetadata=no
+{% else %}
 CleanPackageMetadata=yes
+{% endif %}
 Autologin=yes
 # Skips installing documentation/man pages
 WithDocs=no
@@ -30,8 +34,7 @@ PackageDirectories=
 # pivot_root(2) work for container runtimes (runc).
 
 Packages=
-    {{ ' '.join(flavor.kernel_packages()) }}
-    tiny-initramfs # a tiny initrd builder to account for the linux-image dependency
+    {{ "\n    ".join(flavor.flavor_packages()) }}
     # systemd and core
     systemd
     systemd-sysv # Provides poweroff, shutdown, reboot, halt, etc.
@@ -41,7 +44,6 @@ Packages=
     dbus
     kmod
     dmsetup
-    acpid
     polkitd
     # Logging
     rsyslog
@@ -74,6 +76,9 @@ Packages=
     #zstd
     #xz-utils
     fastfetch
+    pciutils # for listing PCI devices
+    curl
+    pv
 
 RemoveFiles=
     /etc/initrd-release
@@ -83,11 +88,15 @@ RemoveFiles=
     /usr/share/locale
     /usr/share/i18n
     /usr/share/zoneinfo
+    {% if not flavor.include_working_apt() %}
     /var/cache
+    {% endif %}
     /var/log
     /usr/share/bash-completion
     /usr/share/zsh
+    {% if not flavor.include_hwdb() %}
     /usr/lib/udev/hwdb.d
+    {% endif %}
     /usr/share/lintian
     /usr/share/bug
     /usr/share/pixmaps

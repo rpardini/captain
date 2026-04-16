@@ -18,5 +18,5 @@ class TrixieRockchip64VendorFlavor(ArmbianCommonFlavor):
     description = "Debian Trixie based with Armbian's rk35xx-vendor kernel"
     supported_architectures = frozenset(["arm64"])  # does NOT support amd64
 
-    def kernel_packages(self) -> set[str]:
-        return {"linux-image-vendor-rk35xx"}
+    def flavor_packages(self) -> set[str]:
+        return {"linux-image-vendor-rk35xx"}.union(super().flavor_packages())

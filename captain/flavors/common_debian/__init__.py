@@ -39,8 +39,14 @@ class DebianCommonFlavor(BaseFlavor):
         self.add_static_dir("mkosi.skeleton", this_flavor_dir)
 
     @abstractmethod
-    def kernel_packages(self) -> set[str]:
-        pass
+    def flavor_packages(self) -> set[str]:
+        return set({})
 
     def package_directories(self) -> set[str]:
         return set({})
+
+    def include_working_apt(self) -> bool:
+        return False
+
+    def include_hwdb(self) -> bool:
+        return False
