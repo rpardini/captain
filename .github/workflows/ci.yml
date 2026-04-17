@@ -270,6 +270,7 @@ jobs:
           - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: true, FLAVOR_ID: "trixie-full" }
           - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-rockchip64" }
           - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-rockchip64-vendor" }
+          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-genio" }
           - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-meson64" }
           - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-armbian-rpi" }
 
