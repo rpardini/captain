@@ -97,6 +97,7 @@ def obtain_builder(cfg: Config) -> None:
             "docker",
             "buildx",
             "build",
+            "--load",  # for older Docker versions
             "--progress=plain",
             "-t",
             local_tagged_image,
