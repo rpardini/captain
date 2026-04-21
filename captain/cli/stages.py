@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+from pathlib import Path
 
 from captain import docker, iso, kernel, tools
 from captain.config import Config
@@ -138,8 +139,8 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
     # --- docker -------------------------------------------------------
     docker.obtain_builder(cfg)
     log.info("Building initrd with mkosi (docker)...")
-    tools_tree = f"/work/mkosi.output/tools/{cfg.arch}"
-    output_dir = f"/work/mkosi.output/initramfs/{cfg.flavor_id}/{cfg.arch}"
+    tools_tree = f"/work/mkosi.output/tools/{cfg.arch}"  # @TODO ooops
+    output_dir = cfg.calc_initramfs_output(Path("/work"), "initramfs")
     docker.run_mkosi_in_builder(
         cfg,
         f"--extra-tree={tools_tree}",
