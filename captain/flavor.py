@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import shutil
 from abc import abstractmethod
@@ -9,7 +10,9 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 import jinja2
+from rich.table import Table
 
+import captain
 from captain.config import Config
 
 log = logging.getLogger(__name__)
@@ -42,7 +45,7 @@ class BaseFlavor(Protocol):
         log.debug("Called BaseFlavor.setup()...")
         pass
 
-    def generate(self):
+    def generate(self, hash_only: bool = False):
         log.debug("Called BaseFlavor.generate()...")
         # Before generating, cleanup known targets. @TODO make dir disposable instead
         log.debug("Cleaning up old generated files in %s", self.cfg.project_dir)
@@ -53,8 +56,28 @@ class BaseFlavor(Protocol):
         shutil.rmtree(self.cfg.project_dir / "mkosi.sandbox", ignore_errors=True)
         shutil.rmtree(self.cfg.project_dir / "mkosi.skeleton", ignore_errors=True)
 
-        self.copy_static_files(self.cfg.project_dir)
-        self.render_templates(self.cfg.project_dir)  # For compatibility
+        hashes: dict[str, str] = {}
+        self.copy_static_files(self.cfg.project_dir, hash_only, hashes)
+        self.render_templates(self.cfg.project_dir, hash_only, hashes)  # For compatibility
+
+        self.cfg.flavor_hash = hashlib.sha256(
+            "".join(f"{k}={v}" for k, v in (sorted(hashes.items()))).encode()
+        ).hexdigest()[:16]
+        log.info(
+            "Generated flavor_hash: %s (based on %s hashes)", self.cfg.flavor_hash, len(hashes)
+        )
+
+        # Emit a Rich Table of the generated files and their hashes
+        if log.isEnabledFor(logging.DEBUG):
+            table = Table(
+                title="Generated Files and Hashes", show_header=True, header_style="bold magenta"
+            )
+            table.add_column("Relative Path", style="dim", width=40)
+            table.add_column("SHA256 Hash", style="dim", width=64)
+            for relative_path, hash_value in hashes.items():
+                table.add_row(relative_path, hash_value)
+            captain.console.print(table)
+
         pass
 
     def specific_flavor_dir(self, flavor_id: str) -> Path:
@@ -78,7 +101,9 @@ class BaseFlavor(Protocol):
                     relative_path = extra_file.relative_to(flavor_dir)
                     self.static_map[str(relative_path)] = extra_file
 
-    def render_templates(self, output_dir: Path):
+    def render_templates(
+        self, output_dir: Path, hash_only: bool = False, hashes: dict[str, str] | None = None
+    ):
         log.debug("Called BaseFlavor.render_templates() with output_dir: %s", output_dir)
         # Use jinja2 to render all templates in self.template_map, writing output to output_dir
         # The keys of self.template_map are the relative output paths (e.g. "mkosi.conf"), and the
@@ -103,6 +128,11 @@ class BaseFlavor(Protocol):
                 ).get_template(template_path.name)
                 rendered_content += template.render(cfg=self.cfg, flavor=self)
 
+            if hashes is not None:
+                hashes[relative_output_path] = hashlib.sha256(rendered_content.encode()).hexdigest()
+            if hash_only:
+                continue  # Skip writing if we're only interested in hashes
+
             output_file_path = output_dir / relative_output_path
             log.debug("Writing rendered content to %s", output_file_path)
             output_file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -111,10 +141,16 @@ class BaseFlavor(Protocol):
             # Make output_file executable @TODO: we will need a way to tell
             output_file_path.chmod(output_file_path.stat().st_mode | 0o111)
 
-    def copy_static_files(self, project_dir):
+    def copy_static_files(
+        self, project_dir, hash_only: bool = False, hashes: dict[str, str] | None = None
+    ):
         # Do a plain copy of all files in self.static_map to project_dir / relative_path, where
         # relative_path is the key in self.static_map
         for relative_path, source_path in self.static_map.items():
+            if hashes is not None:
+                hashes[relative_path] = hashlib.sha256(source_path.read_bytes()).hexdigest()
+            if hash_only:
+                continue  # Skip copying if we're only interested in hashes
             destination_path = project_dir / relative_path
             log.debug("Copying static file from '%s' to '%s'", source_path, destination_path)
             destination_path.parent.mkdir(parents=True, exist_ok=True)
