@@ -34,7 +34,7 @@ log = logging.getLogger(__name__)
 @click.option(
     "--tools-mode",
     envvar="TOOLS_MODE",
-    default="docker",
+    default="native",
     show_default=True,
     type=click.Choice(["docker", "native", "skip"], case_sensitive=False),
     metavar="MODE",
