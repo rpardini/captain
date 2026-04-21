@@ -63,6 +63,7 @@ def build_kernel_stage(cfg: Config) -> None:
 
 def _build_tools_stage(cfg: Config) -> None:
     """Run the tools download stage according to *cfg.tools_mode*."""
+    log.debug("Building tools stage in mode %s", cfg.tools_mode)
 
     # --- skip ---------------------------------------------------------
     if cfg.tools_mode == "skip":
