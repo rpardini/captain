@@ -129,8 +129,6 @@ def release_publish_cmd(
 
         env_args: list[str] = [
             "-e",
-            f"FLAVOR_ID={cfg.flavor_id}",
-            "-e",
             f"REGISTRY={registry}",
             "-e",
             f"GITHUB_REPOSITORY={repository}",
@@ -146,23 +144,7 @@ def release_publish_cmd(
         if force:
             env_args += ["-e", "FORCE=true"]
 
-        inner_cmd = ["captain", "release-publish"]
-
-        try:
-            docker.run_in_builder(
-                cfg,
-                command_and_args=[
-                    "--entrypoint",
-                    "/usr/bin/uv",
-                    cfg.builder_image,
-                    *(["--verbose"] if cfg.verbose_uv else ["--quiet"]),
-                    "run",
-                    *inner_cmd,
-                ],
-                extra_docker_args=env_args,
-            )
-        except subprocess.CalledProcessError as exc:
-            raise SystemExit(exc.returncode) from None
+        docker.run_captain_in_builder(cfg, ["release-publish"], extra_docker_args=env_args)
         docker.fix_docker_ownership(cfg, ["/work/out"])
         return
 
