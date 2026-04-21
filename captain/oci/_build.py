@@ -35,6 +35,20 @@ def _deterministic_tar(file_path: Path, output_dir: Path) -> Path:
     return tar_path
 
 
+def _deterministic_tar_multiple(all_dtb_files: list[Path], dtb_tar_path, out: Path):
+    with tarfile.open(dtb_tar_path, "w") as tf:
+        for f in all_dtb_files:
+            info = tf.gettarinfo(str(f), arcname=str(f.relative_to(out)))
+            info.uid = 0
+            info.gid = 0
+            info.uname = ""
+            info.gname = ""
+            info.mtime = 0
+            info.mode = 0o644
+            with open(f, "rb") as fh:
+                tf.addfile(info, fh)
+
+
 def _collect_arch_artifacts(
     project_dir: Path,
     out: Path,
