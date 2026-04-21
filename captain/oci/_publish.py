@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -14,7 +13,12 @@ from captain.config import Config
 from captain.flavor import BaseFlavor
 from captain.util import ensure_dir, get_arch_info
 
-from ._build import _build_platform_image, _collect_arch_artifacts, _deterministic_tar
+from ._build import (
+    _build_platform_image,
+    _collect_arch_artifacts,
+    _deterministic_tar,
+    _deterministic_tar_multiple,
+)
 from ._common import _ARCHES, _image_ref
 
 log = logging.getLogger(__name__)
@@ -187,7 +191,9 @@ def publish(
         return
 
     out = ensure_dir(cfg.output_dir)
-    created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Set created to the epoch so it is always the same
+    created = datetime(1970, 1, 1, tzinfo=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Collect artifacts for every requested architecture.
     arch_files: dict[str, list[Path]] = {}
@@ -209,10 +215,8 @@ def publish(
         else:
             log.info(f"Found DTB directory for {arch}: {dtb_dir_in}")
             all_dtb_files: list[Path] = sorted(dtb_dir_in.glob("**/*.dtb*"))
-            dtb_tar_path = out / f"dtbs-{cfg.flavor_id}-{arch}.tar"
-            with tarfile.open(dtb_tar_path, "w") as tar:
-                for f in all_dtb_files:
-                    tar.add(f, arcname=f.relative_to(out))
+            dtb_tar_path = out / f".layer-dtbs-{cfg.flavor_id}-{arch}.tar"
+            _deterministic_tar_multiple(all_dtb_files, dtb_tar_path, out)
             arch_layer_tars[arch].append(dtb_tar_path)
 
     pushed = True
