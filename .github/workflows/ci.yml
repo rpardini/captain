@@ -1,5 +1,6 @@
 name: For each commit and PR
 on:
+  workflow_dispatch:
   push:
     branches:
       - "main"
@@ -11,6 +12,7 @@ permissions:
 
 env:
   FORCE_COLOR: "1"
+  CAPTAIN_VERBOSE: "1"
 
 jobs:
   # -------------------------------------------------------------------
