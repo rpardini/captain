@@ -55,7 +55,7 @@ class Config:
     verbose_docker: bool = False  # Pass --verbose to captain when re-launched in Docker
 
     # Per-stage mode: "docker" | "native" | "skip"
-    tools_mode: str = "docker"
+    tools_mode: str = "native"
     mkosi_mode: str = "docker"
     iso_mode: str = "docker"
     release_mode: str = "docker"
