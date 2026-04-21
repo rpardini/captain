@@ -31,11 +31,14 @@ class Config:
 
     # Paths
     project_dir: Path
-    output_dir: Path
+
+    # "across invocations" / "GHA interface dir"; project_dir / "out"
+    output_dir: Path  # target of collect_xx() stuff, coming from mkosi.output
 
     # Target
     arch: str = "amd64"
     flavor_id: str = DEFAULT_FLAVOR_ID
+    flavor_hash: str | None = None  # resolved at runtime
 
     # For kernel build
     build_kernel: bool = False
@@ -117,12 +120,26 @@ class Config:
     @property
     def initramfs_output(self) -> Path:
         """Per-version, per-arch directory for mkosi initramfs output."""
-        return self.project_dir / "mkosi.output" / "initramfs" / self.flavor_id / self.arch
+        base_dir: Path = self.project_dir
+        return self.calc_initramfs_output(base_dir, "initramfs")
 
     @property
     def iso_output(self) -> Path:
         """Per-version, per-arch directory for the built ISO image."""
-        return self.project_dir / "mkosi.output" / "iso" / self.flavor_id / self.arch
+        base_dir: Path = self.project_dir
+        return self.calc_initramfs_output(base_dir, "iso")
+
+    def calc_initramfs_output(self, base_dir: Path, which: str) -> Path:
+        log.debug("Asked for %s output dir; flavor_hash=%r", which, self.flavor_hash)
+        # To know the output dir, we must know the flavor_hash; make sure.
+        if self.flavor_hash is None:
+            log.error("flavor_hash is not set; cannot determine initramfs output directory")
+            raise ValueError("flavor_hash is not set; cannot determine initramfs output directory")
+
+        flavor_id = (
+            base_dir / "mkosi.output" / which / self.flavor_id / self.arch / self.flavor_hash
+        )
+        return flavor_id
 
     @property
     def iso_staging(self) -> Path:
