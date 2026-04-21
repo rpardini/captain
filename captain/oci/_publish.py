@@ -203,7 +203,7 @@ def publish(
         arch_layer_tars[arch] = [_deterministic_tar(f, out) for f in files]
 
         # A single layer for all DTBs, if any; those are highly compressible together.
-        dtb_dir_in = out / f"dtb-{cfg.flavor_id}-{get_arch_info(arch).output_arch}"
+        dtb_dir_in = out / f"dtb-{cfg.flavor_id}-{get_arch_info(arch).output_arch}"  # @TODO "out"
         if not dtb_dir_in.is_dir():
             log.warning("No dtbs directory found for %s: %s", arch, dtb_dir_in)
         else:
