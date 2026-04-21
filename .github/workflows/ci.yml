@@ -209,11 +209,50 @@ jobs:
           chmod +x mkosi.output/tools/${{ matrix.arch }}/usr/local/bin/*
           chmod +x mkosi.output/tools/${{ matrix.arch }}/opt/cni/bin/*
 
+      - name: Restore initramfs cache
+        id: initramfs-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            mkosi.output/initramfs
+          key: initramfs-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}-${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+          # any "previous" cache can also be useful; we'll just churn cache misses more often, but that's better than a complete cache miss and rebuild every time
+          restore-keys: |
+            initramfs-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}-
+
+      - name: Restore iso cache
+        id: iso-cache
+        if: ${{ matrix.iso }} # only if matrix entry had iso: true
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            mkosi.output/iso
+          key: iso-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}-${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+          # any "previous" cache can also be useful; we'll just churn cache misses more often, but that's better than a complete cache miss and rebuild every time
+          restore-keys: |
+            iso-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}-
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
 
       - name: Build initramfs
         run: uv run captain build # full build, incl initramfs and iso when appropriate
+
+      - name: Save initramfs cache
+        if: github.ref == 'refs/heads/main' && steps.initramfs-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            mkosi.output/initramfs
+          key: initramfs-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}-${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+
+      - name: Save iso cache
+        if: matrix.iso && github.ref == 'refs/heads/main' && steps.iso-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            mkosi.output/iso
+          key: iso-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}-${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
 
       - name: Upload initramfs artifacts
         uses: actions/upload-artifact@v6
