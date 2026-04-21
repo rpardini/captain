@@ -51,7 +51,8 @@ def build_cmd(
     )
 
     # Instantiate the flavor
-    captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
+    flavor = captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
+    flavor.generate(hash_only=True)  # Just populates cfg.flavor_hash so we can find the initramfs
 
     _build_iso_stage(cfg)
     artifacts.collect_iso(cfg)
