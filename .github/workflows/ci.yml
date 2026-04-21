@@ -1,5 +1,6 @@
 name: For each commit and PR
 on:
+  workflow_dispatch:
   push:
     branches:
       - "main"
