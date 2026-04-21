@@ -42,6 +42,9 @@ class DebianCommonFlavor(BaseFlavor):
     def flavor_packages(self) -> set[str]:
         return set({})
 
+    def sorted_flavor_packages(self) -> list[str]:
+        return sorted(self.flavor_packages())
+
     def package_directories(self) -> set[str]:
         return set({})
 
