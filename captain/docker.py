@@ -209,6 +209,7 @@ def run_in_builder(
 
     docker_args += ["-v", f"{cfg.project_dir}/kernel.configs:/work/kernel.configs"]
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.output:/work/mkosi.output"]
+    docker_args += ["-v", f"{cfg.project_dir}/mkosi.input:/work/mkosi.input"]
     docker_args += ["-v", f"{cfg.project_dir}/out:/work/out"]
 
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.extra:/work/mkosi.extra"]
