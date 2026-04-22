@@ -56,8 +56,8 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: |
-            mkosi.output/tools/${{ matrix.arch }}/usr/local/bin
-            mkosi.output/tools/${{ matrix.arch }}/opt/cni
+            mkosi.input/tools/${{ matrix.arch }}/usr/local/bin
+            mkosi.input/tools/${{ matrix.arch }}/opt/cni
           key: tools-${{ matrix.arch }}-${{ hashFiles('captain/tools.py') }}
 
       - name: Install uv
@@ -73,8 +73,8 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: |
-            mkosi.output/tools/${{ matrix.arch }}/usr/local/bin
-            mkosi.output/tools/${{ matrix.arch }}/opt/cni
+            mkosi.input/tools/${{ matrix.arch }}/usr/local/bin
+            mkosi.input/tools/${{ matrix.arch }}/opt/cni
           key: tools-${{ matrix.arch }}-${{ hashFiles('captain/tools.py') }}
 
       - name: Upload tools artifacts
@@ -82,8 +82,8 @@ jobs:
         with:
           name: tools-${{ matrix.arch }}
           path: |
-            mkosi.output/tools/${{ matrix.arch }}/usr/local/bin
-            mkosi.output/tools/${{ matrix.arch }}/opt/cni
+            mkosi.input/tools/${{ matrix.arch }}/usr/local/bin
+            mkosi.input/tools/${{ matrix.arch }}/opt/cni
           retention-days: 1
 
   # -------------------------------------------------------------------
@@ -142,7 +142,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: |
-            mkosi.output/kernel/${{ matrix.arch }}
+            mkosi.input/kernel/${{ matrix.arch }}
           key: kernel-${{ matrix.arch }}-${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
           # any "previous" cache can also be useful; we'll just churn cache misses more often, but that's better than a complete cache miss and rebuild every time
           restore-keys: |
@@ -159,7 +159,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: |
-            mkosi.output/kernel/${{ matrix.arch }}
+            mkosi.input/kernel/${{ matrix.arch }}
           key: kernel-${{ matrix.arch }}-${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
 
       - name: Upload kernel artifacts
@@ -167,7 +167,7 @@ jobs:
         with:
           name: kernel-${{ matrix.arch }}
           path: |
-            mkosi.output/kernel/${{ matrix.arch }}
+            mkosi.input/kernel/${{ matrix.arch }}
           retention-days: 1
 
 
@@ -194,21 +194,21 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: tools-${{ matrix.arch }}
-          path: mkosi.output/tools/${{ matrix.arch }}
+          path: mkosi.input/tools/${{ matrix.arch }}
 
       - name: Download kernel artifacts == ${{ matrix.captainos_kernel }}
         uses: actions/download-artifact@v8
         if: ${{ matrix.captainos_kernel }} # only if matrix entry had captainos_kernel: true
         with:
           name: kernel-${{ matrix.arch }}
-          path: mkosi.output/kernel/${{ matrix.arch }}
+          path: mkosi.input/kernel/${{ matrix.arch }}
 
       - name: Restore tool binary permissions
         run: |
           # GitHub Actions artifact upload/download strips execute permissions.
           # Restore +x on all tool binaries so they work inside the initramfs.
-          chmod +x mkosi.output/tools/${{ matrix.arch }}/usr/local/bin/*
-          chmod +x mkosi.output/tools/${{ matrix.arch }}/opt/cni/bin/*
+          chmod +x mkosi.input/tools/${{ matrix.arch }}/usr/local/bin/*
+          chmod +x mkosi.input/tools/${{ matrix.arch }}/opt/cni/bin/*
 
       - name: Restore initramfs cache
         id: initramfs-cache
