@@ -22,7 +22,7 @@ class TrixieSlimFlavor(TrixieACPIFlavor):
 
     def pre_mkosi_stage(self):
         log.debug("Flavor delegating to build_kernel_stage to ensure kernel .deb is present")
-        # call the kernel build stage, to ensure kernel .deb is in mkosi.output/kernel/<arch>
+        # call the kernel build stage, to ensure kernel .deb is in mkosi.input/kernel/<arch>
         stages.build_kernel_stage(self.cfg)
 
     def flavor_packages(self) -> set[str]:

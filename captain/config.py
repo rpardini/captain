@@ -100,7 +100,7 @@ class Config:
         Passed to mkosi via ``--extra-tree=`` to merge into the initramfs.
         Kernel modules are stored separately under :attr:`kernel_output`.
         """
-        return self.project_dir / "mkosi.output" / "tools" / self.arch
+        return self.project_dir / "mkosi.input" / "tools" / self.arch
 
     @property
     def kernel_output(self) -> Path:
@@ -111,11 +111,7 @@ class Config:
         (``usr/lib/modules/{kver}/``) so it can be passed directly
         as an ``--extra-tree=`` to mkosi.
         """
-        return self.project_dir / "mkosi.output" / "kernel" / self.arch
-
-    @property
-    def mkosi_output(self) -> Path:
-        return self.project_dir / "mkosi.output"
+        return self.project_dir / "mkosi.input" / "kernel" / self.arch
 
     @property
     def initramfs_output(self) -> Path:
