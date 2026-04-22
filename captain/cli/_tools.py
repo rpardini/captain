@@ -42,7 +42,7 @@ def tools_cmd(
     """Download tools (containerd, runc, nerdctl, CNI plugins).
 
     Fetches pre-built binaries for the target architecture and stages
-    them under ``mkosi.output/tools/{arch}/``.  The tools are later
+    them under ``mkosi.input/tools/{arch}/``.  The tools are later
     merged into the initramfs by mkosi via ``--extra-tree``.
 
     \b
