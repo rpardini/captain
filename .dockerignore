@@ -1,5 +1,6 @@
 # Exclude build artifacts from Docker build context
 mkosi.output/
+mkosi.input/
 mkosi.cache/
 mkosi.tools/
 mkosi.tools.manifest
