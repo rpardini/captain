@@ -5,12 +5,6 @@
 # creating directories and dropping config files.
 set -euo pipefail
 
-log info "CaptainOS post-install: dump env at $(hostname)..."
-env
-
-log info "CaptainOS post-install: show mounts at $(hostname)..."
-mount || true
-
 # Ensure CA certificate bundle is generated (dpkg triggers may not
 # fire reliably in mkosi's chroot).
 log info "Generating fresh CA certificate bundle..."
