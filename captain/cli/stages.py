@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 def build_kernel_stage(cfg: Config) -> None:
     """Run the kernel build stage according to *cfg.kernel_mode*."""
-    log.warning("Building kernel stage in mode %s", cfg.kernel_mode)
+    log.debug("Building kernel stage in mode %s", cfg.kernel_mode)
 
     # --- skip ---------------------------------------------------------
     if cfg.kernel_mode == "skip":
@@ -55,7 +55,7 @@ def build_kernel_stage(cfg: Config) -> None:
     docker.fix_docker_ownership(
         cfg,
         [
-            f"/work/mkosi.output/kernel/{cfg.kernel_version}/{cfg.arch}",
+            f"/work/mkosi.input/kernel/{cfg.kernel_version}/{cfg.arch}",
             "/work/out",
         ],
     )
@@ -80,7 +80,7 @@ def _build_tools_stage(cfg: Config) -> None:
     docker.obtain_builder(cfg)
     log.info("Downloading tools (nerdctl, containerd, etc.) docker...")
     docker.run_captain_in_builder(cfg, ["tools"])
-    docker.fix_docker_ownership(cfg, ["/work/mkosi.output"])
+    docker.fix_docker_ownership(cfg, ["/work/mkosi.input"])
 
 
 def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
@@ -140,7 +140,7 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
     # --- docker -------------------------------------------------------
     docker.obtain_builder(cfg)
     log.info("Building initrd with mkosi (docker)...")
-    tools_tree = f"/work/mkosi.output/tools/{cfg.arch}"  # @TODO ooops
+    tools_tree = f"/work/mkosi.input/tools/{cfg.arch}"  # @TODO ooops
     output_dir = cfg.calc_initramfs_output(Path("/work"), "initramfs")
     docker.run_mkosi_in_builder(
         cfg,
