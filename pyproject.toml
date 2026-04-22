@@ -40,5 +40,5 @@ select = [
 [tool.pyright]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
-exclude = ["mkosi.tools", "mkosi.output", "__pycache__"]
+exclude = ["mkosi.tools", "mkosi.output", "mkosi.input", "__pycache__"]
 include = ["captain", "build.py"]
