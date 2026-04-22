@@ -158,7 +158,7 @@ def download_tool(tool: ToolSpec, arch: str, output_base: Path, force: bool) -> 
 
 
 def download_all(cfg: Config) -> None:
-    """Download all tools into mkosi.output/tools/{arch}/."""
+    """Download all tools into mkosi.input/tools/{arch}/."""
     arch = cfg.arch_info.dl_arch
     output_base = cfg.tools_output
 
