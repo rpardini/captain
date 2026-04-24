@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
 
+from captain.artifacts import OutputArchArtifact
 from captain.cli import stages
 from captain.flavor import BaseFlavor
 from captain.flavors.common_acpi import TrixieACPIFlavor
@@ -30,3 +31,7 @@ class TrixieSlimFlavor(TrixieACPIFlavor):
 
     def package_directories(self) -> set[str]:
         return {str(obtain_target_artifact_path(self.cfg).parent.relative_to(self.cfg.project_dir))}
+
+    def add_arch_dtb_artifacts(self, artifacts: list[OutputArchArtifact], output_arch: str):
+        # no dtb artifacts for trixie-slim flavor
+        pass

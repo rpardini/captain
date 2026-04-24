@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import shutil
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from captain.config import Config
@@ -132,3 +134,15 @@ def collect(cfg: Config) -> None:
     collect_initramfs(cfg)
     collect_kernel(cfg)
     collect_iso(cfg)
+
+
+class OutputArchArtifactType(StrEnum):
+    FILE = "file"
+    DIRECTORY = "directory"
+
+
+@dataclass
+class OutputArchArtifact:
+    # type is either File or Directory
+    type: OutputArchArtifactType
+    name: str
