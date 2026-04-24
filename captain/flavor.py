@@ -13,6 +13,7 @@ import jinja2
 from rich.table import Table
 
 import captain
+from captain.artifacts import OutputArchArtifact, OutputArchArtifactType
 from captain.config import Config
 
 log = logging.getLogger(__name__)
@@ -162,6 +163,42 @@ class BaseFlavor(Protocol):
 
     def pre_mkosi_stage(self):
         pass
+
+    def list_arch_artifacts(self, output_arch: str) -> list[OutputArchArtifact]:
+        artifacts: list[OutputArchArtifact] = [
+            OutputArchArtifact(
+                type=OutputArchArtifactType.FILE, name=f"vmlinuz-{self.cfg.flavor_id}-{output_arch}"
+            ),
+            OutputArchArtifact(
+                type=OutputArchArtifactType.FILE,
+                name=f"initramfs-{self.cfg.flavor_id}-{output_arch}",
+            ),
+        ]
+        # include .iso if the flavor supports it.
+        if self.has_iso():
+            artifacts += [
+                OutputArchArtifact(
+                    type=OutputArchArtifactType.FILE,
+                    name=f"captainos-{self.cfg.flavor_id}-{output_arch}.iso",
+                )
+            ]
+
+        self.add_arch_dtb_artifacts(artifacts, output_arch)
+
+        log.info(
+            "Artifacts for flavor %s for arch '%s': %s", self.cfg.flavor_id, output_arch, artifacts
+        )
+        return artifacts
+
+    def add_arch_dtb_artifacts(self, artifacts: list[OutputArchArtifact], output_arch: str):
+        # if arm64, include DTBs.
+        if output_arch == "aarch64":
+            artifacts.append(
+                OutputArchArtifact(
+                    type=OutputArchArtifactType.DIRECTORY,
+                    name=f"dtb-{self.cfg.flavor_id}-{output_arch}",
+                )
+            )
 
 
 def list_available_flavors() -> list[str]:
