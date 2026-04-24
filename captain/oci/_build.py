@@ -9,7 +9,6 @@ from datetime import datetime
 from pathlib import Path
 
 from captain import artifacts, buildah
-from captain.util import get_arch_info
 
 log = logging.getLogger(__name__)
 
@@ -49,27 +48,7 @@ def _deterministic_tar_multiple(all_dtb_files: list[Path], dtb_tar_path, out: Pa
                 tf.addfile(info, fh)
 
 
-def _collect_arch_artifacts(
-    project_dir: Path,
-    out: Path,
-    arch: str,
-    flavor_id: str,
-    has_iso: bool,
-) -> list[Path]:
-    """Collect and return the artifact files for a single architecture.
-
-    Returns [vmlinuz, initramfs, iso, checksums] paths in *out*.
-    """
-    oarch = get_arch_info(arch).output_arch
-
-    arch_files = [
-        out / f"vmlinuz-{flavor_id}-{oarch}",
-        out / f"initramfs-{flavor_id}-{oarch}",
-    ]
-
-    if has_iso:
-        arch_files += [out / f"captainos-{flavor_id}-{oarch}.iso"]
-
+def _checksum_files(arch_files: list[Path], flavor_id: str, oarch: str, out: Path) -> list[Path]:
     checksums_path = out / f"sha256sums-{flavor_id}-{oarch}.txt"
     artifacts.collect_checksums(arch_files, checksums_path)
 
