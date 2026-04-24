@@ -9,13 +9,14 @@ from pathlib import Path
 from uuid import uuid4
 
 from captain import buildah, skopeo
+from captain.artifacts import OutputArchArtifactType
 from captain.config import Config
 from captain.flavor import BaseFlavor
 from captain.util import ensure_dir, get_arch_info
 
 from ._build import (
     _build_platform_image,
-    _collect_arch_artifacts,
+    _checksum_files,
     _deterministic_tar,
     _deterministic_tar_multiple,
 )
@@ -197,27 +198,65 @@ def publish(
 
     # Collect artifacts for every requested architecture.
     arch_files: dict[str, list[Path]] = {}
+    arch_directories: dict[str, list[Path]] = {}
     for arch in arches:
-        arch_files[arch] = _collect_arch_artifacts(
-            cfg.project_dir, out, arch, cfg.flavor_id, has_iso=flavor.has_iso()
+        output_arch = get_arch_info(arch).output_arch
+        arch_artifacts = flavor.list_arch_artifacts(output_arch)
+
+        # First, pick all the type=file artifacts for this arch.
+        file_arch_artifacts = [a for a in arch_artifacts if a.type == OutputArchArtifactType.FILE]
+        if not file_arch_artifacts:
+            log.warning("No file artifacts found for %s/%s", flavor.id, output_arch)
+            continue
+
+        file_arch_artifacts_in_out = []
+        for a in file_arch_artifacts:
+            path_in_out = out / a.name
+            if not path_in_out.is_file():
+                log.error("Expected artifact file not found in output: %s", path_in_out)
+                raise SystemExit(1)
+            file_arch_artifacts_in_out.append(path_in_out)
+
+        # Calculate the checksums & add to arch_files
+        arch_files[arch] = _checksum_files(
+            file_arch_artifacts_in_out, cfg.flavor_id, output_arch, out
         )
+
+        # Also add directories; those are not checksummed
+        dir_arch_artifacts_in_out = []
+        dir_arch_artifacts = [
+            a for a in arch_artifacts if a.type == OutputArchArtifactType.DIRECTORY
+        ]
+        if dir_arch_artifacts:
+            for a in dir_arch_artifacts:
+                dir_in_out = out / a.name
+                if not dir_in_out.is_dir():
+                    log.error("Expected artifact directory not found in output: %s", dir_in_out)
+                    raise SystemExit(1)
+                dir_arch_artifacts_in_out.append(dir_in_out)
+        arch_directories[arch] = dir_arch_artifacts_in_out
 
     # Create deterministic layer tars (shared across manifest pushes).
     arch_layer_tars: dict[str, list[Path]] = {}
-    for arch, files in arch_files.items():
-        log.info("Creating layer tars for %s... files: %s", arch, files)
-        arch_layer_tars[arch] = [_deterministic_tar(f, out) for f in files]
 
-        # A single layer for all DTBs, if any; those are highly compressible together.
-        dtb_dir_in = out / f"dtb-{cfg.flavor_id}-{get_arch_info(arch).output_arch}"  # @TODO "out"
-        if not dtb_dir_in.is_dir():
-            log.warning("No dtbs directory found for %s: %s", arch, dtb_dir_in)
-        else:
-            log.info(f"Found DTB directory for {arch}: {dtb_dir_in}")
-            all_dtb_files: list[Path] = sorted(dtb_dir_in.glob("**/*.dtb*"))
-            dtb_tar_path = out / f".layer-dtbs-{cfg.flavor_id}-{arch}.tar"
-            _deterministic_tar_multiple(all_dtb_files, dtb_tar_path, out)
-            arch_layer_tars[arch].append(dtb_tar_path)
+    # Add the files first, each in a deterministic tar
+    for arch, files in arch_files.items():
+        log.info("Creating layer tars (single-file) for %s... files: %s", arch, files)
+        arch_layer_tars[arch] = []
+        for f in files:
+            log.info("Creating layer tar (single-file) for %s... file: %s", arch, f)
+            arch_layer_tars[arch].append(_deterministic_tar(f, out))
+
+    # Add all directories (with every file within); single tar for better compression
+    for arch, dirs in arch_directories.items():
+        for directory in dirs:
+            log.info("Creating layer tar (directory) for %s... directory: %s", arch, directory)
+            all_dir_files: list[Path] = sorted(directory.glob("**/*"))
+            all_dir_files = [f for f in all_dir_files if f.is_file()]  # only files, not dirs
+            dir_tar_path = out / f".layer-dir-{cfg.flavor_id}-{arch}-{directory.name}.tar"
+            log.debug("Adding %d files to layer tar for arch %s", len(all_dir_files), arch)
+            _deterministic_tar_multiple(all_dir_files, dir_tar_path, out)
+            arch_layer_tars[arch].append(dir_tar_path)
 
     pushed = True
     try:
@@ -254,6 +293,8 @@ def publish(
     artifact_names: list[str] = []
     for arch in arches:
         artifact_names.extend(f.name for f in arch_files.get(arch, []))
+        artifact_names.extend(d.name for d in arch_directories.get(arch, []))
+
     platforms = [f"linux/{a}" for a in _ARCHES]
     log.info("")
     log.info("Publish complete")
