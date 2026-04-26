@@ -125,6 +125,8 @@ def build_cmd(
     artifacts.collect_dtbs(cfg)
     log.info("Initramfs build complete.")
 
+    flavor.post_mkosi_stage()
+
     # ISO stage (if the flavor supports it).
     if flavor.has_iso():
         _build_iso_stage(cfg)
@@ -133,4 +135,8 @@ def build_cmd(
 
     # Final artifact collection.
     artifacts.collect(cfg)
+
+    # Flavor-driven artifact collection.
+    flavor.post_artifact_collect()
+
     log.info("Build complete!")
