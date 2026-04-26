@@ -1,8 +1,14 @@
 import logging
+import os
+import shutil
 from dataclasses import dataclass
+from pathlib import Path
 
+from captain.artifacts import OutputArchArtifact, OutputArchArtifactType
 from captain.flavor import BaseFlavor
 from captain.flavors.common_armbian import ArmbianCommonFlavor
+from captain.tools import _download_binary
+from captain.util import ensure_dir
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -17,6 +23,105 @@ class TrixieArmbianRPiFlavor(ArmbianCommonFlavor):
     name = "Trixie for Raspberry Pi - Armbian bcm2711-current Kernel"
     description = "Debian Trixie based on Armbian's rockchip64-edge kernel"
     supported_architectures = frozenset(["arm64"])  # does NOT support amd64
+    rpi_fw_tag = "1.20260408"
 
     def flavor_packages(self) -> set[str]:
         return {"linux-image-current-bcm2711"}.union(super().flavor_packages())
+
+    def list_arch_artifacts(self, output_arch: str) -> list[OutputArchArtifact]:
+        artifacts = super().list_arch_artifacts(output_arch)
+        artifacts.append(
+            OutputArchArtifact(
+                type=OutputArchArtifactType.DIRECTORY, name=self.firmware_out_dirname()
+            )
+        )
+        return artifacts
+
+    def post_mkosi_stage(self):
+        self.download_rpi_firmware()
+
+    def post_artifact_collect(self):
+        out: Path = ensure_dir(self.cfg.output_dir)
+        log.debug("Copying firmware directory from %s to %s", self.firmware_output(), out)
+        target_fw_dir = out / self.firmware_out_dirname()
+        if target_fw_dir.exists():
+            shutil.rmtree(target_fw_dir)
+        shutil.copytree(self.firmware_output(), target_fw_dir)
+        log.info("Copied firmware directory: %s", target_fw_dir)
+
+        # Symlink all dtbs directly in the fw dir
+        out_dtbs = out / f"dtb-{self.cfg.flavor_id}-{self.cfg.arch_info.output_arch}"
+        broadcom_dtbs = out_dtbs / "broadcom"
+        if not broadcom_dtbs.is_dir():
+            log.error(
+                "Expected dtb directory %s does not exist, skipping dtb symlinks", broadcom_dtbs
+            )
+            raise ValueError(f"Expected dtb directory {broadcom_dtbs} does not exist")
+        for dtb in broadcom_dtbs.glob("*.dtb"):
+            target_dtb = target_fw_dir / dtb.name
+            log.debug("Symlinking dtb: %s to %s", dtb, target_dtb)
+            target_dtb.symlink_to(Path(os.path.relpath(dtb, target_dtb.parent)))
+
+        # Symlink all overlays (which are in the same level as "broadcom") into an "overlays" subdir
+        broadcom_overlays = out_dtbs / "overlays"
+        if not broadcom_overlays.is_dir():
+            log.error("Expected dtb overlays directory %s does not exist", broadcom_overlays)
+            raise ValueError(f"Expected dtb overlays directory {broadcom_overlays} does not exist")
+        target_overlays = ensure_dir(target_fw_dir / "overlays")
+        for overlay in broadcom_overlays.glob("*.dtbo"):
+            log.debug("Symlinking dtb overlay %s to firmware overlays directory", overlay)
+            target_overlay = target_overlays / overlay.name
+            target_overlay.symlink_to(Path(os.path.relpath(overlay, target_overlay.parent)))
+
+    def firmware_out_dirname(self) -> str:
+        # return f"firmware-{self.cfg.flavor_id}-{self.cfg.arch_info.output_arch}"
+        return "firmware-rpi"
+
+    def firmware_output(self) -> Path:
+        return ensure_dir(self.cfg.initramfs_output / "firmware")
+
+    def rpi_firmware_base_url(self) -> str:
+        return (
+            "https://raw.githubusercontent.com/raspberrypi/firmware/refs/tags/"
+            + self.rpi_fw_tag
+            + "/boot/"
+        )
+
+    def download_rpi_firmware(self):
+        rpi_fw_files = [
+            "bootcode.bin",
+            "fixup4cd.dat",
+            "fixup4.dat",
+            "fixup4db.dat",
+            "fixup4x.dat",
+            "fixup_cd.dat",
+            "fixup.dat",
+            "fixup_db.dat",
+            "fixup_x.dat",
+            "LICENCE.broadcom",
+            "start4cd.elf",
+            "start4db.elf",
+            "start4.elf",
+            "start4x.elf",
+            "start_cd.elf",
+            "start_db.elf",
+            "start.elf",
+            "start_x.elf",
+        ]
+        for filename in rpi_fw_files:
+            url = self.rpi_firmware_base_url() + filename
+            output_path = self.firmware_output() / filename
+            if output_path.is_file():
+                log.debug(
+                    "Raspberry Pi firmware file %s already exists at %s, skipping download",
+                    url,
+                    output_path,
+                )
+                continue
+            log.info(
+                "Raspberry Pi firmware file %s does not exist at %s, downloading...",
+                url,
+                output_path,
+            )
+            log.info("Downloading Raspberry Pi firmware file %s to %s", url, output_path)
+            _download_binary(url, output_path)
