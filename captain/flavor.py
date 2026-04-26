@@ -164,6 +164,12 @@ class BaseFlavor(Protocol):
     def pre_mkosi_stage(self):
         pass
 
+    def post_mkosi_stage(self):
+        pass
+
+    def post_artifact_collect(self):
+        pass
+
     def list_arch_artifacts(self, output_arch: str) -> list[OutputArchArtifact]:
         artifacts: list[OutputArchArtifact] = [
             OutputArchArtifact(
