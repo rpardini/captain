@@ -1,5 +1,4 @@
 import logging
-import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,7 +7,7 @@ from captain.artifacts import OutputArchArtifact, OutputArchArtifactType
 from captain.flavor import BaseFlavor
 from captain.flavors.common_armbian import ArmbianCommonFlavor
 from captain.tools import _download_binary
-from captain.util import ensure_dir
+from captain.util import ensure_dir, symlink_relative
 
 log: logging.Logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ class TrixieArmbianRPiFlavor(ArmbianCommonFlavor):
         shutil.copytree(self.firmware_output(), target_fw_dir)
         log.info("Copied firmware directory: %s", target_fw_dir)
 
-        # Symlink all dtbs directly in the fw dir
+        ## Symlink all dtbs directly in the fw dir
         out_dtbs = out / f"dtb-{self.cfg.flavor_id}-{self.cfg.arch_info.output_arch}"
         broadcom_dtbs = out_dtbs / "broadcom"
         if not broadcom_dtbs.is_dir():
@@ -60,7 +59,7 @@ class TrixieArmbianRPiFlavor(ArmbianCommonFlavor):
         for dtb in broadcom_dtbs.glob("*.dtb"):
             target_dtb = target_fw_dir / dtb.name
             log.debug("Symlinking dtb: %s to %s", dtb, target_dtb)
-            target_dtb.symlink_to(Path(os.path.relpath(dtb, target_dtb.parent)))
+            symlink_relative(target_dtb, dtb)
 
         # Symlink all overlays (which are in the same level as "broadcom") into an "overlays" subdir
         broadcom_overlays = out_dtbs / "overlays"
@@ -71,7 +70,34 @@ class TrixieArmbianRPiFlavor(ArmbianCommonFlavor):
         for overlay in broadcom_overlays.glob("*.dtbo"):
             log.debug("Symlinking dtb overlay %s to firmware overlays directory", overlay)
             target_overlay = target_overlays / overlay.name
-            target_overlay.symlink_to(Path(os.path.relpath(overlay, target_overlay.parent)))
+            symlink_relative(target_overlay, overlay)
+
+        ## Symlink the kernel and initramfs
+        # kernel as kernel8.img
+        # see https://www.raspberrypi.com/documentation/computers/config_txt.html#kernel
+        kernel_src = out / f"vmlinuz-{self.cfg.flavor_id}-{self.cfg.arch_info.output_arch}"
+        if not kernel_src.is_file():
+            log.error(
+                "Expected kernel image %s does not exist, cannot symlink to firmware dir",
+                kernel_src,
+            )
+            raise ValueError(f"Expected kernel image {kernel_src} does not exist")
+        kernel_dst = target_fw_dir / "kernel8.img"
+        log.debug("Symlinking kernel from %s to %s", kernel_src, kernel_dst)
+        symlink_relative(kernel_dst, kernel_src)
+
+        # initramfs as initramfs8
+        # see https://www.raspberrypi.com/documentation/computers/config_txt.html#initramfs
+        initramfs_src = out / f"initramfs-{self.cfg.flavor_id}-{self.cfg.arch_info.output_arch}"
+        if not initramfs_src.is_file():
+            log.error(
+                "Expected initramfs image %s does not exist, cannot symlink to firmware dir",
+                initramfs_src,
+            )
+            raise ValueError(f"Expected initramfs image {initramfs_src} does not exist")
+        initramfs_dst = target_fw_dir / "initramfs8"
+        log.debug("Symlinking initramfs from %s to %s", initramfs_src, initramfs_dst)
+        symlink_relative(initramfs_dst, initramfs_src)
 
     def firmware_out_dirname(self) -> str:
         # return f"firmware-{self.cfg.flavor_id}-{self.cfg.arch_info.output_arch}"
