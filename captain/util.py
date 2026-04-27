@@ -232,3 +232,9 @@ def check_dependencies(arch: str) -> list[str]:
     Returns a list of missing command names (empty if all found).
     """
     return check_kernel_dependencies(arch) + check_mkosi_dependencies()
+
+
+def symlink_relative(initramfs_dst: Path, initramfs_src: Path):
+    relative = Path(os.path.relpath(initramfs_src, initramfs_dst.parent))
+    log.debug("Symlinking %s to %s (relative path: %s)", initramfs_dst, initramfs_src, relative)
+    initramfs_dst.symlink_to(relative)
