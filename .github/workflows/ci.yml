@@ -12,6 +12,7 @@ permissions:
 
 env:
   FORCE_COLOR: "1"
+  CAPTAIN_VERBOSE: "1"
 
 jobs:
   # -------------------------------------------------------------------
