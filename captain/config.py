@@ -22,7 +22,7 @@ DEFAULT_FLAVOR_ID = "trixie-full"
 # The latest version can be obtained and passed as --kernel-version/KERNEL_VERSION
 # via <@TODO cmd for listing from cached releases.json
 # Override at runtime via --kernel-version or KERNEL_VERSION env var.
-DEFAULT_KERNEL_VERSION = "6.18.22"
+DEFAULT_KERNEL_VERSION = "6.18.26"
 
 
 @dataclass(slots=True)
