@@ -34,6 +34,7 @@ PackageDirectories=
 # pivot_root(2) work for container runtimes (runc).
 
 Packages=
+    # flavor-specific packages
     {{ "\n    ".join(flavor.sorted_flavor_packages()) }}
     # systemd and core
     systemd
