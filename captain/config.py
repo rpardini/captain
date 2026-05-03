@@ -64,10 +64,21 @@ class Config:
     # Force flags
     force_tools: bool = False
     force_iso: bool = False
+    force_release: bool = False
 
     # QEMU
     qemu_mem: str = "2G"
     qemu_smp: str = "2"
+
+    # Release related
+    release_registry: str | None = None
+    release_repository: str | None = None
+    release_oci_artifact_name: str | None = None
+    release_target: str | None = None
+    release_git_sha: str | None = None
+    release_src_tag: str | None = None
+    release_pull_output: Path | None = None
+    release_new_tag: str | None = None
 
     # mkosi passthrough
     mkosi_args: list[str] = field(default_factory=list)

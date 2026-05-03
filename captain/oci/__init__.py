@@ -27,12 +27,10 @@ registry.  Read operations (digest, tag, export) use ``skopeo``.
 * ``skopeo`` extracts individual files for release workflows.
 """
 
-from captain.oci._common import compute_version_tag
 from captain.oci._publish import publish
 from captain.oci._pull import pull, tag_all, tag_image
 
 __all__ = [
-    "compute_version_tag",
     "publish",
     "pull",
     "tag_all",
