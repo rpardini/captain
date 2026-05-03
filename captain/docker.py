@@ -7,6 +7,7 @@ import logging
 import os
 import platform
 from pathlib import Path
+from subprocess import CalledProcessError
 
 from rich.table import Table
 
@@ -153,32 +154,45 @@ def run_in_builder(
     """
 
     docker_envs: dict[str, str] = {
-        "CAPTAIN_IN_DOCKER": "docker",
+        # common to all commands
         "ARCH": cfg.arch,
         "FLAVOR_ID": cfg.flavor_id,
         "KERNEL_VERSION": cfg.kernel_version,
         "FORCE_TOOLS": str(int(cfg.force_tools)),
         "FORCE_ISO": str(int(cfg.force_iso)),
         "FORCE_KERNEL": f"{int(cfg.force_kernel)!s}",
+        "FORCE_RELEASE": str(cfg.force_release),
+        "CAPTAIN_VERBOSE": "1" if cfg.verbose_docker else "0",
+        "CONFIG_KERNEL": "1" if cfg.kernel_menuconfig else "0",
+        # publish-related env vars
         "BUILDAH_ISOLATION": "chroot",
         "BUILDAH_INSECURE": os.environ.get("BUILDAH_INSECURE", ""),
+        "REGISTRY": str(cfg.release_registry),
+        "GITHUB_REPOSITORY": str(cfg.release_repository),
+        "OCI_ARTIFACT_NAME": str(cfg.release_oci_artifact_name),
+        "TARGET": str(cfg.release_target),
+        "GIT_SHA": str(cfg.release_git_sha),
+        "SRC_TAG": str(cfg.release_src_tag),
+        "PULL_OUTPUT": str(cfg.release_pull_output),
+        "NEW_TAG": str(cfg.release_new_tag),
+        # set all modes to native under Docker
         "KERNEL_MODE": "native",
         "RELEASE_MODE": "native",
         "TOOLS_MODE": "native",
         "MKOSI_MODE": "native",
         "ISO_MODE": "native",
+        # terminal control / gha stuff etc
         "TERM": os.environ.get("TERM", "xterm-256color"),
         "FORCE_COLOR": "1",
         "COLUMNS": str(captain.env_columns),
         "GITHUB_ACTIONS": os.environ.get("GITHUB_ACTIONS", ""),
+        "CAPTAIN_IN_DOCKER": "docker",
         # Forward host registry credentials so buildah/skopeo can authenticate.
         # The caller sets these env vars on the host (e.g. via docker login or
         # CI secrets); they are passed through to the container as-is.
         "REGISTRY_AUTH_FILE": os.environ.get("REGISTRY_AUTH_FILE", ""),
         "REGISTRY_USERNAME": os.environ.get("REGISTRY_USERNAME", ""),
         "REGISTRY_PASSWORD": os.environ.get("REGISTRY_PASSWORD", ""),
-        "CAPTAIN_VERBOSE": "1" if cfg.verbose_docker else "0",
-        "CONFIG_KERNEL": "1" if cfg.kernel_menuconfig else "0",
     }
 
     docker_args: list[str] = [
@@ -232,7 +246,16 @@ def run_in_builder(
     docker_args += [cfg.builder_image]
 
     docker_args.extend(command_and_args)
-    run(docker_args)
+
+    # Handle exceptions: when re-launching in Docker, the inner instance already showed
+    # the full error with traceback, so we can suppress the redundant outer traceback.
+    try:
+        run(docker_args)
+    except CalledProcessError as e:
+        log.error(
+            "Command '%s' failed with exit code %d.", " ".join(command_and_args), e.returncode
+        )
+        raise SystemExit(e.returncode) from None
 
 
 def run_captain_in_builder(
