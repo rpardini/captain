@@ -69,6 +69,7 @@ def tag_all(
     """Tag all artifact images (per-arch + combined) with a new version."""
     arches = arches or list(_ARCHES)
     for a in arches:
+        log.info("Tagging for arch %s-%s → %s-%s", src_tag, a, new_tag, a)
         tag_image(
             registry=registry,
             repository=repository,
@@ -77,6 +78,7 @@ def tag_all(
             new_tag=f"{new_tag}-{a}",
         )
     # Tag the combined image (no arch suffix).
+    log.info("Tagging combined image %s → %s", src_tag, new_tag)
     tag_image(
         registry=registry,
         repository=repository,

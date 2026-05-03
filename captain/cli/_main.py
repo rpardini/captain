@@ -170,6 +170,7 @@ def cli(
         return
 
     # Build the shared context object for subcommands.
+    log.debug("Main CLI creating CliContext...")
     ctx.obj = CliContext(
         project_dir=resolve_project_dir(project_dir),
         arch=arch,
@@ -195,7 +196,7 @@ def main() -> None:
         _iso,
         _kernel,
         _qemu,
-        _release_publish,
+        _release,
         _shell,
         _tools,
     )
