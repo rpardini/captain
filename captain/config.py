@@ -69,6 +69,18 @@ class Config:
     qemu_mem: str = "2G"
     qemu_smp: str = "2"
 
+    # Release related
+    release_registry: str | None = None
+    release_repository: str | None = None
+    release_oci_artifact_name: str | None = None
+    release_target: str | None = None
+    release_github_sha: str | None = None
+    release_version_exclude: str | None = None
+    release_tag: str | None = None
+    release_pull_output: Path | None = None
+    release_new_tag: str | None = None
+    release_force: bool = False
+
     # mkosi passthrough
     mkosi_args: list[str] = field(default_factory=list)
 

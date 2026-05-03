@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import subprocess
 from pathlib import Path
 
 _ARCHES = ("amd64", "arm64")
+
+log = logging.getLogger(__name__)
 
 
 def _image_ref(registry: str, repository: str, artifact_name: str, tag: str) -> str:
@@ -47,6 +50,7 @@ def compute_version_tag(
             cwd=project_dir,
         )
         version = result.stdout.strip()
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        log.error("Failed to compute version tag from git. Error: %s", e)
         version = "v0.0.0"
     return f"{version}-{sha[:7]}"
