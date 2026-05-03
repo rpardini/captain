@@ -22,10 +22,10 @@ env_columns = shutil.get_terminal_size(fallback=(161, 24)).columns
 # Install Rich traceback handler globally (once, at import time).
 if os.environ.get("FORCE_COLOR", "0") == "1":
     console: Console = Console(stderr=True, color_system="standard", width=env_columns)
-    _install_rich_traceback(console=console, show_locals=True, width=env_columns, suppress=[click])
+    _install_rich_traceback(console=console, show_locals=False, width=env_columns, suppress=[click])
 else:
     console: Console = Console(stderr=True)
-    _install_rich_traceback(console=console, show_locals=True, width=None, suppress=[click])
+    _install_rich_traceback(console=console, show_locals=False, width=None, suppress=[click])
 
 
 class _StageFormatter(logging.Formatter):
@@ -44,7 +44,7 @@ _handler = RichHandler(
     show_path=True,
     markup=True,  # interprets [braket]stuff[/bracket] in log messages, beware
     rich_tracebacks=True,
-    tracebacks_show_locals=True,
+    tracebacks_show_locals=False,
     tracebacks_suppress=[click],  # don't wanna see click infra code in traces
 )
 _handler.setFormatter(_StageFormatter("[bold][cyan]%(stage)s[/cyan][/bold]: %(message)s"))
