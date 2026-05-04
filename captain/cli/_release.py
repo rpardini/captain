@@ -17,10 +17,7 @@ from captain.util import check_release_dependencies
 log = logging.getLogger(__name__)
 
 
-@cli.group(
-    # "release-publish",
-    # short_help="Publish build artifacts as a multi-arch OCI image.",
-)
+@cli.group()
 @click.option(
     "--release-mode",
     envvar="RELEASE_MODE",
@@ -51,7 +48,7 @@ log = logging.getLogger(__name__)
     show_default=True,
     help="OCI artifact image name.",
 )
-@click.option(  # @TODO also for pull (not tag)
+@click.option(
     "--target",
     envvar="TARGET",
     default=None,
@@ -60,51 +57,25 @@ log = logging.getLogger(__name__)
     help="Artifact target: 'amd64', 'arm64', or 'combined' (default: value of --arch); "
     "'combined' requires an ACPI flavor with both arch's outputs present.",
 )
-@click.option(  # @TODO also for pull (not tag)
+@click.option(
     "--git-sha",
-    envvar="GITHUB_SHA",
+    envvar="GIT_SHA",
     default=None,
     help="Git commit SHA (default: auto-detected via git rev-parse HEAD).",
 )
-@click.option(  # @TODO also for pull (not tag)
-    "--version-exclude",
-    envvar="VERSION_EXCLUDE",
-    default=None,
-    help="Tag to exclude from git-describe version lookup.",
-)
-@click.option(  # @TODO also for pull (not tag)
-    "--force",
-    "force",
+@click.option(
+    "--force-release",
+    envvar="FORCE_RELEASE",
     is_flag=True,
     default=False,
     help="Publish even if the image already exists in the registry.",
 )
 @click.option(
-    "--tag",
-    envvar="TAG",
+    "--src-tag",
+    envvar="SRC_TAG",
     default=None,
     help="Override specific tag to use; auto-determined if omitted.",
 )
-# @TODO missing for tag command only
-# def _add_release_tag_version(parser: configargparse.ArgParser) -> None:
-#    """Positional <version> argument for 'release tag'."""
-#    parser.add_argument(
-#        "version",
-#        nargs="?",
-#        default=None,
-#        help="version tag to apply (e.g. v1.0.0)",
-#    )
-# @TODO missing for pull command only
-# def _add_release_pull_output(parser: configargparse.ArgParser) -> None:
-#    """--pull-output flag (only relevant for 'release pull')."""
-#    g = parser.add_argument_group("pull")
-#    g.add_argument(
-#        "--pull-output",
-#        metavar="DIR",
-#        default=None,
-#        help="output directory for pulled artifacts",
-#    )
-
 @click.pass_context
 def release_group(
     ctx: click.Context,
@@ -115,9 +86,8 @@ def release_group(
     oci_artifact_name: str,
     target: str | None,
     git_sha: str | None,
-    version_exclude: str | None,
-    force: bool,
-    tag: str | None,
+    force_release: bool,
+    src_tag: str | None,
 ) -> None:
     cli_ctx: CliContext = ctx.obj
 
@@ -133,28 +103,26 @@ def release_group(
         release_repository=repository,
         release_oci_artifact_name=oci_artifact_name,
         release_target=target,
-        release_github_sha=git_sha,
-        release_version_exclude=version_exclude,
-        release_force=force,
-        release_tag=tag,
+        release_git_sha=git_sha,
+        force_release=force_release,
+        release_src_tag=src_tag,
     )
 
     # resolve the SHA before launching Docker, as we've the .git here and not there.
-    if cfg.release_github_sha is None:
+    if cfg.release_git_sha is None:
         log.debug(
             "Auto-detecting git SHA for release since not provided via --git-sha or GITHUB_SHA..."
         )
-        cfg.release_github_sha = _autodetect_git_sha(cfg.project_dir)
-    log.warning("Git SHA at group level: %s", cfg.release_github_sha)
+        cfg.release_git_sha = _autodetect_git_sha(cfg.project_dir)
+    log.warning("Git SHA at group level: %s", cfg.release_git_sha)
 
-    # same for the tag; as it uses git describe.
-    if cfg.release_tag is None:
-        log.debug("Auto-computing version tag for release since not provided via --tag or TAG...")
-        tag = oci.compute_version_tag(
-            cfg.project_dir, str(cfg.release_github_sha), exclude=cfg.release_version_exclude
+    if cfg.release_src_tag is None:
+        log.debug(
+            "Auto-computing version tag for release since not provided via --src-tag or SRC_TAG..."
         )
-        cfg.release_tag = f"{tag}-{cfg.flavor_id}"
-    log.warning("Tag at group level: %s", cfg.release_tag)
+        tag = f"v0.0.0-{str(cfg.release_git_sha)[:7]}"
+        cfg.release_src_tag = f"{tag}-{cfg.flavor_id}"
+    log.debug("Tag at group level: %s", cfg.release_src_tag)
 
     # pass it down via Context // pass_obj
     ctx.obj = cfg
@@ -182,7 +150,7 @@ def pull_command(cfg: Config, pull_output: Path) -> None:
         registry=str(cfg.release_registry),
         repository=str(cfg.release_repository),
         artifact_name=str(cfg.release_oci_artifact_name),
-        tag=str(cfg.release_tag),
+        tag=str(cfg.release_src_tag),
         target=str(cfg.release_target),
         output_dir=cfg.output_dir / cfg.release_pull_output,
     )
@@ -211,7 +179,7 @@ def tag_command(cfg: Config, new_tag: str) -> None:
         registry=str(cfg.release_registry),
         repository=str(cfg.release_repository),
         artifact_name=str(cfg.release_oci_artifact_name),
-        src_tag=str(cfg.release_tag),
+        src_tag=str(cfg.release_src_tag),
         new_tag=str(cfg.release_new_tag),
         arches=list(flavor.supported_architectures),
     )
@@ -243,9 +211,9 @@ def publish_command(cfg: Config) -> None:
         registry=str(cfg.release_registry),
         repository=str(cfg.release_repository),
         artifact_name=str(cfg.release_oci_artifact_name),
-        tag=str(cfg.release_tag),
-        sha=str(cfg.release_github_sha),
-        force=cfg.release_force,
+        tag=str(cfg.release_src_tag),
+        sha=str(cfg.release_git_sha),
+        force=cfg.force_release,
     )
 
 

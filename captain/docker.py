@@ -161,6 +161,7 @@ def run_in_builder(
         "FORCE_TOOLS": str(int(cfg.force_tools)),
         "FORCE_ISO": str(int(cfg.force_iso)),
         "FORCE_KERNEL": f"{int(cfg.force_kernel)!s}",
+        "FORCE_RELEASE": str(cfg.force_release),
         "CAPTAIN_VERBOSE": "1" if cfg.verbose_docker else "0",
         "CONFIG_KERNEL": "1" if cfg.kernel_menuconfig else "0",
         # publish-related env vars
@@ -170,10 +171,8 @@ def run_in_builder(
         "GITHUB_REPOSITORY": str(cfg.release_repository),
         "OCI_ARTIFACT_NAME": str(cfg.release_oci_artifact_name),
         "TARGET": str(cfg.release_target),
-        "GITHUB_SHA": str(cfg.release_github_sha),
-        "VERSION_EXCLUDE": str(cfg.release_version_exclude),
-        "RELEASE_FORCE": str(cfg.release_force),
-        "TAG": str(cfg.release_tag),
+        "GIT_SHA": str(cfg.release_git_sha),
+        "SRC_TAG": str(cfg.release_src_tag),
         "PULL_OUTPUT": str(cfg.release_pull_output),
         "NEW_TAG": str(cfg.release_new_tag),
         # set all modes to native under Docker
