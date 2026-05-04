@@ -49,7 +49,7 @@ jobs:
         run: |
           for dir in */; do
               # if not a directory, skip
-              [ -d "$dir" || "$dir" == "." || "$dir" == ".." ] || continue
+              [[ ! -d "$dir" || "$dir" == "." || "$dir" == ".." ]] && continue
               tarball="${dir%/}.tar.gz"
               echo "Creating tarball for $dir -> $tarball"
               tar -czvf "${dir%/}.tar.gz" "$dir"
