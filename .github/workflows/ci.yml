@@ -336,8 +336,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - name: Load shared config
         run: cat .github/config.env >> "$GITHUB_ENV"
