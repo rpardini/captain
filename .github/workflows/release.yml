@@ -37,7 +37,7 @@ jobs:
       - name: Pull release artifacts (trixie-full, combined)
         env:
           VERSION_EXCLUDE: ${{ github.ref_name }}
-        run: uv run captain --flavor-id trixie-full release pull --target combined --pull-output combined-trixie-full
+        run: uv run captain --flavor-id trixie-full release --target combined pull --pull-output combined-trixie-full
 
       - name: Create GitHub Release
         env:
