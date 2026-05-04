@@ -8,6 +8,10 @@ permissions:
   contents: write
   packages: write
 
+env:
+  FORCE_COLOR: "1"
+  CAPTAIN_VERBOSE: "1"
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -30,21 +34,21 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
 
-      - name: Pull release artifacts (combined)
+      - name: Pull release artifacts (trixie-full, combined)
         env:
           VERSION_EXCLUDE: ${{ github.ref_name }}
-        run: uv run ./build.py release pull --target combined --pull-output artifacts/combined
+        run: uv run captain --flavor-id trixie-full release pull --target combined --pull-output combined-trixie-full
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ github.ref_name }}" \
-            artifacts/combined/* \
+            out/combined-trixie-full/* \
             --generate-notes \
             --title "${{ github.ref_name }}"
 
       - name: Tag OCI artifacts with version
         env:
           VERSION_EXCLUDE: ${{ github.ref_name }}
-        run: uv run ./build.py release tag ${{ github.ref_name }}
+        run: uv run captain --flavor-id trixie-full release tag --new-tag "${{ github.ref_name }}"
