@@ -34,21 +34,44 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
 
-      - name: Pull release artifacts (trixie-full, combined)
+      - name: Pull release artifacts
         env:
           VERSION_EXCLUDE: ${{ github.ref_name }}
-        run: uv run captain --flavor-id trixie-full release --target combined pull --pull-output combined-trixie-full
+        run: |
+          uv run captain --flavor-id trixie-full release --target combined pull --pull-output release-artifacts
+          uv run captain --flavor-id trixie-slim release --target combined pull --pull-output release-artifacts
+          uv run captain --flavor-id trixie-armbian-rpi release --target arm64 pull --pull-output release-artifacts
+          uv run captain --flavor-id trixie-rockchip64 release --target arm64 pull --pull-output release-artifacts
+          uv run captain --flavor-id trixie-meson64 release --target arm64 pull --pull-output release-artifacts
+
+      - name: "directories -> tarball"
+        working-directory: out/release-artifacts
+        run: |
+          for dir in */; do
+              # if not a directory, skip
+              [ -d "$dir" || "$dir" == "." || "$dir" == ".." ] || continue
+              tarball="${dir%/}.tar.gz"
+              echo "Creating tarball for $dir -> $tarball"
+              tar -czvf "${dir%/}.tar.gz" "$dir"
+              echo "Removing directory $dir"
+              rm -rf "$dir"
+          done
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ github.ref_name }}" \
-            out/combined-trixie-full/* \
+            out/release-artifacts/* \
             --generate-notes \
             --title "${{ github.ref_name }}"
 
-      - name: Tag OCI artifacts with version
+      - name: Tag OCI artifacts with version (trixie-full)
         env:
           VERSION_EXCLUDE: ${{ github.ref_name }}
         run: uv run captain --flavor-id trixie-full release tag --new-tag "${{ github.ref_name }}"
+
+      - name: Tag OCI artifacts with version (trixie-slim)
+        env:
+          VERSION_EXCLUDE: ${{ github.ref_name }}
+        run: uv run captain --flavor-id trixie-slim release tag --new-tag "${{ github.ref_name }}-slim"
