@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import tarfile
 from pathlib import Path
 
@@ -57,8 +58,11 @@ def copy(src: str, dest: str) -> None:
         [
             "skopeo",
             "copy",
-            "--src-tls-verify=false",  # @TODO BUILDAH_INSECURE
-            "--dest-tls-verify=false",  # @TODO BUILDAH_INSECURE
+            *(
+                ("--src-tls-verify=false", "--dest-tls-verify=false")
+                if os.environ.get("REGISTRY_INSECURE") == "1"
+                else ()
+            ),
             "--all",
             f"docker://{src}",
             f"docker://{dest}",
@@ -80,7 +84,11 @@ def copy_to_dir(
     Returns *output_dir*.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
-    cmd: list[str] = ["skopeo", "copy", "--src-tls-verify=false"]  # @TODO BUILDAH_INSECURE
+    cmd: list[str] = [
+        "skopeo",
+        "copy",
+        *(("--src-tls-verify=false") if os.environ.get("REGISTRY_INSECURE") == "1" else ()),
+    ]
     if platform:
         parts = platform.split("/")
         if len(parts) == 2:
