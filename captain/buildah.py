@@ -26,7 +26,11 @@ def from_image(
     *,
     platform: str | None = None,
 ) -> str:
-    cmd: list[str] = ["buildah", "from", "--tls-verify=false"]  # @TODO BUILDAH_INSECURE
+    cmd: list[str] = [
+        "buildah",
+        "from",
+        *(("--tls-verify=false",) if os.environ.get("REGISTRY_INSECURE") == "1" else ()),
+    ]
     if platform:
         cmd += ["--platform", platform]
     cmd.append(image)
@@ -125,7 +129,7 @@ def manifest_push(
             "buildah",
             "manifest",
             "push",
-            *(("--tls-verify=false",) if os.environ.get("BUILDAH_INSECURE") == "1" else ()),
+            *(("--tls-verify=false",) if os.environ.get("REGISTRY_INSECURE") == "1" else ()),
             "--all",
             manifest,
             f"docker://{dest}",
