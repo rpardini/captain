@@ -221,6 +221,9 @@ def run_in_builder(
     for k, v in docker_envs.items():
         docker_args += ["-e", f"{k}={v}"]
 
+    if cfg.custom_dir.exists() and cfg.custom_dir.is_dir():
+        docker_args += ["-v", f"{cfg.custom_dir}:/work/custom"]
+
     docker_args += ["-v", f"{cfg.project_dir}/kernel.configs:/work/kernel.configs"]
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.output:/work/mkosi.output"]
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.input:/work/mkosi.input"]
