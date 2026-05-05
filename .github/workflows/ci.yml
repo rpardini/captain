@@ -295,7 +295,7 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           TARGET: ${{ matrix.arch }}
-        run: uv run captain release-publish
+        run: uv run captain release publish
 
   build-captainos: # those use regular Debian apt repos for kernels
     name: "build-captainos ${{ matrix.FLAVOR_ID }} (${{ matrix.arch }})"
@@ -336,8 +336,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - name: Load shared config
         run: cat .github/config.env >> "$GITHUB_ENV"
@@ -379,4 +377,4 @@ jobs:
       - name: Publish combined image to GHCR
         # only pushes to main, and not PR workflows, should try to push to OCI registry
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        run: uv run captain release-publish
+        run: uv run captain release publish
