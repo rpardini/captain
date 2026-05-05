@@ -3,9 +3,6 @@
 # The root filesystem is writable here.
 set -euo pipefail
 
-log info "Showing full contents of environment variables for debugging:"
-env
-
 log info "CaptainOS finalize: unlocking root account..."
 
 # Unlock root with empty password
@@ -132,4 +129,4 @@ fi
 log info "Final contents of root filesystem (up to depth 4, top 30):"
 du -h -x -d 4 "$BUILDROOT" | sort -h | tail -n30 || true
 
-log info "CaptainOS finalize complete."
+log info "Regular CaptainOS finalize complete."
