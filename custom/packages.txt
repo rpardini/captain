@@ -1,0 +1,2 @@
+# Add (Debian) package names, one per line, to be included in CaptainOS.
+cowsay
