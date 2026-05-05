@@ -2,8 +2,8 @@ log warn "Example custom post-install script (custom/mkosi-postinst/example-post
 # Runs *outside* the image chroot after packages are installed.
 # The target filesystem is at /buildroot; use 'mkosi-chroot' to run commands inside the chroot environment.
 
-declare -i ENABLE_EXAMPLE_CONTAINERD_MIRRORS=0 # flip to 1 to enable
-declare -i ENABLE_EXAMPLE_CA_CERTS=0           # flip to 1 to enable
+declare -i ENABLE_EXAMPLE_CONTAINERD_MIRRORS=1 # flip to 1 to enable
+declare -i ENABLE_EXAMPLE_CA_CERTS=1           # flip to 1 to enable
 
 ### Example: configure containerd registry mirrors for a few common registries.
 # Each target registry is a directory under /etc/containerd/certs.d with a hosts.toml file.
