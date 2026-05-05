@@ -94,12 +94,14 @@ class BaseFlavor(Protocol):
             raise SystemExit(1)
         return flavor_dir
 
-    def add_static_dir(self, dir_to_include: str, flavor_dir: Path):
+    def add_static_dir(self, dir_to_include: str, flavor_dir: Path, prefix_with: str | None = None):
         extra_dir = flavor_dir / dir_to_include
         if extra_dir.exists() and extra_dir.is_dir():
             for extra_file in extra_dir.rglob("*"):
                 if extra_file.is_file():
                     relative_path = extra_file.relative_to(flavor_dir)
+                    if prefix_with is not None:
+                        relative_path = Path(prefix_with) / extra_file.relative_to(extra_dir)
                     self.static_map[str(relative_path)] = extra_file
 
     def render_templates(
@@ -127,7 +129,7 @@ class BaseFlavor(Protocol):
                     loader=jinja2.FileSystemLoader(template_path.parent),
                     undefined=jinja2.StrictUndefined,
                 ).get_template(template_path.name)
-                rendered_content += template.render(cfg=self.cfg, flavor=self)
+                rendered_content += template.render(cfg=self.cfg, flavor=self) + "\n"
 
             if hashes is not None:
                 hashes[relative_output_path] = hashlib.sha256(rendered_content.encode()).hexdigest()
