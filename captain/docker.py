@@ -166,7 +166,7 @@ def run_in_builder(
         "CONFIG_KERNEL": "1" if cfg.kernel_menuconfig else "0",
         # publish-related env vars
         "BUILDAH_ISOLATION": "chroot",
-        "BUILDAH_INSECURE": os.environ.get("BUILDAH_INSECURE", ""),
+        "REGISTRY_INSECURE": os.environ.get("REGISTRY_INSECURE", ""),
         "REGISTRY": str(cfg.release_registry),
         "GITHUB_REPOSITORY": str(cfg.release_repository),
         "OCI_ARTIFACT_NAME": str(cfg.release_oci_artifact_name),
