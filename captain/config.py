@@ -152,3 +152,8 @@ class Config:
     def iso_staging(self) -> Path:
         """Per-version, per-arch staging directory for assembling the ISO filesystem."""
         return self.iso_output / "staging"
+
+    @property
+    def custom_dir(self) -> Path:
+        """Directory for custom user files"""
+        return self.project_dir / "custom"
