@@ -221,6 +221,16 @@ def run_in_builder(
     for k, v in docker_envs.items():
         docker_args += ["-e", f"{k}={v}"]
 
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        log.debug("Running in GitHub Actions, adding bind mount for Docker credentials...")
+        github_docker_config = Path.home() / ".docker" / "config.json"
+        if github_docker_config.exists() and github_docker_config.is_file():
+            log.debug(
+                "Under GHA, Found Docker config file at %s, adding to bind mounts.",
+                github_docker_config,
+            )
+            docker_args += ["-v", f"{github_docker_config}:/root/.docker/config.json"]
+
     if cfg.custom_dir.exists() and cfg.custom_dir.is_dir():
         docker_args += ["-v", f"{cfg.custom_dir}:/work/custom"]
 
