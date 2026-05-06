@@ -96,9 +96,22 @@ def push(
 
 def manifest_create(
     ref: str,
+    oci_metadata: dict[str, str],
 ) -> str:
     log.info("buildah manifest create %s", ref)
-    result = run(["buildah", "manifest", "create", ref], capture=True)
+    cmd = ["buildah", "manifest", "create"]
+    for key, value in oci_metadata.items():
+        cmd += ["--annotation", f"{key}={value}"]
+    cmd += [ref]
+    result = run(cmd, capture=True, check=False)
+    # handle and show both stdout and stderr on failure
+    if result.returncode != 0:
+        log.error(
+            "buildah manifest create failed: stdout: '%s' stderr: '%s'",
+            result.stdout.strip(),
+            result.stderr.strip(),
+        )
+        raise RuntimeError("buildah manifest create failed")
     return result.stdout.strip()
 
 

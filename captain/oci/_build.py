@@ -63,12 +63,9 @@ def _checksum_files(arch_files: list[Path], flavor_id: str, oarch: str, out: Pat
 def _build_platform_image(
     layer_tars: list[Path],
     platform: str,
-    sha: str,
-    repository: str,
     *,
     created: str,
-    tag: str,
-    artifact_name: str,
+    oci_metadata: dict[str, str],
     base: str = "scratch",
 ) -> str:
     """Build an OCI image locally for *platform*.
@@ -87,16 +84,6 @@ def _build_platform_image(
     """
     os_name, arch = platform.split("/")
     epoch = int(datetime.fromisoformat(created.replace("Z", "+00:00")).timestamp())
-    oci_metadata = {
-        "org.opencontainers.image.created": created,
-        "org.opencontainers.image.source": f"https://github.com/{repository}",
-        "org.opencontainers.image.revision": sha,
-        "org.opencontainers.image.version": tag,
-        "org.opencontainers.image.title": artifact_name,
-        "org.opencontainers.image.description": "CaptainOS build artifacts",
-        "org.opencontainers.image.vendor": "Tinkerbell",
-        "org.opencontainers.image.licenses": "Apache-2.0",
-    }
 
     # Build one layer per tar: from base → add file → commit → repeat.
     # Track intermediate image IDs so they can be cleaned up afterwards;
@@ -120,6 +107,7 @@ def _build_platform_image(
         if prev != base:
             intermediates.append(prev)
 
+    log.debug("Cleaning up intermediate images: %s", intermediates)
     for img in intermediates:
         with contextlib.suppress(Exception):
             buildah.rmi(img)

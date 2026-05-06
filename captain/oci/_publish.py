@@ -28,6 +28,7 @@ log = logging.getLogger(__name__)
 def _create_push_cleanup(
     image_ids: list[str],
     dest_ref: str,
+    oci_metadata: dict[str, str],
 ) -> None:
     """Create a manifest list from *image_ids*, push it to *dest_ref*, and clean up.
 
@@ -38,14 +39,16 @@ def _create_push_cleanup(
     temp_name = f"captain-local-{uuid4().hex[:12]}"
     manifest_id: str | None = None
     try:
-        manifest_id = buildah.manifest_create(temp_name)
+        manifest_id = buildah.manifest_create(temp_name, oci_metadata)
         for image_id in image_ids:
             buildah.manifest_add(manifest_id, image_id)
         buildah.manifest_push(manifest_id, dest_ref)
     finally:
         if manifest_id is not None:
+            log.debug("Cleaning up manifest: %s", manifest_id)
             with contextlib.suppress(Exception):
                 buildah.rmi(manifest_id)
+        log.debug("Cleaning up intermediate images: %s", image_ids)
         for image_id in image_ids:
             with contextlib.suppress(Exception):
                 buildah.rmi(image_id)
@@ -53,12 +56,10 @@ def _create_push_cleanup(
 
 def _publish_single_arch(
     *,
+    flavor: BaseFlavor,
     layer_tars: list[Path],
     ref: str,
-    tag: str,
-    sha: str,
     repository: str,
-    artifact_name: str,
     created: str,
 ) -> None:
     """Build a per-arch multi-arch index and push it.
@@ -71,25 +72,36 @@ def _publish_single_arch(
         image_id = _build_platform_image(
             layer_tars,
             f"linux/{platform_arch}",
-            sha,
-            repository,
             created=created,
-            tag=tag,
-            artifact_name=artifact_name,
+            oci_metadata=create_oci_metadata(
+                flavor=flavor,
+                image_type="inner-arch",
+                arch=platform_arch,
+                repository=repository,
+            ),
         )
         image_ids.append(image_id)
 
-    _create_push_cleanup(image_ids, ref)
+    _create_push_cleanup(
+        image_ids=image_ids,
+        dest_ref=ref,
+        oci_metadata=create_oci_metadata(
+            flavor=flavor,
+            image_type="outer-arch",
+            arch=None,
+            repository=repository,
+        ),
+    )
 
 
 def _publish_combined(
     *,
+    flavor: BaseFlavor,
     arch_layer_tars: dict[str, list[Path]],
     registry: str,
     repository: str,
     artifact_name: str,
     tag: str,
-    sha: str,
     created: str,
     force: bool = False,
 ) -> bool:
@@ -125,12 +137,10 @@ def _publish_combined(
                 per_arch_ref,
             )
             _publish_single_arch(
+                flavor=flavor,
                 layer_tars=arch_layer_tars[arch],
                 ref=per_arch_ref,
-                tag=per_arch_tag,
-                sha=sha,
                 repository=repository,
-                artifact_name=artifact_name,
                 created=created,
             )
 
@@ -143,16 +153,28 @@ def _publish_combined(
         image_id = _build_platform_image(
             arch_layer_tars[other],
             f"linux/{arch}",
-            sha,
-            repository,
             created=created,
-            tag=tag,
-            artifact_name=artifact_name,
+            oci_metadata=create_oci_metadata(
+                flavor=flavor,
+                image_type="inner-combined",
+                arch=arch,
+                repository=repository,
+            ),
             base=f"docker://{per_arch_ref}",
         )
         image_ids.append(image_id)
 
-    _create_push_cleanup(image_ids, combined_ref)
+    _create_push_cleanup(
+        image_ids=image_ids,
+        dest_ref=combined_ref,
+        oci_metadata=create_oci_metadata(
+            flavor=flavor,
+            image_type="outer-combined",
+            arch=None,
+            repository=repository,
+        ),
+    )
+
     return True
 
 
@@ -165,7 +187,6 @@ def publish(
     repository: str,
     artifact_name: str,
     tag: str,
-    sha: str,
     force: bool = False,
 ) -> None:
     """Collect artifacts and publish a multi-arch OCI index.
@@ -262,23 +283,21 @@ def publish(
     try:
         if target == "combined":
             pushed = _publish_combined(
+                flavor=flavor,
                 arch_layer_tars=arch_layer_tars,
                 registry=registry,
                 repository=repository,
                 artifact_name=artifact_name,
                 tag=tag,
-                sha=sha,
                 created=created,
                 force=force,
             )
         else:
             _publish_single_arch(
+                flavor=flavor,
                 layer_tars=arch_layer_tars[target],
                 ref=final_ref,
-                tag=full_tag,
-                sha=sha,
                 repository=repository,
-                artifact_name=artifact_name,
                 created=created,
             )
     finally:
@@ -305,3 +324,50 @@ def publish(
     log.info("  Artifacts:")
     for name in artifact_names:
         log.info("    - %s", name)
+
+
+def create_oci_metadata(
+    *,
+    flavor: BaseFlavor,
+    image_type: str,
+    arch: str | None = None,
+    repository: str,
+) -> dict[str, str]:
+    title_parts = ["CaptainOS"]
+    title_parts += [f"{flavor.id}"]
+    title_parts += [f"{image_type}"]
+    if arch is not None:
+        title_parts += [f"{arch}"]
+
+    desc_parts = ["Tinkerbell CaptainOS"]
+
+    # Add flavor info
+    desc_parts += [f"flavor {flavor.id}"]
+    desc_parts += [f"({flavor.description})"]
+
+    if arch is not None:
+        desc_parts += [f"{arch}"]
+
+    match image_type:
+        case "inner-arch":
+            desc_parts += ["single-platform inner image"]
+        case "inner-combined":
+            desc_parts += ["combined inner image"]
+        case "outer-combined":
+            desc_parts += ["combined multi-platform image"]
+        case "outer-arch":
+            desc_parts += ["single-platform image"]
+        case _:
+            log.warning("Unknown OCI metadata type: %s", image_type)
+
+    description = " ".join(desc_parts)
+    title = " ".join(title_parts)
+
+    oci_metadata = {
+        "org.opencontainers.image.vendor": "Tinkerbell",
+        "org.opencontainers.image.licenses": "Apache-2.0",
+        "org.opencontainers.image.source": f"https://github.com/{repository}",
+        "org.opencontainers.image.title": title,
+        "org.opencontainers.image.description": description,
+    }
+    return oci_metadata
