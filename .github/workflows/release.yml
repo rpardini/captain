@@ -35,8 +35,6 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Pull release artifacts
-        env:
-          VERSION_EXCLUDE: ${{ github.ref_name }}
         run: |
           uv run captain --flavor-id trixie-full release --target combined pull --pull-output release-artifacts
           uv run captain --flavor-id trixie-slim release --target combined pull --pull-output release-artifacts
@@ -75,16 +73,16 @@ jobs:
         run: uv run captain --flavor-id trixie-slim release tag --new-tag "${{ github.ref_name }}-slim"
 
       - name: Tag (trixie-armbian-rpi)
-        run: uv run captain --flavor-id --arch arm64 trixie-armbian-rpi release tag --new-tag "${{ github.ref_name }}-rpi"
+        run: uv run captain --flavor-id trixie-armbian-rpi --arch arm64 release tag --new-tag "${{ github.ref_name }}-rpi"
 
       - name: Tag (trixie-rockchip64)
-        run: uv run captain --flavor-id --arch arm64 trixie-rockchip64 release tag --new-tag "${{ github.ref_name }}-rockchip64"
+        run: uv run captain --flavor-id trixie-rockchip64 --arch arm64 release tag --new-tag "${{ github.ref_name }}-rockchip64"
 
       - name: Tag (trixie-meson64)
-        run: uv run captain --flavor-id --arch arm64 trixie-meson64 release tag --new-tag "${{ github.ref_name }}-meson64"
+        run: uv run captain --flavor-id trixie-meson64 --arch arm64 release tag --new-tag "${{ github.ref_name }}-meson64"
 
       - name: Tag (trixie-rockchip64-vendor)
-        run: uv run captain --flavor-id --arch arm64 trixie-rockchip64-vendor release tag --new-tag "${{ github.ref_name }}-rockchip64-vendor"
+        run: uv run captain --flavor-id trixie-rockchip64-vendor --arch arm64 release tag --new-tag "${{ github.ref_name }}-rockchip64-vendor"
 
       - name: Tag (trixie-genio)
-        run: uv run captain --flavor-id --arch arm64 trixie-genio release tag --new-tag "${{ github.ref_name }}-genio"
+        run: uv run captain --flavor-id trixie-genio --arch arm64 release tag --new-tag "${{ github.ref_name }}-genio"
