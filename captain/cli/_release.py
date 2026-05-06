@@ -213,7 +213,6 @@ def publish_command(cfg: Config) -> None:
         repository=str(cfg.release_repository),
         artifact_name=str(cfg.release_oci_artifact_name),
         tag=str(cfg.release_src_tag),
-        sha=str(cfg.release_git_sha),
         force=cfg.force_release,
     )
 
