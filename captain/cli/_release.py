@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 @click.option(
     "--release-mode",
     envvar="RELEASE_MODE",
-    default="native",
+    default="docker",
     show_default=True,
     type=click.Choice(["docker", "native", "skip"], case_sensitive=False),
     metavar="MODE",
