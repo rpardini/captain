@@ -36,7 +36,13 @@ def from_image(
     cmd.append(image)
     log.info("buildah from %s (platform %s)", image, platform)
     result = run(cmd, capture=True)
-    return result.stdout.strip()
+
+    imageid = result.stdout.strip()
+    # Use buildah config to strip the annotation added by buildah from
+    log.debug("Stripping digest annotation from base image %s", imageid)
+    run(["buildah", "config", "--annotation", "org.opencontainers.image.base.digest=", imageid])
+
+    return imageid
 
 
 def add(
