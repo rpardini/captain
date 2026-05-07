@@ -20,7 +20,7 @@ entirely from RAM.
   and troubleshooting straightforward.
 - **Simpler architecture** — fewer layers between hardware and workload, easier to develop against and extend.
 
-## How it works
+## How it worksaaaaaa
 
 1. The machine PXE boots the kernel (`vmlinuz`) and initramfs (`initramfs`) or runs the UEFI-bootable ISO image
 2. A custom `/init` script transitions the rootfs to tmpfs, then exec's systemd
