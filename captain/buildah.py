@@ -34,7 +34,7 @@ def from_image(
     if platform:
         cmd += ["--platform", platform]
     cmd.append(image)
-    log.info("buildah from %s", image)
+    log.info("buildah from %s (platform %s)", image, platform)
     result = run(cmd, capture=True)
     return result.stdout.strip()
 
@@ -78,7 +78,7 @@ def commit(
     timestamp: int | None = None,
 ) -> str:
     log.info("buildah commit %s", container)
-    cmd: list[str] = ["buildah", "commit", "--rm"]
+    cmd: list[str] = ["buildah", "commit", "--rm", "--omit-history=true"]
     if timestamp is not None:
         cmd += ["--timestamp", str(timestamp)]
     cmd.append(container)
