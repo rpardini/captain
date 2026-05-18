@@ -16,10 +16,16 @@ env:
 
 jobs:
   # -------------------------------------------------------------------
-  # Lint — ruff (lint + format) and pyright (type checking)
+  # Lint — ruff (lint + format) and pyright (type checking).
+  # Doubles as the "prepare" job: resolves dynamic version tokens once
+  # (latest kernel.org release of the branch; armbian-next Release ETag)
+  # and exposes them as outputs consumed by the build jobs.
   # -------------------------------------------------------------------
-  lint:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      kernel_version: ${{ steps.versions.outputs.kernel_version }}
+      armbian_version: ${{ steps.versions.outputs.armbian_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -33,11 +39,15 @@ jobs:
       - name: Lint
         run: make lint
 
+      - name: Resolve dynamic version tokens
+        id: versions
+        run: uv run captain prepare-versions >> "$GITHUB_OUTPUT"
+
   # -------------------------------------------------------------------
   # Download tools (containerd, runc, nerdctl, CNI plugins)
   # -------------------------------------------------------------------
   download-tools:
-    needs: [ lint ]
+    needs: [ prepare ]
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
@@ -90,7 +100,7 @@ jobs:
   # Build Docker builder image, per-arch; pushes to ghcr.io.
   # -------------------------------------------------------------------
   build-dockerfile:
-    needs: [ lint ]
+    needs: [ prepare ]
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
@@ -125,7 +135,7 @@ jobs:
   # Download tools (containerd, runc, nerdctl, CNI plugins)
   # -------------------------------------------------------------------
   build-captainos-kernel:
-    needs: [ build-dockerfile ]
+    needs: [ prepare, build-dockerfile ]
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
@@ -133,6 +143,7 @@ jobs:
         arch: [ amd64, arm64 ]
     env:
       ARCH: ${{ matrix.arch }}
+      KERNEL_VERSION: ${{ needs.prepare.outputs.kernel_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -143,7 +154,7 @@ jobs:
         with:
           path: |
             mkosi.input/kernel/${{ matrix.arch }}
-          key: kernel-${{ matrix.arch }}-${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+          key: kernel-${{ matrix.arch }}-${{ needs.prepare.outputs.kernel_version }}-${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
           # any "previous" cache can also be useful; we'll just churn cache misses more often, but that's better than a complete cache miss and rebuild every time
           restore-keys: |
             kernel-${{ matrix.arch }}
@@ -155,12 +166,12 @@ jobs:
         run: uv run captain --verbose kernel
 
       - name: Save kernel cache
-        if: github.ref == 'refs/heads/main' && steps.tools-cache.outputs.cache-hit != 'true'
+        if: github.ref == 'refs/heads/main' && steps.kernel-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: |
             mkosi.input/kernel/${{ matrix.arch }}
-          key: kernel-${{ matrix.arch }}-${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+          key: kernel-${{ matrix.arch }}-${{ needs.prepare.outputs.kernel_version }}-${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
 
       - name: Upload kernel artifacts
         uses: actions/upload-artifact@v6
@@ -174,7 +185,7 @@ jobs:
   build-captainos-with-kernel: # only for flavors that require the custom CaptainOS kernel; otherwise, just build-captainos
     name: "build-captainos (with kernel) ${{ matrix.FLAVOR_ID }} (${{ matrix.arch }})"
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    needs: [ download-tools, build-dockerfile, build-captainos-kernel ]
+    needs: [ prepare, download-tools, build-dockerfile, build-captainos-kernel ]
     strategy:
       fail-fast: false
       matrix:
@@ -189,6 +200,10 @@ jobs:
       # Keep the initramfs/iso caches to only the freshly-built flavor hash; a
       # restore-key (prefix) cache hit otherwise leaves the previous hash behind.
       CAPTAIN_DROP_OLD_CACHES: "1"
+      # Latest-of-branch kernel (trixie-slim) and armbian-next repo token
+      # (armbian flavors), resolved once by the prepare job.
+      KERNEL_VERSION: ${{ needs.prepare.outputs.kernel_version }}
+      ARMBIAN_VERSION: ${{ needs.prepare.outputs.armbian_version }}
     steps: &build_steps
       - name: Checkout code
         uses: actions/checkout@v6
@@ -218,7 +233,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: mkosi.output/initramfs
-          key: initramfs-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+          key: initramfs-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--k${{ needs.prepare.outputs.kernel_version }}-a${{ needs.prepare.outputs.armbian_version }}--${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
           # any "previous" cache can also be useful; we'll just churn cache misses more often, but that's better than a complete cache miss and rebuild every time
           restore-keys: initramfs-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--
 
@@ -233,7 +248,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: mkosi.output/iso
-          key: iso-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+          key: iso-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--k${{ needs.prepare.outputs.kernel_version }}-a${{ needs.prepare.outputs.armbian_version }}--${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
           # any "previous" cache can also be useful; we'll just churn cache misses more often, but that's better than a complete cache miss and rebuild every time
           restore-keys: iso-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--
 
@@ -259,7 +274,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: mkosi.output/initramfs
-          key: initramfs-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+          key: initramfs-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--k${{ needs.prepare.outputs.kernel_version }}-a${{ needs.prepare.outputs.armbian_version }}--${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
 
       - name: Show iso cache save SHA256's
         if: ${{ matrix.iso }} # only if matrix entry had iso: true
@@ -272,7 +287,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: mkosi.output/iso
-          key: iso-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+          key: iso-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--k${{ needs.prepare.outputs.kernel_version }}-a${{ needs.prepare.outputs.armbian_version }}--${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
 
       - name: Upload initramfs artifacts
         uses: actions/upload-artifact@v6
@@ -321,7 +336,7 @@ jobs:
     steps: *build_steps
     env: *build_env
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    needs: [ download-tools, build-dockerfile ]
+    needs: [ prepare, download-tools, build-dockerfile ]
     strategy:
       fail-fast: false
       matrix:
