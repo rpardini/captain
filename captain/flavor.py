@@ -159,6 +159,15 @@ class BaseFlavor(Protocol):
             destination_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_path, destination_path)
 
+    def cache_bust_token(self) -> str:
+        """Token rendered into mkosi.conf so a flavor's hash changes on demand.
+
+        Base flavors return an empty string (stable hash). Flavors whose upstream
+        packages move under a stable name (e.g. armbian meta-packages) override
+        this to fold a repo version token in, forcing a rebuild when it changes.
+        """
+        return ""
+
     @abstractmethod
     def has_iso(self) -> bool:
         return False

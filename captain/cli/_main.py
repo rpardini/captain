@@ -11,7 +11,7 @@ from typing import Any
 import click
 from trogon import tui
 
-from captain.config import DEFAULT_FLAVOR_ID, Config
+from captain.config import DEFAULT_FLAVOR_ID, DEFAULT_KERNEL_VERSION, Config
 from captain.flavor import list_available_flavors
 from captain.util import detect_current_machine_arch
 
@@ -35,6 +35,8 @@ class CliContext:
     builder_image: str
     verbose_docker: bool
     drop_old_caches: bool
+    kernel_version: str
+    armbian_version: str | None
 
     def make_config(self, **overrides: Any) -> Config:
         """Build a :class:`Config` from the common options plus per-command *overrides*."""
@@ -48,6 +50,8 @@ class CliContext:
             builder_image=self.builder_image,
             verbose_docker=self.verbose_docker,
             drop_old_caches=self.drop_old_caches,
+            kernel_version=self.kernel_version,
+            armbian_version=self.armbian_version,
             **overrides,
         )
 
@@ -157,6 +161,22 @@ CONTEXT_SETTINGS = dict(
         "only keep the freshly-built version (env: CAPTAIN_DROP_OLD_CACHES)."
     ),
 )
+@click.option(
+    "--kernel-version",
+    envvar="KERNEL_VERSION",
+    default=DEFAULT_KERNEL_VERSION,
+    show_default=True,
+    help="Kernel version to build/reference. Must match an official tarball (env: KERNEL_VERSION).",
+)
+@click.option(
+    "--armbian-version",
+    envvar="ARMBIAN_VERSION",
+    default=None,
+    help=(
+        "Armbian repo version token folded into armbian flavors' hash so they rebuild "
+        "when armbian-next updates (env: ARMBIAN_VERSION). Empty = no cache-bust."
+    ),
+)
 @click.pass_context
 def cli(
     ctx: click.Context,
@@ -169,6 +189,8 @@ def cli(
     builder_repository: str | None,
     builder_image: str,
     drop_old_caches: bool,
+    kernel_version: str,
+    armbian_version: str | None,
 ) -> None:
     """CaptainOS build system — click CLI."""
     # Configure log level based on --verbose.
@@ -193,6 +215,8 @@ def cli(
         builder_image=builder_image,
         verbose_docker=verbose,
         drop_old_caches=drop_old_caches,
+        kernel_version=kernel_version,
+        armbian_version=armbian_version,
     )
 
 
@@ -209,6 +233,7 @@ def main() -> None:
         _builder,
         _iso,
         _kernel,
+        _prepare,
         _qemu,
         _release,
         _shell,
