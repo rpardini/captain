@@ -23,6 +23,11 @@ class ArmbianCommonFlavor(DebianCommonFlavor):
     def has_iso(self) -> bool:
         return False
 
+    def cache_bust_token(self) -> str:
+        # Fold the armbian-next repo version token in so these flavors rebuild
+        # when armbian publishes a newer kernel under the same package name.
+        return self.cfg.armbian_version or ""
+
     def flavor_packages(self) -> set[str]:
         return {"tiny-initramfs"}.union(super().flavor_packages())
 

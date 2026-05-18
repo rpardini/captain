@@ -47,6 +47,11 @@ class Config:
     kernel_clean: bool = False
     kernel_menuconfig: bool = False
 
+    # Armbian repo version token (ETag proxy) folded into armbian flavors' hash
+    # so they rebuild when armbian-next publishes a newer kernel. Empty/None =
+    # no cache-bust (default; stable hash for local builds).
+    armbian_version: str | None = None
+
     # Docker
     builder_registry: str | None = None
     builder_repository: str | None = None

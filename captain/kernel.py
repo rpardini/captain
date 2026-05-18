@@ -9,6 +9,7 @@ the CLI with all modes forced to native).
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import re
@@ -28,14 +29,69 @@ from rich.progress import (
 )
 
 from captain import console
-from captain.config import Config
+from captain.config import DEFAULT_KERNEL_VERSION, Config
 from captain.util import ensure_dir, run, safe_extractall
 
 KERNEL_BUILD_BASE_PATH = "/work/kernel-build"
 
+RELEASES_JSON_URL = "https://www.kernel.org/releases.json"
+
 log = logging.getLogger(__name__)
 
 _DOWNLOAD_TIMEOUT = 60  # seconds
+
+
+def _version_tuple(version: str) -> tuple[int, ...]:
+    """Parse a dotted kernel version into an int tuple for comparison."""
+    parts: list[int] = []
+    for piece in version.split("."):
+        # stop at the first non-numeric component (e.g. rc suffixes)
+        if not piece.isdigit():
+            break
+        parts.append(int(piece))
+    return tuple(parts)
+
+
+def latest_branch_version(branch: str | None = None) -> str:
+    """Return the newest kernel.org point release of *branch* (e.g. ``"6.18"``).
+
+    Consults kernel.org's ``releases.json``, which lists the latest release of
+    each active branch. *branch* defaults to the ``<major>.<minor>`` of
+    :data:`DEFAULT_KERNEL_VERSION`. Falls back to ``DEFAULT_KERNEL_VERSION`` on
+    any network/parse failure or when the branch is not listed — never returns
+    an empty string, so callers/CI always get a buildable version.
+    """
+    if branch is None:
+        branch = ".".join(DEFAULT_KERNEL_VERSION.split(".")[:2])
+
+    try:
+        req = urllib.request.Request(RELEASES_JSON_URL)
+        with urllib.request.urlopen(req, timeout=_DOWNLOAD_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode())
+    except (urllib.error.URLError, json.JSONDecodeError, OSError) as exc:
+        log.warning(
+            "Could not fetch %s (%s); using default %s",
+            RELEASES_JSON_URL,
+            exc,
+            DEFAULT_KERNEL_VERSION,
+        )
+        return DEFAULT_KERNEL_VERSION
+
+    prefix = f"{branch}."
+    matches = [
+        r["version"]
+        for r in data.get("releases", [])
+        if isinstance(r.get("version"), str) and r["version"].startswith(prefix)
+    ]
+    if not matches:
+        log.warning(
+            "No kernel.org release for branch %s; using default %s", branch, DEFAULT_KERNEL_VERSION
+        )
+        return DEFAULT_KERNEL_VERSION
+
+    latest = max(matches, key=_version_tuple)
+    log.info("Latest kernel for branch %s is %s", branch, latest)
+    return latest
 
 
 def _download_with_progress(url: str, filename: Path) -> None:
