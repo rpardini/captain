@@ -15,8 +15,8 @@ def create_flavor() -> BaseFlavor:
 class TrixieMeson64Flavor(ArmbianCommonFlavor):
     id = "trixie-meson64"
     name = "Trixie for Meson (Amlogic) 64-bit ARM machines"
-    description = "Debian Trixie based with Armbian's meson64-edge kernel"
+    description = "Debian Trixie based with Armbian's meson64-oldlts kernel"
     supported_architectures = frozenset(["arm64"])  # does NOT support amd64
 
     def flavor_packages(self) -> set[str]:
-        return {"linux-image-edge-meson64"}.union(super().flavor_packages())
+        return {"linux-image-oldlts-meson64"}.union(super().flavor_packages())
