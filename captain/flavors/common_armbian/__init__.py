@@ -25,3 +25,9 @@ class ArmbianCommonFlavor(DebianCommonFlavor):
 
     def flavor_packages(self) -> set[str]:
         return {"tiny-initramfs"}.union(super().flavor_packages())
+
+    def include_hwdb(self) -> bool:
+        return True
+
+    def include_working_apt(self) -> bool:
+        return True
