@@ -78,6 +78,8 @@ class DebianCommonFlavor(BaseFlavor):
                     if line.strip() and not line.strip().startswith("#")
                 }
             )
+        if self.include_working_apt():
+            packages.add("apt")
         return packages
 
     def sorted_flavor_packages(self) -> list[str]:
