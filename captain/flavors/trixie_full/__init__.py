@@ -23,8 +23,6 @@ class TrixieFullFlavor(TrixieACPIFlavor):
             "linux-image-generic",  # Debian's standard kernel (arm64/amd64)
             "tiny-initramfs",  # A tiny initramfs builder; required for kernel image
         }
-        if self.include_working_apt():
-            pkgs.add("apt")
         return pkgs.union(super().flavor_packages())
 
     def include_hwdb(self) -> bool:

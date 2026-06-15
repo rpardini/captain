@@ -67,6 +67,8 @@ class DebianCommonFlavor(BaseFlavor):
     @abstractmethod
     def flavor_packages(self) -> set[str]:
         packages = set({})
+        if self.include_working_apt():
+            packages.add("apt")
         # look into cfg.custom_dir/packages.txt, if it exists, read each non-comment line
         custom_packages_file = self.cfg.custom_dir / "packages.txt"
         if custom_packages_file.exists():
