@@ -8,16 +8,16 @@ name = "captain"
 requires-python = ">=3.13"
 dependencies = [
     "click>=8.1",
-    "rich>=14.3.3",
-    "jinja2>=3.1.6",
-    "trogon>=0.6.0",
+    "rich>=15.0",
+    "jinja2>=3.1",
+    "trogon>=0.6",
 ]
 
 [project.scripts]
 captain = "build:main"
 
 [project.optional-dependencies]
-dev = ["ruff>=0.15.9", "pyright>=1.1"]
+dev = ["ruff>=0.15", "pyright>=1.1"]
 
 [tool.ruff]
 target-version = "py310"
