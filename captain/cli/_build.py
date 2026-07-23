@@ -13,6 +13,7 @@ from captain.cli.stages import (
     _build_iso_stage,
     _build_mkosi_stage,
     _build_tools_stage,
+    _prune_stale_output_dirs,
 )
 
 log = logging.getLogger(__name__)
@@ -138,5 +139,8 @@ def build_cmd(
 
     # Flavor-driven artifact collection.
     flavor.post_artifact_collect()
+
+    # Keep caches/artifacts lean when asked (CI).
+    _prune_stale_output_dirs(cfg)
 
     log.info("Build complete!")

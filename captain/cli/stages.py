@@ -166,6 +166,32 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
     )
 
 
+def _prune_stale_output_dirs(cfg: Config) -> None:
+    """Drop sibling flavor-hash output dirs, keeping only the current hash.
+
+    Caches (``mkosi.output/initramfs`` / ``mkosi.output/iso``) are keyed on the
+    whole tree but outputs live under ``.../<flavor_id>/<arch>/<flavor_hash>``.
+    A restore-key (prefix) cache hit brings in the *previous* hash's dir, which
+    would otherwise be re-saved alongside the freshly-built one and accumulate
+    forever. When enabled, prune everything but the current hash so the cache
+    only contains the just-built version.
+
+    Opt-in via ``--drop-old-caches`` / ``CAPTAIN_DROP_OLD_CACHES``; a no-op
+    otherwise so local builds keep prior versions around.
+    """
+    if not cfg.drop_old_caches:
+        return
+
+    for current in (cfg.initramfs_output, cfg.iso_output):
+        parent = current.parent  # .../<flavor_id>/<arch>/
+        if not parent.is_dir():
+            continue
+        for child in parent.iterdir():
+            if child.is_dir() and child.name != current.name:
+                log.info("Dropping stale output dir %s", child)
+                shutil.rmtree(child)
+
+
 def _build_iso_stage(cfg: Config) -> None:
     """Run the ISO build stage according to *cfg.iso_mode*."""
 

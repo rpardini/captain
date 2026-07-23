@@ -186,6 +186,9 @@ jobs:
       MKOSI_MODE: docker
       ISO_MODE: docker
       FLAVOR_ID: ${{ matrix.FLAVOR_ID }}
+      # Keep the initramfs/iso caches to only the freshly-built flavor hash; a
+      # restore-key (prefix) cache hit otherwise leaves the previous hash behind.
+      CAPTAIN_DROP_OLD_CACHES: "1"
     steps: &build_steps
       - name: Checkout code
         uses: actions/checkout@v6
