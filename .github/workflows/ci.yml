@@ -412,3 +412,28 @@ jobs:
         # only pushes to main, and not PR workflows, should try to push to OCI registry
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: uv run captain release publish
+
+  # -------------------------------------------------------------------
+  # Auto-tag downstream forks (everything but the upstream 'tinkerbell'
+  # org) with an always-increasing, always-unique v0.0.0.<run_number>.
+  # Runs last, after the whole pipeline. Note: pushing a v** tag triggers
+  # the Release workflow (.github/workflows/release.yml).
+  # -------------------------------------------------------------------
+  tag-downstream:
+    # Skip on the upstream org; only downstream forks self-tag.
+    if: github.repository_owner != 'tinkerbell'
+    needs: [ publish-combined ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Create and push tag
+        env:
+          TAG: v0.0.0.${{ github.run_number }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
