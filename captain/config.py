@@ -66,6 +66,10 @@ class Config:
     force_iso: bool = False
     force_release: bool = False
 
+    # Prune sibling flavor_hash output dirs after a build, so caches/artifacts
+    # only contain the freshly-built version (opt-in; used in CI).
+    drop_old_caches: bool = False
+
     # QEMU
     qemu_mem: str = "2G"
     qemu_smp: str = "2"
