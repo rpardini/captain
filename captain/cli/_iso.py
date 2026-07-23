@@ -11,6 +11,7 @@ from captain import artifacts
 from captain.cli._main import CliContext, cli
 from captain.cli.stages import (
     _build_iso_stage,
+    _prune_stale_output_dirs,
 )
 
 log = logging.getLogger(__name__)
@@ -56,4 +57,5 @@ def build_cmd(
 
     _build_iso_stage(cfg)
     artifacts.collect_iso(cfg)
+    _prune_stale_output_dirs(cfg)
     log.info("ISO build complete!!!")

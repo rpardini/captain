@@ -34,6 +34,7 @@ class CliContext:
     builder_repository: str | None
     builder_image: str
     verbose_docker: bool
+    drop_old_caches: bool
 
     def make_config(self, **overrides: Any) -> Config:
         """Build a :class:`Config` from the common options plus per-command *overrides*."""
@@ -46,6 +47,7 @@ class CliContext:
             builder_repository=self.builder_repository,
             builder_image=self.builder_image,
             verbose_docker=self.verbose_docker,
+            drop_old_caches=self.drop_old_caches,
             **overrides,
         )
 
@@ -145,6 +147,16 @@ CONTEXT_SETTINGS = dict(
     show_default=True,
     help="Local name/tag of Docker builder image name",
 )
+@click.option(
+    "--drop-old-caches",
+    envvar="CAPTAIN_DROP_OLD_CACHES",
+    is_flag=True,
+    default=False,
+    help=(
+        "After a build, remove sibling flavor-hash output dirs so caches/artifacts "
+        "only keep the freshly-built version (env: CAPTAIN_DROP_OLD_CACHES)."
+    ),
+)
 @click.pass_context
 def cli(
     ctx: click.Context,
@@ -156,6 +168,7 @@ def cli(
     builder_registry: str | None,
     builder_repository: str | None,
     builder_image: str,
+    drop_old_caches: bool,
 ) -> None:
     """CaptainOS build system — click CLI."""
     # Configure log level based on --verbose.
@@ -179,6 +192,7 @@ def cli(
         builder_repository=builder_repository,
         builder_image=builder_image,
         verbose_docker=verbose,
+        drop_old_caches=drop_old_caches,
     )
 
 
