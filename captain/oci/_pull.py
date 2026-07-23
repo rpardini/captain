@@ -29,10 +29,9 @@ def pull(
     """
     tag_suffix = "" if target == "combined" else f"-{target}"
     ref = _image_ref(registry, repository, artifact_name, f"{tag}{tag_suffix}")
-    skopeo.export_image(ref, output_dir)
+    extracted = skopeo.export_image(ref, output_dir)
 
-    # Recap
-    extracted = sorted(f.name for f in Path(output_dir).iterdir() if f.is_file())
+    # Recap — list what the pulled image contained, not what is on disk.
     log.info("")
     log.info("Pull complete")
     log.info("  Image:  %s", ref)
