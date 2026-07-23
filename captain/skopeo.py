@@ -104,16 +104,22 @@ def export_image(
     output_dir: Path,
     *,
     platform: str | None = None,
-) -> None:
+) -> list[str]:
     """Download and extract all layers from *image_ref* into *output_dir*.
 
     Uses ``skopeo copy`` to download the image to a temporary directory,
     parses the manifest to find layer blobs, and extracts each layer tar
     with path-traversal protection.
+
+    Returns the sorted list of top-level entries (files and directories)
+    that the pulled image's layers contained.  This reflects the image
+    contents, not whatever happens to be on disk in *output_dir*.
     """
     import tempfile
 
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    extracted: set[str] = set()
 
     with tempfile.TemporaryDirectory(prefix="skopeo-export-") as tmp:
         tmp_dir = Path(tmp)
@@ -137,4 +143,11 @@ def export_image(
 
             log.info("Extracting layer %s…", digest_str[:20])
             with tarfile.open(blob_file, "r:*") as tf:
-                safe_extractall(tf, output_dir)
+                members = tf.getmembers()
+                for m in members:
+                    parts = Path(m.name).parts
+                    if parts and parts[0] not in (".", ""):
+                        extracted.add(parts[0])
+                safe_extractall(tf, output_dir, members=members)
+
+    return sorted(extracted)
