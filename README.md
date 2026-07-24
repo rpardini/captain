@@ -1,6 +1,6 @@
 # CaptainOS
 
-A minimal, systemd-based in-memory OS for [Tinkerbell](https://tinkerbell.org) bare-metal provisioning.
+A minimal, systemd-based in-memory OS for [Tinkerbell](https://tinkerbell.org) bare-metal provisioning. Unrelated change.
 
 CaptainOS boots via PXE/iPXE, runs entirely from RAM as a compressed CPIO initramfs, and provides a container runtime
 environment for the [tink-agent](https://github.com/tinkerbell/tinkerbell) — the component that drives hardware
