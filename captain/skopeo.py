@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import tarfile
 from pathlib import Path
 
@@ -53,7 +54,20 @@ def copy(src: str, dest: str) -> None:
     destination differ only in the tag component.
     """
     log.info("skopeo copy %s → %s", src, dest)
-    run(["skopeo", "copy", "--all", f"docker://{src}", f"docker://{dest}"])
+    run(
+        [
+            "skopeo",
+            "copy",
+            *(
+                ["--src-tls-verify=false", "--dest-tls-verify=false"]
+                if os.environ.get("REGISTRY_INSECURE") == "1"
+                else []
+            ),
+            "--all",
+            f"docker://{src}",
+            f"docker://{dest}",
+        ]
+    )
 
 
 def copy_to_dir(
@@ -70,7 +84,11 @@ def copy_to_dir(
     Returns *output_dir*.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
-    cmd: list[str] = ["skopeo", "copy"]
+    cmd: list[str] = [
+        "skopeo",
+        "copy",
+        *(["--src-tls-verify=false"] if os.environ.get("REGISTRY_INSECURE") == "1" else []),
+    ]
     if platform:
         parts = platform.split("/")
         if len(parts) == 2:
@@ -86,16 +104,22 @@ def export_image(
     output_dir: Path,
     *,
     platform: str | None = None,
-) -> None:
+) -> list[str]:
     """Download and extract all layers from *image_ref* into *output_dir*.
 
     Uses ``skopeo copy`` to download the image to a temporary directory,
     parses the manifest to find layer blobs, and extracts each layer tar
     with path-traversal protection.
+
+    Returns the sorted list of top-level entries (files and directories)
+    that the pulled image's layers contained.  This reflects the image
+    contents, not whatever happens to be on disk in *output_dir*.
     """
     import tempfile
 
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    extracted: set[str] = set()
 
     with tempfile.TemporaryDirectory(prefix="skopeo-export-") as tmp:
         tmp_dir = Path(tmp)
@@ -119,4 +143,11 @@ def export_image(
 
             log.info("Extracting layer %s…", digest_str[:20])
             with tarfile.open(blob_file, "r:*") as tf:
-                safe_extractall(tf, output_dir)
+                members = tf.getmembers()
+                for m in members:
+                    parts = Path(m.name).parts
+                    if parts and parts[0] not in (".", ""):
+                        extracted.add(parts[0])
+                safe_extractall(tf, output_dir, members=members)
+
+    return sorted(extracted)

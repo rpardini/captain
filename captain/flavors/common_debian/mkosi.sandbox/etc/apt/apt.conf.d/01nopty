@@ -1,0 +1,4 @@
+Dpkg::Use-Pty "0";
+APT::Quiet "2";
+Dpkg::Progress-Fancy "false";
+APT::Color "true";

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""CaptainOS build system entry point.
+"""CaptainOS build system — click-based CLI entry point.
 
-Requires: Python >= 3.13, Rich, Docker (unless all stages use native or skip).
-It is recommended to use Astral's uv to run this script, which will automatically
- install dependencies in an isolated environment.
-This will automatically use uv to re-launch itself when stages use Docker.
+Requires: Python >= 3.13 and a lot of dependencies; Use Astral's ``uv`` to run::
+
+    uv run build.py --help
+    uv run build.py builder
+    uv run build.py build --arch arm64
+    uv run build.py release-publish --target combined
 """
 
 import sys

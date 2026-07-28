@@ -1,236 +1,258 @@
-"""Release subcommand — publish, pull, tag."""
+"""``captain release-publish`` — publish artifacts as OCI images via buildah."""
 
 from __future__ import annotations
 
 import logging
-import shutil
 import subprocess
 from pathlib import Path
 
-import configargparse
+import click
 
-from captain import docker, oci
+import captain.flavor
+from captain import oci
+from captain.cli._main import CliContext, cli
 from captain.config import Config
 from captain.util import check_release_dependencies
 
-from ._parser import (
-    _add_common_flags,
-    _add_kernel_flags,
-    _add_release_base_flags,
-    _add_release_pull_output,
-    _add_release_tag_version,
-    _add_release_target_flag,
-    _HelpFormatter,
-)
-
 log = logging.getLogger(__name__)
 
-_RELEASE_SUBCOMMANDS = ("publish", "pull", "tag")
 
-_RELEASE_SUBCMD_INFO: dict[str, tuple[str, list]] = {
-    "publish": (
-        "Publish artifacts as a multi-arch OCI image",
-        [_add_common_flags, _add_kernel_flags, _add_release_base_flags, _add_release_target_flag],
-    ),
-    "pull": (
-        "Pull and extract artifacts (amd64, arm64, or combined)",
-        [
-            _add_common_flags,
-            _add_kernel_flags,
-            _add_release_base_flags,
-            _add_release_target_flag,
-            _add_release_pull_output,
-        ],
-    ),
-    "tag": (
-        "Tag all artifact images with a version",
-        [_add_common_flags, _add_kernel_flags, _add_release_base_flags, _add_release_tag_version],
-    ),
-}
+@cli.group()
+@click.option(
+    "--release-mode",
+    envvar="RELEASE_MODE",
+    default="docker",
+    show_default=True,
+    type=click.Choice(["docker", "native", "skip"], case_sensitive=False),
+    metavar="MODE",
+    help="Release stage execution mode (docker, native, skip).",
+)
+@click.option(
+    "--registry",
+    envvar="REGISTRY",
+    default="ghcr.io",
+    show_default=True,
+    help="OCI registry hostname.",
+)
+@click.option(
+    "--repository",
+    envvar="GITHUB_REPOSITORY",
+    default="tinkerbell/captain",
+    show_default=True,
+    help="Repository path (owner/name).",
+)
+@click.option(
+    "--oci-artifact-name",
+    envvar="OCI_ARTIFACT_NAME",
+    default="artifacts",
+    show_default=True,
+    help="OCI artifact image name.",
+)
+@click.option(
+    "--target",
+    envvar="TARGET",
+    default=None,
+    type=click.Choice(["amd64", "arm64", "combined"], case_sensitive=False),
+    metavar="TARGET",
+    help="Artifact target: 'amd64', 'arm64', or 'combined' (default: value of --arch); "
+    "'combined' requires an ACPI flavor with both arch's outputs present.",
+)
+@click.option(
+    "--git-sha",
+    envvar="GIT_SHA",
+    default=None,
+    help="Git commit SHA (default: auto-detected via git rev-parse HEAD).",
+)
+@click.option(
+    "--force-release",
+    envvar="FORCE_RELEASE",
+    is_flag=True,
+    default=False,
+    help="Publish even if the image already exists in the registry.",
+)
+@click.option(
+    "--src-tag",
+    envvar="SRC_TAG",
+    default=None,
+    help="Override specific tag to use; auto-determined if omitted.",
+)
+@click.pass_context
+def release_group(
+    ctx: click.Context,
+    *,
+    release_mode: str,
+    registry: str,
+    repository: str,
+    oci_artifact_name: str,
+    target: str | None,
+    git_sha: str | None,
+    force_release: bool,
+    src_tag: str | None,
+) -> None:
+    """Release-related operations: publish, pull, tag. Operates on OCI images in a registry."""
+    cli_ctx: CliContext = ctx.obj
 
+    if target is None:
+        target = cli_ctx.arch
+    assert isinstance(target, str)
 
-def _print_release_subcmd_help(sub: str, *, exit_code: int = 0) -> None:
-    """Print help for a release subcommand and exit."""
-    desc, adders = _RELEASE_SUBCMD_INFO[sub]
-    columns = shutil.get_terminal_size().columns
-    parser = configargparse.ArgParser(
-        prog=f"build.py release {sub}",
-        description=desc,
-        add_env_var_help=False,
-        formatter_class=lambda prog: _HelpFormatter(
-            prog,
-            max_help_position=38,
-            width=columns,
-        ),
+    log.debug("Creating Release group Config and putting into Context...")
+
+    cfg = cli_ctx.make_config(
+        release_mode=release_mode,
+        release_registry=registry,
+        release_repository=repository,
+        release_oci_artifact_name=oci_artifact_name,
+        release_target=target,
+        release_git_sha=git_sha,
+        force_release=force_release,
+        release_src_tag=src_tag,
     )
-    for adder in adders:
-        adder(parser)
-    parser.print_help()
-    raise SystemExit(exit_code)
+
+    # resolve the SHA before launching Docker, as we've the .git here and not there.
+    if cfg.release_git_sha is None:
+        log.debug(
+            "Auto-detecting git SHA for release since not provided via --git-sha or GITHUB_SHA..."
+        )
+        cfg.release_git_sha = _autodetect_git_sha(cfg.project_dir)
+    log.debug("Git SHA at group level: %s", cfg.release_git_sha)
+
+    if cfg.release_src_tag is None:
+        log.debug(
+            "Auto-computing version tag for release since not provided via --src-tag or SRC_TAG..."
+        )
+        tag = f"v0.0.0-{str(cfg.release_git_sha)[:7]}"
+        cfg.release_src_tag = f"{tag}-{cfg.flavor_id}"
+    log.debug("Tag at group level: %s", cfg.release_src_tag)
+
+    # pass it down via Context // pass_obj
+    ctx.obj = cfg
 
 
-def _resolve_git_sha(args: object, project_dir: Path) -> str:
-    """Return the git SHA from args or by running git rev-parse."""
-    sha = getattr(args, "git_sha", None)
-    if sha:
-        return sha
+@release_group.command("pull")
+@click.option(
+    "--pull-output",
+    envvar="PULL_OUTPUT",
+    required=True,
+    type=click.Path(),
+    help="Output directory for pulled artifacts, relative to 'out/'.",
+)
+@click.pass_obj
+def pull_command(cfg: Config, pull_output: Path) -> None:
+    """Pull release artifacts as OCI images from a registry and extract to disk."""
+    log.debug("Release Pull with Config %s and pull_output %s", cfg, pull_output)
 
-    result = subprocess.run(
+    cfg.release_pull_output = pull_output
+
+    if skip_or_relaunch_in_docker(cfg, "pull"):
+        return
+
+    oci.pull(
+        registry=str(cfg.release_registry),
+        repository=str(cfg.release_repository),
+        artifact_name=str(cfg.release_oci_artifact_name),
+        tag=str(cfg.release_src_tag),
+        target=str(cfg.release_target),
+        output_dir=cfg.output_dir / cfg.release_pull_output,
+    )
+
+
+@release_group.command("tag")
+@click.option(
+    "--new-tag",
+    envvar="NEW_TAG",
+    required=True,
+    help="New tag to apply to the existing release image (e.g. v1.0.0).",
+)
+@click.pass_obj
+def tag_command(cfg: Config, new_tag: str) -> None:
+    """Tag an existing release image with a new version."""
+    log.debug("Release tag with Config: %s and new_tag %s", cfg, new_tag)
+
+    cfg.release_new_tag = new_tag
+
+    if skip_or_relaunch_in_docker(cfg, "tag"):
+        return
+
+    flavor = captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
+
+    oci.tag_all(
+        registry=str(cfg.release_registry),
+        repository=str(cfg.release_repository),
+        artifact_name=str(cfg.release_oci_artifact_name),
+        src_tag=str(cfg.release_src_tag),
+        new_tag=str(cfg.release_new_tag),
+        arches=list(flavor.supported_architectures),
+    )
+
+
+@release_group.command("publish")
+@click.pass_obj
+def publish_command(cfg: Config) -> None:
+    """Publish build artifacts as a multi-arch OCI image to a registry.
+
+    Uses buildah to construct OCI images from the build artifacts (kernel,
+    initramfs, ISO, DTBs) and pushes them to the specified registry.
+
+    Each artifact file becomes its own layer.  Deterministic tar generation
+    ensures byte-identical layers across runs so that registries can
+    deduplicate blobs.
+    """
+    log.debug("Got into release publish with Config: %s", cfg)
+
+    if skip_or_relaunch_in_docker(cfg, "publish"):
+        return
+
+    flavor = captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
+
+    oci.publish(
+        cfg,
+        flavor,
+        target=str(cfg.release_target),
+        registry=str(cfg.release_registry),
+        repository=str(cfg.release_repository),
+        artifact_name=str(cfg.release_oci_artifact_name),
+        tag=str(cfg.release_src_tag),
+        force=cfg.force_release,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def skip_or_relaunch_in_docker(cfg: Config, subcommand: str) -> bool:
+    # --- skip mode --------------------------------------------------------
+    if cfg.release_mode == "skip":
+        log.info("RELEASE_MODE=skip — nothing to do.")
+        return True
+
+    # --- docker mode ------------------------------------------------------
+    if cfg.release_mode == "docker":
+        from captain import docker
+
+        docker.obtain_builder(cfg)
+        docker.run_captain_in_builder(cfg, ["release", subcommand])
+        docker.fix_docker_ownership(cfg, ["/work/out"])
+        return True
+
+    # --- native mode ------------------------------------------------------
+    missing = check_release_dependencies()
+    if missing:
+        log.error("Missing release tools: %s", ", ".join(missing))
+        log.error("Install them or set --release-mode=docker.")
+        raise SystemExit(1)
+
+    return False
+
+
+def _autodetect_git_sha(project_dir: Path) -> str:
+    """Auto-detect via ``git rev-parse HEAD``."""
+    return subprocess.run(
         ["git", "rev-parse", "HEAD"],
         capture_output=True,
         text=True,
         check=True,
         cwd=project_dir,
-    )
-    return result.stdout.strip()
-
-
-def _cmd_release(cfg: Config, extra_args: list[str], args: object = None) -> None:
-    """OCI artifact operations: publish, pull, tag."""
-
-    # Peel the release subcommand from extra_args.
-    if not extra_args:
-        log.error(
-            "Missing release subcommand.\n  usage: build.py release {%s}\n",
-            ",".join(_RELEASE_SUBCOMMANDS),
-        )
-        raise SystemExit(2)
-
-    sub = extra_args[0]
-    rest = extra_args[1:]
-
-    if sub not in _RELEASE_SUBCOMMANDS:
-        log.error(
-            "Unknown release subcommand '%s'.\n  valid: %s\n",
-            sub,
-            ", ".join(_RELEASE_SUBCOMMANDS),
-        )
-        raise SystemExit(2)
-
-    # Handle --help / -h for the subcommand.
-    if "-h" in rest or "--help" in rest:
-        _print_release_subcmd_help(sub)
-
-    # --- validate required args early ---------------------------------
-    if sub == "tag" and not rest:
-        log.error("Missing version argument.")
-        _print_release_subcmd_help(sub, exit_code=2)
-    if sub == "pull" and not getattr(args, "pull_output", None):
-        log.error("--pull-output is required for 'release pull'.")
-        _print_release_subcmd_help(sub, exit_code=2)
-
-    # --- skip ---------------------------------------------------------
-    if cfg.release_mode == "skip":
-        log.info("RELEASE_MODE=skip — skipping release operation")
-        return
-
-    # --- docker -------------------------------------------------------
-    if cfg.release_mode == "docker":
-        docker.build_release_image(cfg)
-        log.info("Running release %s (docker)...", sub)
-        # Forward release-specific env vars into the container.
-        registry = getattr(args, "registry", "ghcr.io")
-        repository = getattr(args, "repository", "tinkerbell/captain")
-        artifact_name = getattr(args, "oci_artifact_name", "artifacts")
-        sha = _resolve_git_sha(args, cfg.project_dir)
-        env_args: list[str] = [
-            "-e",
-            f"KERNEL_VERSION={cfg.kernel_version}",
-            "-e",
-            f"REGISTRY={registry}",
-            "-e",
-            f"GITHUB_REPOSITORY={repository}",
-            "-e",
-            f"OCI_ARTIFACT_NAME={artifact_name}",
-            "-e",
-            f"GITHUB_SHA={sha}",
-        ]
-        exclude = getattr(args, "version_exclude", None)
-        if exclude:
-            env_args += ["-e", f"VERSION_EXCLUDE={exclude}"]
-        if sub in ("publish", "pull"):
-            target = getattr(args, "target", None) or cfg.arch
-            env_args += ["-e", f"TARGET={target}"]
-        if getattr(args, "force", False):
-            env_args += ["-e", "FORCE=true"]
-        pull_output = getattr(args, "pull_output", None)
-
-        # Build the inner command.
-        inner_cmd = ["/work/build.py", "release", sub]
-        if pull_output:
-            inner_cmd += ["--pull-output", pull_output]
-        inner_cmd += list(rest)
-
-        try:
-            docker.run_in_release(
-                cfg,
-                *env_args,
-                "--entrypoint",
-                "/usr/bin/uv",
-                docker.RELEASE_IMAGE,
-                *(["--verbose"] if logging.getLogger().isEnabledFor(logging.DEBUG) else []),
-                "run",
-                *inner_cmd,
-            )
-        except subprocess.CalledProcessError as exc:
-            raise SystemExit(exc.returncode) from None
-        paths_to_fix = ["/work/out"]
-        if pull_output:
-            container_pull_output = f"/work/{pull_output.lstrip('/')}"
-            paths_to_fix.append(container_pull_output)
-        docker.fix_docker_ownership(cfg, paths_to_fix)
-        return
-
-    # --- native -------------------------------------------------------
-    if cfg.release_mode == "native":
-        missing = check_release_dependencies()
-        if missing:
-            log.error("Missing release tools: %s", ", ".join(missing))
-            log.error("Install them or set --release-mode=docker.")
-            raise SystemExit(1)
-    # Common OCI parameters.
-    registry = getattr(args, "registry", "ghcr.io")
-    repository = getattr(args, "repository", "tinkerbell/captain")
-    artifact_name = getattr(args, "oci_artifact_name", "artifacts")
-    exclude = getattr(args, "version_exclude", None)
-    sha = _resolve_git_sha(args, cfg.project_dir)
-    tag = oci.compute_version_tag(cfg.project_dir, sha, exclude=exclude)
-
-    if sub == "publish":
-        target = getattr(args, "target", None) or cfg.arch
-        force = getattr(args, "force", False)
-        oci.publish(
-            cfg,
-            target=target,
-            registry=registry,
-            repository=repository,
-            artifact_name=artifact_name,
-            tag=tag,
-            sha=sha,
-            force=force,
-        )
-
-    elif sub == "pull":
-        target = getattr(args, "target", None) or cfg.arch
-        pull_output = getattr(args, "pull_output", None)
-        if pull_output is None:
-            log.error("--pull-output is required for 'release pull'.")
-            raise SystemExit(2)
-        oci.pull(
-            registry=registry,
-            repository=repository,
-            artifact_name=artifact_name,
-            tag=tag,
-            target=target,
-            output_dir=Path(pull_output),
-        )
-
-    elif sub == "tag":
-        version = rest[0]
-        oci.tag_all(
-            registry=registry,
-            repository=repository,
-            artifact_name=artifact_name,
-            src_tag=tag,
-            new_tag=version,
-        )
+    ).stdout.strip()

@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import shutil
 import tarfile
 from datetime import datetime
 from pathlib import Path
 
 from captain import artifacts, buildah
-from captain.util import get_arch_info
 
 log = logging.getLogger(__name__)
 
@@ -36,33 +34,22 @@ def _deterministic_tar(file_path: Path, output_dir: Path) -> Path:
     return tar_path
 
 
-def _collect_arch_artifacts(
-    project_dir: Path,
-    out: Path,
-    arch: str,
-    kernel_version: str,
-) -> list[Path]:
-    """Collect and return the artifact files for a single architecture.
+def _deterministic_tar_multiple(all_dtb_files: list[Path], dtb_tar_path, out: Path):
+    with tarfile.open(dtb_tar_path, "w") as tf:
+        for f in all_dtb_files:
+            info = tf.gettarinfo(str(f), arcname=str(f.relative_to(out)))
+            info.uid = 0
+            info.gid = 0
+            info.uname = ""
+            info.gname = ""
+            info.mtime = 0
+            info.mode = 0o644
+            with open(f, "rb") as fh:
+                tf.addfile(info, fh)
 
-    Returns [vmlinuz, initramfs, iso, checksums] paths in *out*.
-    """
-    # Collect kernel
-    vmlinuz_dir = project_dir / "mkosi.output" / "kernel" / kernel_version / arch
-    vmlinuz_files = sorted(vmlinuz_dir.glob("vmlinuz-*")) if vmlinuz_dir.is_dir() else []
-    oarch = get_arch_info(arch).output_arch
-    vmlinuz_dst = out / f"vmlinuz-{kernel_version}-{oarch}"
-    if vmlinuz_files:
-        shutil.copy2(vmlinuz_files[0], vmlinuz_dst)
-        log.info("kernel: %s", vmlinuz_dst)
-    else:
-        log.warning("No kernel image found for %s", arch)
 
-    arch_files = [
-        out / f"vmlinuz-{kernel_version}-{oarch}",
-        out / f"initramfs-{kernel_version}-{oarch}",
-        out / f"captainos-{kernel_version}-{oarch}.iso",
-    ]
-    checksums_path = out / f"sha256sums-{kernel_version}-{oarch}.txt"
+def _checksum_files(arch_files: list[Path], flavor_id: str, oarch: str, out: Path) -> list[Path]:
+    checksums_path = out / f"sha256sums-{flavor_id}-{oarch}.txt"
     artifacts.collect_checksums(arch_files, checksums_path)
 
     push_files = [*arch_files, checksums_path]
@@ -76,12 +63,9 @@ def _collect_arch_artifacts(
 def _build_platform_image(
     layer_tars: list[Path],
     platform: str,
-    sha: str,
-    repository: str,
     *,
     created: str,
-    tag: str,
-    artifact_name: str,
+    oci_metadata: dict[str, str],
     base: str = "scratch",
 ) -> str:
     """Build an OCI image locally for *platform*.
@@ -100,16 +84,6 @@ def _build_platform_image(
     """
     os_name, arch = platform.split("/")
     epoch = int(datetime.fromisoformat(created.replace("Z", "+00:00")).timestamp())
-    oci_metadata = {
-        "org.opencontainers.image.created": created,
-        "org.opencontainers.image.source": f"https://github.com/{repository}",
-        "org.opencontainers.image.revision": sha,
-        "org.opencontainers.image.version": tag,
-        "org.opencontainers.image.title": artifact_name,
-        "org.opencontainers.image.description": "CaptainOS build artifacts",
-        "org.opencontainers.image.vendor": "Tinkerbell",
-        "org.opencontainers.image.licenses": "Apache-2.0",
-    }
 
     # Build one layer per tar: from base → add file → commit → repeat.
     # Track intermediate image IDs so they can be cleaned up afterwards;
@@ -133,6 +107,7 @@ def _build_platform_image(
         if prev != base:
             intermediates.append(prev)
 
+    log.debug("Cleaning up intermediate images: %s", intermediates)
     for img in intermediates:
         with contextlib.suppress(Exception):
             buildah.rmi(img)

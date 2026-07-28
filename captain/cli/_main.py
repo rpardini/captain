@@ -1,144 +1,243 @@
-"""CLI entry point — single configargparse parser with pre-extracted subcommand.
-
-Every configuration parameter is both a ``--cli-flag`` and an environment
-variable, following the ff priority model:
-
-    CLI args  >  environment variables  >  defaults
-
-The subcommand (``build``, ``kernel``, ``tools``, …) is extracted from
-``sys.argv`` *before* parsing so that flags work in any position::
-
-    ./build.py --arch=arm64 kernel      # works
-    ./build.py kernel --arch=arm64      # also works
-    ARCH=arm64 ./build.py kernel        # also works
-"""
+"""Click CLI — main group with shared options and subcommand registration."""
 
 from __future__ import annotations
 
 import logging
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
-from captain import docker
-from captain.config import Config
-from captain.util import run
+import click
+from trogon import tui
 
-from ._commands import (
-    _cmd_build,
-    _cmd_checksums,
-    _cmd_clean,
-    _cmd_initramfs,
-    _cmd_iso,
-    _cmd_kernel,
-    _cmd_qemu_test,
-    _cmd_shell,
-    _cmd_summary,
-    _cmd_tools,
-)
-from ._parser import _build_parser, _extract_command
-from ._release import _cmd_release
+from captain.config import DEFAULT_FLAVOR_ID, DEFAULT_KERNEL_VERSION, Config
+from captain.flavor import list_available_flavors
+from captain.util import detect_current_machine_arch
 
 log = logging.getLogger(__name__)
 
 
-def main(project_dir: Path | None = None) -> None:
-    """Main CLI entry point."""
+# ---------------------------------------------------------------------------
+# CLI context object — shared state for all subcommands
+# ---------------------------------------------------------------------------
 
-    # 1. Extract the subcommand from argv before parsing so flags
-    #    work in any position (before or after the command name).
-    raw_argv = sys.argv[1:]
-    command, flag_argv = _extract_command(raw_argv)
 
-    # For release subcommands, defer -h/--help to _cmd_release so it
-    # can print subcommand-specific help instead of the generic release help.
-    # We defer whenever there's any positional token (not just valid ones),
-    # so that invalid subcommands like "push" show the proper error instead
-    # of the parent help.
-    help_deferred = False
-    if command == "release":
-        has_positional = any(not tok.startswith("-") for tok in flag_argv)
-        has_help = "-h" in flag_argv or "--help" in flag_argv
-        if has_positional and has_help:
-            flag_argv = [t for t in flag_argv if t not in ("-h", "--help")]
-            help_deferred = True
+@dataclass(slots=True)
+class CliContext:
+    """Resolved common CLI options, passed to subcommands via ``@click.pass_obj``."""
 
-    # 2. Build the parser (TINK flags added only for qemu-test).
-    parser = _build_parser(command)
+    project_dir: Path
+    arch: str
+    flavor_id: str
+    builder_registry: str | None
+    builder_repository: str | None
+    builder_image: str
+    verbose_docker: bool
+    drop_old_caches: bool
+    kernel_version: str
+    armbian_version: str | None
 
-    # 3. Parse known args — anything unrecognised passes through to mkosi.
-    args, extra = parser.parse_known_args(flag_argv)
-    if help_deferred:
-        extra.append("--help")
+    def make_config(self, **overrides: Any) -> Config:
+        """Build a :class:`Config` from the common options plus per-command *overrides*."""
+        return Config(
+            project_dir=self.project_dir,
+            output_dir=self.project_dir / "out",
+            arch=self.arch,
+            flavor_id=self.flavor_id,
+            builder_registry=self.builder_registry,
+            builder_repository=self.builder_repository,
+            builder_image=self.builder_image,
+            verbose_docker=self.verbose_docker,
+            drop_old_caches=self.drop_old_caches,
+            kernel_version=self.kernel_version,
+            armbian_version=self.armbian_version,
+            **overrides,
+        )
 
-    # 4. Separate --force (mkosi passthrough) from the rest.
-    mkosi_args: list[str] = []
-    if getattr(args, "force", False):
-        mkosi_args.append("--force")
 
-    # 5. Determine project directory.
-    if project_dir is None:
-        project_dir = Path(__file__).resolve().parent.parent.parent
+# ---------------------------------------------------------------------------
+# Resolve project directory
+# ---------------------------------------------------------------------------
 
-    # 6. Build Config from the parsed namespace.
-    cfg = Config.from_args(args, project_dir)
-    cfg.mkosi_args = mkosi_args
 
-    # 7. Dispatch.
-    dispatch: dict[str, object] = {
-        "build": _cmd_build,
-        "kernel": _cmd_kernel,
-        "tools": _cmd_tools,
-        "initramfs": _cmd_initramfs,
-        "iso": _cmd_iso,
-        "checksums": _cmd_checksums,
-        "shell": _cmd_shell,
-        "clean": _cmd_clean,
-        "release": _cmd_release,
-        "summary": _cmd_summary,
-        "qemu-test": _cmd_qemu_test,
-    }
+def resolve_project_dir(project_dir: str | None) -> Path:
+    """Return an absolute ``Path`` for the project root."""
+    if project_dir is not None:
+        return Path(project_dir)
+    # Walk upward from this file until we find pyproject.toml.
+    candidate = Path(__file__).resolve().parent.parent.parent
+    if (candidate / "pyproject.toml").is_file():
+        return candidate
+    click.echo("Error: cannot auto-detect project directory. Pass --project-dir.", err=True)
+    sys.exit(1)
 
-    handler = dispatch.get(command)
-    if handler is not None:
-        if command in ("qemu-test", "checksums", "release", "clean"):
-            handler(cfg, extra, args=args)  # type: ignore[operator]
-        else:
-            handler(cfg, extra)  # type: ignore[operator]
-    else:
-        # Pass through to mkosi (shouldn't happen with _extract_command
-        # but kept as a safety net).
-        tools_tree = str(cfg.tools_output)
-        modules_tree = str(cfg.modules_output)
-        output_dir = str(cfg.initramfs_output)
-        match cfg.mkosi_mode:
-            case "docker":
-                docker.build_builder(cfg)
-                container_tree = f"/work/mkosi.output/tools/{cfg.arch}"
-                container_modules = (
-                    f"/work/mkosi.output/kernel/{cfg.kernel_version}/{cfg.arch}/modules"
-                )
-                container_outdir = f"/work/mkosi.output/initramfs/{cfg.kernel_version}/{cfg.arch}"
-                docker.run_mkosi(
-                    cfg,
-                    f"--extra-tree={container_tree}",
-                    f"--extra-tree={container_modules}",
-                    f"--output-dir={container_outdir}",
-                    command,
-                    *extra,
-                )
-            case "native":
-                run(
-                    [
-                        "mkosi",
-                        f"--architecture={cfg.arch_info.mkosi_arch}",
-                        f"--extra-tree={tools_tree}",
-                        f"--extra-tree={modules_tree}",
-                        f"--output-dir={output_dir}",
-                        command,
-                        *extra,
-                    ],
-                    cwd=cfg.project_dir,
-                )
-            case "skip":
-                log.error("Cannot pass '%s' to mkosi when MKOSI_MODE=skip.", command)
-                raise SystemExit(1)
+
+# ---------------------------------------------------------------------------
+# Top-level Click group
+# ---------------------------------------------------------------------------
+# Important: decorator order matters here.  The @tui() decorator must be outermost
+#            to properly wrap the entire CLI, including subcommands.
+
+CONTEXT_SETTINGS = dict(
+    help_option_names=["-h", "--help"],
+    max_content_width=120,
+)
+
+
+@tui()
+@click.group(
+    context_settings=CONTEXT_SETTINGS,
+    invoke_without_command=True,
+    help=(
+        "CaptainOS build system.\n\n"
+        "Run 'captain COMMAND --help' for details on each subcommand.\n\n"
+        "Shell completion (bash/zsh):\n\n"
+        '  eval "$(_CAPTAIN_COMPLETE=bash_source captain)"   # bash\n\n'
+        '  eval "$(_CAPTAIN_COMPLETE=zsh_source captain)"    # zsh'
+    ),
+)
+@click.version_option(package_name="captain")
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    default=False,
+    envvar="CAPTAIN_VERBOSE",
+    help="Enable verbose (DEBUG-level) logging.",
+)
+@click.option(
+    "--arch",
+    envvar="ARCH",
+    default=(detect_current_machine_arch()),
+    show_default=True,
+    type=click.Choice(["amd64", "arm64"], case_sensitive=False),
+    metavar="ARCH",
+    help="Target architecture (amd64, arm64).",
+)
+@click.option(
+    "--flavor-id",
+    envvar="FLAVOR_ID",
+    default=DEFAULT_FLAVOR_ID,
+    show_default=True,
+    type=click.Choice(list_available_flavors(), case_sensitive=False),
+    help="Flavor (kernel/board config) to build.",
+)
+@click.option(
+    "--project-dir",
+    envvar="CAPTAIN_PROJECT_DIR",
+    default=None,
+    type=click.Path(exists=True, file_okay=False, resolve_path=True),
+    help="Project root directory (auto-detected when omitted).",
+)
+@click.option(
+    "--builder-registry",
+    envvar="REGISTRY",
+    default="ghcr.io",
+    show_default=True,
+    help="OCI registry hostname for the Docker builder image",
+)
+@click.option(
+    "--builder-repository",
+    envvar="GITHUB_REPOSITORY",
+    default="tinkerbell/captain",
+    show_default=True,
+    help="Repository path (owner/name) for the Docker builder image",
+)
+@click.option(
+    "--builder-image",
+    envvar="BUILDER_IMAGE",
+    default="captainos-builder",
+    show_default=True,
+    help="Local name/tag of Docker builder image name",
+)
+@click.option(
+    "--drop-old-caches",
+    envvar="CAPTAIN_DROP_OLD_CACHES",
+    is_flag=True,
+    default=False,
+    help=(
+        "After a build, remove sibling flavor-hash output dirs so caches/artifacts "
+        "only keep the freshly-built version (env: CAPTAIN_DROP_OLD_CACHES)."
+    ),
+)
+@click.option(
+    "--kernel-version",
+    envvar="KERNEL_VERSION",
+    default=DEFAULT_KERNEL_VERSION,
+    show_default=True,
+    help="Kernel version to build/reference. Must match an official tarball (env: KERNEL_VERSION).",
+)
+@click.option(
+    "--armbian-version",
+    envvar="ARMBIAN_VERSION",
+    default=None,
+    help=(
+        "Armbian repo version token folded into armbian flavors' hash so they rebuild "
+        "when armbian-next updates (env: ARMBIAN_VERSION). Empty = no cache-bust."
+    ),
+)
+@click.pass_context
+def cli(
+    ctx: click.Context,
+    *,
+    verbose: bool,
+    arch: str,
+    flavor_id: str,
+    project_dir: str | None,
+    builder_registry: str | None,
+    builder_repository: str | None,
+    builder_image: str,
+    drop_old_caches: bool,
+    kernel_version: str,
+    armbian_version: str | None,
+) -> None:
+    """CaptainOS build system — click CLI."""
+    # Configure log level based on --verbose.
+    # Configure the root logger (configged via basicLogging() in captain __init__)
+    # since subcommands and imported modules will use it.
+    log_level = logging.DEBUG if verbose else logging.INFO
+    logging.getLogger().setLevel(log_level)
+    logging.getLogger("captain").setLevel(log_level)
+
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
+        return
+
+    # Build the shared context object for subcommands.
+    log.debug("Main CLI creating CliContext...")
+    ctx.obj = CliContext(
+        project_dir=resolve_project_dir(project_dir),
+        arch=arch,
+        flavor_id=flavor_id,
+        builder_registry=builder_registry,
+        builder_repository=builder_repository,
+        builder_image=builder_image,
+        verbose_docker=verbose,
+        drop_old_caches=drop_old_caches,
+        kernel_version=kernel_version,
+        armbian_version=armbian_version,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Register subcommands (imported lazily to avoid circular imports)
+# ---------------------------------------------------------------------------
+
+
+def main() -> None:
+    """Console-script entry point."""
+    # Import subcommand modules to register them on the group.
+    from captain.cli import (  # noqa: F401
+        _build,
+        _builder,
+        _iso,
+        _kernel,
+        _prepare,
+        _qemu,
+        _release,
+        _shell,
+        _tools,
+    )
+
+    cli()

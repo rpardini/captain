@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import shutil
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from captain.config import Config
@@ -32,17 +34,19 @@ def _human_size(size: int) -> str:
 
 
 def collect_kernel(cfg: Config) -> None:
-    """Copy the kernel image from mkosi.output/kernel/{version}/{arch}/ to out/."""
+    """Copy the kernel image produced by mkosi."""
     out = ensure_dir(cfg.output_dir)
-    vmlinuz_dir = cfg.kernel_output
-    vmlinuz_files = sorted(vmlinuz_dir.glob("vmlinuz-*")) if vmlinuz_dir.is_dir() else []
-    if vmlinuz_files:
-        vmlinuz_src = vmlinuz_files[0]
-        vmlinuz_dst = out / f"vmlinuz-{cfg.kernel_version}-{cfg.arch_info.output_arch}"
+    log.debug("Looking for kernel image produced by mkosi in %s", cfg.initramfs_output)
+    vmlinu_files = sorted(cfg.initramfs_output.glob("*.vmlinu*"))
+    if vmlinu_files:
+        vmlinuz_src = vmlinu_files[0]
+        vmlinuz_dst = out / f"vmlinuz-{cfg.flavor_id}-{cfg.arch_info.output_arch}"
         shutil.copy2(vmlinuz_src, vmlinuz_dst)
-        log.info("kernel: %s (%s)", vmlinuz_dst, _human_size(vmlinuz_dst.stat().st_size))
+        log.info(
+            "mkosi supplied kernel: %s (%s)", vmlinuz_dst, _human_size(vmlinuz_dst.stat().st_size)
+        )
     else:
-        log.warning("No kernel image found in %s", cfg.kernel_output)
+        log.error("No kernel image produced by mkosi in %s", cfg.initramfs_output)
 
 
 def collect_initramfs(cfg: Config) -> None:
@@ -51,11 +55,27 @@ def collect_initramfs(cfg: Config) -> None:
     cpio_files = sorted(cfg.initramfs_output.glob("*.cpio*"))
     if cpio_files:
         initrd_src = cpio_files[0]
-        initrd_dst = out / f"initramfs-{cfg.kernel_version}-{cfg.arch_info.output_arch}"
+        initrd_dst = out / f"initramfs-{cfg.flavor_id}-{cfg.arch_info.output_arch}"
         shutil.copy2(initrd_src, initrd_dst)
         log.info("initramfs: %s (%s)", initrd_dst, _human_size(initrd_dst.stat().st_size))
     else:
         log.warning("No initramfs CPIO found in %s", cfg.initramfs_output)
+
+
+def collect_dtbs(cfg):
+    """Collect the dtb directory produced by mkosi's finalize script."""
+    indir = ensure_dir(cfg.initramfs_output)
+    dtb_dir: Path = indir / "dtb"
+    if dtb_dir.exists():
+        log.info("Found dtb directory in %s, copying to output...", dtb_dir)
+        out = ensure_dir(cfg.output_dir)
+        target_dtb_dir = out / f"dtb-{cfg.flavor_id}-{cfg.arch_info.output_arch}"
+        if target_dtb_dir.exists():
+            shutil.rmtree(target_dtb_dir)
+        shutil.copytree(dtb_dir, target_dtb_dir)
+        log.info("Copied dtb directory: %s", target_dtb_dir)
+    else:
+        log.warning("No dtb directory found in %s", dtb_dir)
 
 
 def collect_iso(cfg: Config) -> None:
@@ -65,7 +85,7 @@ def collect_iso(cfg: Config) -> None:
     iso_files = sorted(iso_dir.glob("*.iso")) if iso_dir.is_dir() else []
     if iso_files:
         iso_src = iso_files[0]
-        iso_dst = out / f"captainos-{cfg.kernel_version}-{cfg.arch_info.output_arch}.iso"
+        iso_dst = out / f"captainos-{cfg.flavor_id}-{cfg.arch_info.output_arch}.iso"
         shutil.copy2(iso_src, iso_dst)
         log.info("iso: %s (%s)", iso_dst, _human_size(iso_dst.stat().st_size))
 
@@ -114,3 +134,15 @@ def collect(cfg: Config) -> None:
     collect_initramfs(cfg)
     collect_kernel(cfg)
     collect_iso(cfg)
+
+
+class OutputArchArtifactType(StrEnum):
+    FILE = "file"
+    DIRECTORY = "directory"
+
+
+@dataclass
+class OutputArchArtifact:
+    # type is either File or Directory
+    type: OutputArchArtifactType
+    name: str

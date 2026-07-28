@@ -1,17 +1,26 @@
 # Build outputs
 mkosi.output/
+mkosi.input/
 mkosi.cache/
 mkosi.tools/
 mkosi.tools.manifest
 mkosi.builddir/
-kernel.configs/.config.resolved.*
 out/
+
+# Generated artifacts
+/mkosi.conf
+/mkosi.finalize
+/mkosi.postinst
+/mkosi.extra
+/mkosi.sandbox
+/mkosi.skeleton
 
 # Editor
 *.swp
 *.swo
 *~
 .vscode/
+.idea/
 
 # OS
 .DS_Store
@@ -29,3 +38,6 @@ dist/
 .mypy_cache/
 .pyright/
 .pytest_cache/
+
+# Ignore uv.lock for now; we should always use the latest version of packages etc
+uv.lock

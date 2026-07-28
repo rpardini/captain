@@ -1,22 +1,20 @@
-"""CLI entry point — single configargparse parser with pre-extracted subcommand.
+"""Click-based CLI for CaptainOS.
 
-Every configuration parameter is both a ``--cli-flag`` and an environment
-variable, following the ff priority model:
+Provides the ``captain`` console script with subcommands:
 
-    CLI args  >  environment variables  >  defaults
+- ``builder``  — build the Docker builder image, optionally push it
+- ``build``    — full build pipeline (tools → initramfs → iso → artifacts)
+- ``release-publish`` — publish artifacts as OCI images via buildah
 
-The subcommand (``build``, ``kernel``, ``tools``, …) is extracted from
-``sys.argv`` *before* parsing so that flags work in any position::
+Shell completion is available for bash and zsh::
 
-    ./build.py --arch=arm64 kernel      # works
-    ./build.py kernel --arch=arm64      # also works
-    ARCH=arm64 ./build.py kernel        # also works
+    # bash
+    eval "$(_CAPTAIN_COMPLETE=bash_source captain)"
+
+    # zsh
+    eval "$(_CAPTAIN_COMPLETE=zsh_source captain)"
 """
 
 from captain.cli._main import main
-from captain.cli._parser import COMMANDS
 
-__all__ = [
-    "COMMANDS",
-    "main",
-]
+__all__ = ["main"]

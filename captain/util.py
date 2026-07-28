@@ -4,11 +4,19 @@ from __future__ import annotations
 
 import logging
 import os
+import platform
 import subprocess
 import sys
 import tarfile
 from dataclasses import dataclass
 from pathlib import Path
+
+from rich.panel import Panel
+from rich.rule import Rule
+from rich.syntax import Syntax
+from rich.table import Table
+
+import captain
 
 log = logging.getLogger(__name__)
 
@@ -26,7 +34,6 @@ class ArchInfo:
     dl_arch: str  # architecture name in download URLs
     mkosi_arch: str  # mkosi --architecture value
     qemu_binary: str  # QEMU system emulator binary
-    strip_prefix: str  # prefix for strip command
 
 
 def get_arch_info(arch: str) -> ArchInfo:
@@ -37,13 +44,12 @@ def get_arch_info(arch: str) -> ArchInfo:
                 arch="amd64",
                 output_arch="x86_64",
                 kernel_arch="x86_64",
-                cross_compile="",
+                cross_compile="x86_64-linux-gnu-",
                 image_target="bzImage",
                 kernel_image_path="arch/x86/boot/bzImage",
                 dl_arch="amd64",
                 mkosi_arch="x86-64",
                 qemu_binary="qemu-system-x86_64",
-                strip_prefix="",
             )
         case "arm64" | "aarch64":
             return ArchInfo(
@@ -56,11 +62,20 @@ def get_arch_info(arch: str) -> ArchInfo:
                 dl_arch="arm64",
                 mkosi_arch="arm64",
                 qemu_binary="qemu-system-aarch64",
-                strip_prefix="aarch64-linux-gnu-",
             )
         case _:
             log.error("Unsupported architecture: %s", arch)
             sys.exit(1)
+
+
+def detect_current_machine_arch() -> str:
+    machine = platform.machine().lower()
+    if machine in ("aarch64", "arm64"):
+        return "arm64"
+    elif machine in ("x86_64", "amd64"):
+        return "amd64"
+    else:
+        raise RuntimeError(f"Unsupported architecture: {machine}")
 
 
 def run(
@@ -75,7 +90,36 @@ def run(
     run_env: dict[str, str] | None = None
     if env is not None:
         run_env = {**os.environ, **env}
-    return subprocess.run(
+
+    # If not capturing, and debugging, emit a Rich separator line, for visual clarity.
+    if log.isEnabledFor(logging.DEBUG):
+        # join cmd into a single string; elements with spaces or special chars should be quoted
+        special = ('"', "'", "\\", "$", ",", "=", "/")
+        cmd_joined = " ".join(
+            f'"{c}"' if " " in c or any(s in c for s in special) else c for c in cmd
+        )
+        syntax = Syntax(
+            cmd_joined, "bash", theme="monokai", word_wrap=True, background_color="default"
+        )
+        panel = Panel(
+            syntax,
+            title="Executing shell command",
+            width=captain.console.width,
+        )
+        captain.console.print(panel)
+        if env:
+            # add a Rich Table with the env vars, two columns
+            table = Table(show_header=True, header_style="bold magenta")
+            table.add_column("Env Var", style="cyan", no_wrap=True)
+            table.add_column("Value", style="white")
+            for k, v in env.items():
+                table.add_row(k, v)
+            captain.console.print(table)
+
+        if not capture:
+            captain.console.print(Rule(f"⮕ Starting subprocess: {cmd} ⮕", style="green"))
+
+    proc = subprocess.run(
         cmd,
         check=check,
         capture_output=capture,
@@ -83,6 +127,14 @@ def run(
         env=run_env,
         cwd=cwd,
     )
+
+    if capture:
+        return proc
+
+    if log.isEnabledFor(logging.DEBUG):
+        captain.console.print(Rule(f"⮕ Finished subprocess: {cmd} ⮕", style="green"))
+
+    return proc
 
 
 def ensure_dir(path: Path) -> Path:
@@ -180,3 +232,9 @@ def check_dependencies(arch: str) -> list[str]:
     Returns a list of missing command names (empty if all found).
     """
     return check_kernel_dependencies(arch) + check_mkosi_dependencies()
+
+
+def symlink_relative(initramfs_dst: Path, initramfs_src: Path):
+    relative = Path(os.path.relpath(initramfs_src, initramfs_dst.parent))
+    log.debug("Symlinking %s to %s (relative path: %s)", initramfs_dst, initramfs_src, relative)
+    initramfs_dst.symlink_to(relative)

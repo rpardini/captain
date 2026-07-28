@@ -6,11 +6,15 @@ import hashlib
 import logging
 import os
 import platform
-import sys
 from pathlib import Path
+from subprocess import CalledProcessError
 
+from rich.table import Table
+
+import captain
 from captain.config import Config
-from captain.util import run
+from captain.kernel import KERNEL_BUILD_BASE_PATH
+from captain.util import detect_current_machine_arch, run
 
 log = logging.getLogger(__name__)
 
@@ -29,164 +33,215 @@ def _dockerfile_hash(cfg: Config) -> str:
     """Return the SHA-256 hex digest of the Dockerfile content.
 
     This is used as an image tag so that Dockerfile changes are detected
-    automatically.  The value intentionally matches what GitHub Actions
-    ``hashFiles('Dockerfile')`` produces, allowing the CI
-    ``docker/build-push-action`` step to pre-load an image with the same
-    tag that ``build_builder`` will look for.
+    automatically.
     """
     dockerfile = cfg.project_dir / "Dockerfile"
-    return hashlib.sha256(dockerfile.read_bytes()).hexdigest()
+    local_arch = detect_current_machine_arch()
+    hex_digest = hashlib.sha256(dockerfile.read_bytes()).hexdigest()
+    return f"{local_arch}-{hex_digest}"
 
 
-def build_builder(cfg: Config) -> None:
+def obtain_builder(cfg: Config) -> None:
     """Build the Docker builder image when the Dockerfile has changed.
 
     The image is tagged with a content hash of the Dockerfile so that
     changes are detected even when the base image name stays the same.
-    When the matching tag already exists locally (e.g. pre-loaded by a CI
-    ``docker/build-push-action`` step with ``load: true``), we skip the
-    build entirely.  Use ``NO_CACHE=1`` to force a full rebuild.
     """
     tag = _dockerfile_hash(cfg)
-    tagged_image = f"{cfg.builder_image}:{tag}"
+    remote_tagged_image = f"{cfg.builder_registry}/{cfg.builder_repository}/builder:{tag}"
+    local_tagged_image = f"{cfg.builder_image}:{tag}"
 
-    if not cfg.no_cache and _image_exists(tagged_image):
-        log.info("Docker image '%s' is up to date.", cfg.builder_image)
+    log.debug(
+        "Checking for existing builder image with tag '%s' or remote image '%s'",
+        local_tagged_image,
+        remote_tagged_image,
+    )
+
+    if _image_exists(local_tagged_image):
+        log.info("Docker image '%s' is up to date with %s.", cfg.builder_image, local_tagged_image)
         # Ensure the un-hashed tag exists so later docker-run calls that
         # reference cfg.builder_image (without the hash suffix) succeed.
-        # This matters when the hashed tag was pre-loaded by CI.
-        run(["docker", "tag", tagged_image, cfg.builder_image], check=False)
+        run(["docker", "tag", local_tagged_image, cfg.builder_image], check=False)
         return
 
+    # Check if the remote name exists locally... (was pre-pulled somehow)
+    if _image_exists(remote_tagged_image):
+        log.info(
+            "Docker image '%s' already exists locally (pre-pulled). Tagging as '%s'.",
+            remote_tagged_image,
+            cfg.builder_image,
+        )
+        run(["docker", "tag", remote_tagged_image, cfg.builder_image], check=False)
+        return
+
+    # Check if we can pull the remote image (exists in registry and matches our Dockerfile hash)
+    if (
+        run(
+            ["docker", "pull", remote_tagged_image],
+            check=False,
+            capture=False,
+        ).returncode
+        == 0
+    ):
+        log.info(
+            "Pulled Docker image '%s' from registry. Tagging as '%s'.",
+            remote_tagged_image,
+            cfg.builder_image,
+        )
+        run(["docker", "tag", remote_tagged_image, cfg.builder_image], check=False)
+        return
+
+    # build locally if no existing image was found.
     log.info("Building Docker image '%s'...", cfg.builder_image)
-    cmd = ["docker", "buildx", "build", "--load"]
-    if cfg.no_cache:
-        cmd.append("--no-cache")
-    cmd.extend(
-        ["--progress=plain", "-t", tagged_image, "-t", cfg.builder_image, str(cfg.project_dir)]
+    run(
+        [
+            "docker",
+            "buildx",
+            "build",
+            "--load",  # for older Docker versions
+            "--progress=plain",
+            "-t",
+            local_tagged_image,
+            "-t",
+            cfg.builder_image,
+            str(cfg.project_dir),
+        ]
     )
-    run(cmd)
+
+    # Show the layer size distribution for the built image to help with debugging and optimization.
+    log.info("Docker image '%s' built successfully. Layer size distribution:", local_tagged_image)
+    layer_sizes_lines = run(
+        [
+            "docker",
+            "history",
+            "--no-trunc",
+            "--format",
+            "-> {{.Size}} :: '{{.CreatedBy}}'",
+            local_tagged_image,
+        ],
+        capture=True,
+        check=True,
+    )
+    layers = []
+    for line in layer_sizes_lines.stdout.strip().splitlines():
+        line = line.strip()
+        if line.startswith("-> "):
+            # remove double whitespace chars to make it easier to read
+            line = " ".join(line.split())
+            layers.append(line)
+    # reverse the array to match the order
+    layers.reverse()
+    for layer in layers:
+        log.info("Layer info: %s", layer)
+
+    # Optionally push the image after building it
+    if cfg.builder_push:
+        log.info(
+            "Pushing Docker image '%s' to registry as '%s'...",
+            cfg.builder_image,
+            remote_tagged_image,
+        )
+        run(["docker", "tag", local_tagged_image, remote_tagged_image], check=False)
+        run(["docker", "push", remote_tagged_image])
 
 
-RELEASE_IMAGE = "captainos-release"
-
-
-def _release_dockerfile_hash(cfg: Config) -> str:
-    """Return the SHA-256 hex digest of the Dockerfile.release content."""
-    dockerfile = cfg.project_dir / "Dockerfile.release"
-    return hashlib.sha256(dockerfile.read_bytes()).hexdigest()
-
-
-def build_release_image(cfg: Config) -> None:
-    """Build the release Docker image from ``Dockerfile.release``."""
-    tag = _release_dockerfile_hash(cfg)
-    tagged_image = f"{RELEASE_IMAGE}:{tag}"
-
-    if not cfg.no_cache and _image_exists(tagged_image):
-        log.info("Docker image '%s' is up to date.", RELEASE_IMAGE)
-        run(["docker", "tag", tagged_image, RELEASE_IMAGE])
-        return
-
-    log.info("Building Docker image '%s'...", RELEASE_IMAGE)
-    cmd = ["docker", "buildx", "build", "--load", "-f", str(cfg.project_dir / "Dockerfile.release")]
-    if cfg.no_cache:
-        cmd.append("--no-cache")
-    cmd.extend(["--progress=plain"])
-    cmd.extend(["-t", tagged_image, "-t", RELEASE_IMAGE, str(cfg.project_dir)])
-    run(cmd)
-
-
-def run_in_release(cfg: Config, *extra_args: str) -> None:
-    """Run a command inside the release container.
-
-    Similar to :func:`run_in_builder` but uses the lightweight release
-    image which has buildah, skopeo, Python, and git.
-    """
-    docker_args: list[str] = [
-        "docker",
-        "run",
-        "--rm",
-        # Buildah needs mount/remount capabilities for layer operations.
-        "--privileged",
-        # interactive if running in a terminal
-        *(["-i"] if sys.stdout.isatty() and sys.stdin.isatty() else []),
-        "-t",  # terminal
-        "-v",
-        f"{cfg.project_dir}:/work",
-        "-w",
-        "/work",
-        "-e",
-        f"ARCH={cfg.arch}",
-        "-e",
-        "RELEASE_MODE=native",
-        # Chroot isolation lets buildah work inside an unprivileged container
-        # (no user namespaces needed — we only assemble scratch images).
-        "-e",
-        "BUILDAH_ISOLATION=chroot",
-        "-e",
-        f"TERM={os.environ.get('TERM', 'xterm-256color')}",
-        "-e",
-        f"COLUMNS={os.environ.get('COLUMNS', '200')}",
-        "-e",
-        f"GITHUB_ACTIONS={os.environ.get('GITHUB_ACTIONS', '')}",
-    ]
-    # Forward host registry credentials so buildah/skopeo can authenticate.
-    # The caller sets these env vars on the host (e.g. via docker login or
-    # CI secrets); they are passed through to the container as-is.
-    for var in ("REGISTRY_AUTH_FILE", "REGISTRY_USERNAME", "REGISTRY_PASSWORD"):
-        val = os.environ.get(var)
-        if val:
-            docker_args += ["-e", f"{var}={val}"]
-    docker_args.extend(extra_args)
-    run(docker_args)
-
-
-def run_in_builder(cfg: Config, *extra_args: str) -> None:
+def run_in_builder(
+    cfg: Config, command_and_args: list[str], extra_docker_args: list[str] | None = None
+) -> None:
     """Run a command inside the Docker builder container.
 
     *extra_args* are appended after the docker run flags and image name.
     """
+
+    docker_envs: dict[str, str] = {
+        # common to all commands
+        "ARCH": cfg.arch,
+        "FLAVOR_ID": cfg.flavor_id,
+        "KERNEL_VERSION": cfg.kernel_version,
+        "FORCE_TOOLS": str(int(cfg.force_tools)),
+        "FORCE_ISO": str(int(cfg.force_iso)),
+        "FORCE_KERNEL": f"{int(cfg.force_kernel)!s}",
+        "FORCE_RELEASE": str(cfg.force_release),
+        "CAPTAIN_VERBOSE": "1" if cfg.verbose_docker else "0",
+        "CONFIG_KERNEL": "1" if cfg.kernel_menuconfig else "0",
+        # publish-related env vars
+        "BUILDAH_ISOLATION": "chroot",
+        "REGISTRY_INSECURE": os.environ.get("REGISTRY_INSECURE", ""),
+        "REGISTRY": str(cfg.release_registry),
+        "GITHUB_REPOSITORY": str(cfg.release_repository),
+        "OCI_ARTIFACT_NAME": str(cfg.release_oci_artifact_name),
+        "TARGET": str(cfg.release_target),
+        "GIT_SHA": str(cfg.release_git_sha),
+        "SRC_TAG": str(cfg.release_src_tag),
+        "PULL_OUTPUT": str(cfg.release_pull_output),
+        "NEW_TAG": str(cfg.release_new_tag),
+        # set all modes to native under Docker
+        "KERNEL_MODE": "native",
+        "RELEASE_MODE": "native",
+        "TOOLS_MODE": "native",
+        "MKOSI_MODE": "native",
+        "ISO_MODE": "native",
+        # terminal control / gha stuff etc
+        "TERM": os.environ.get("TERM", "xterm-256color"),
+        "FORCE_COLOR": "1",
+        "COLUMNS": str(captain.env_columns),
+        "GITHUB_ACTIONS": os.environ.get("GITHUB_ACTIONS", ""),
+        "CAPTAIN_IN_DOCKER": "docker",
+        # Forward host registry credentials so buildah/skopeo can authenticate.
+        # The caller sets these env vars on the host (e.g. via docker login or
+        # CI secrets); they are passed through to the container as-is.
+        "REGISTRY_AUTH_FILE": os.environ.get("REGISTRY_AUTH_FILE", ""),
+        "REGISTRY_USERNAME": os.environ.get("REGISTRY_USERNAME", ""),
+        "REGISTRY_PASSWORD": os.environ.get("REGISTRY_PASSWORD", ""),
+    }
+
     docker_args: list[str] = [
         "docker",
         "run",
         "--rm",
-        "--privileged",
-        # interactive if running in a terminal
-        *(["-i"] if sys.stdout.isatty() and sys.stdin.isatty() else []),
-        "-t",  # terminal
+        "--privileged",  # yes, this is required for both buildah and mkosi in the container
         "-w",
         "/work",
-        "-e",
-        f"ARCH={cfg.arch}",
-        "-e",
-        f"KERNEL_VERSION={cfg.kernel_version}",
-        "-e",
-        f"FORCE_TOOLS={int(cfg.force_tools)}",
-        "-e",
-        f"FORCE_KERNEL={int(cfg.force_kernel)}",
-        "-e",
-        f"FORCE_ISO={int(cfg.force_iso)}",
-        "-e",
-        "KERNEL_MODE=native",
-        "-e",
-        "TOOLS_MODE=native",
-        "-e",
-        "MKOSI_MODE=native",
-        "-e",
-        "ISO_MODE=native",
-        "-e",
-        "RELEASE_MODE=native",
-        "-e",
-        f"TERM={os.environ.get('TERM', 'xterm-256color')}",
-        "-e",
-        f"COLUMNS={os.environ.get('COLUMNS', '200')}",
-        "-e",
-        f"GITHUB_ACTIONS={os.environ.get('GITHUB_ACTIONS', '')}",
     ]
 
+    if extra_docker_args is not None:
+        log.debug("Adding extra Docker args: %s", extra_docker_args)
+        docker_args.extend(extra_docker_args)
+
+    if log.isEnabledFor(logging.DEBUG):
+        table = Table(
+            title="Docker Environment Variables", show_header=True, header_style="bold cyan"
+        )
+        table.add_column("Environment Variable", style="green")
+        table.add_column("Value", style="yellow")
+        for key, value in sorted(docker_envs.items()):
+            table.add_row(key, value)
+        captain.console.print(table)
+
+    for k, v in docker_envs.items():
+        docker_args += ["-e", f"{k}={v}"]
+
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        log.debug("Running in GitHub Actions, adding bind mount for Docker credentials...")
+        github_docker_config = Path.home() / ".docker" / "config.json"
+        if github_docker_config.exists() and github_docker_config.is_file():
+            log.debug(
+                "Under GHA, Found Docker config file at %s, adding to bind mounts.",
+                github_docker_config,
+            )
+            docker_args += ["-v", f"{github_docker_config}:/root/.docker/config.json"]
+
+    if cfg.custom_dir.exists() and cfg.custom_dir.is_dir():
+        docker_args += ["-v", f"{cfg.custom_dir}:/work/custom"]
+
+    docker_args += ["-v", f"{cfg.project_dir}/kernel.configs:/work/kernel.configs"]
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.output:/work/mkosi.output"]
-    docker_args += ["-v", f"{cfg.project_dir}/mkosi.extra:/work/mkosi.extra"]
+    docker_args += ["-v", f"{cfg.project_dir}/mkosi.input:/work/mkosi.input"]
     docker_args += ["-v", f"{cfg.project_dir}/out:/work/out"]
+
+    docker_args += ["-v", f"{cfg.project_dir}/mkosi.extra:/work/mkosi.extra"]
+    docker_args += ["-v", f"{cfg.project_dir}/mkosi.sandbox:/work/mkosi.sandbox"]
+    docker_args += ["-v", f"{cfg.project_dir}/mkosi.skeleton:/work/mkosi.skeleton"]
 
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.conf:/work/mkosi.conf"]
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.finalize:/work/mkosi.finalize"]
@@ -196,45 +251,53 @@ def run_in_builder(cfg: Config, *extra_args: str) -> None:
     docker_args += ["-v", f"{cfg.project_dir}/pyproject.toml:/work/pyproject.toml"]
     docker_args += ["-v", f"{cfg.project_dir}/build.py:/work/build.py"]
 
-    docker_args += ["-v", f"{cfg.project_dir}/kernel.configs:/work/kernel.configs"]
-
     docker_args += ["--mount", "type=volume,source=captain-cache-packages,target=/cache/packages"]
+    docker_args += [
+        "--mount",
+        f"type=volume,source=captain-kernel-build,target={KERNEL_BUILD_BASE_PATH}",
+    ]
+    docker_args += [cfg.builder_image]
 
-    # Mount kernel source if provided
-    if cfg.kernel_src is not None:
-        kernel_src_path = Path(cfg.kernel_src).resolve()
-        if not kernel_src_path.is_dir():
-            log.error("KERNEL_SRC=%s does not exist", cfg.kernel_src)
-            raise SystemExit(1)
-        docker_args.extend(["-v", f"{kernel_src_path}:/work/kernel-src:ro"])
-        docker_args.extend(["-e", "KERNEL_SRC=/work/kernel-src"])
+    docker_args.extend(command_and_args)
 
-    # Mount kernel config override and point KERNEL_CONFIG to the container path
-    if cfg.kernel_config is not None:
-        kernel_cfg_path = Path(cfg.kernel_config)
-        if not kernel_cfg_path.is_absolute():
-            kernel_cfg_path = (cfg.project_dir / kernel_cfg_path).resolve()
-        else:
-            kernel_cfg_path = kernel_cfg_path.resolve()
-        if not kernel_cfg_path.is_file():
-            log.error("KERNEL_CONFIG=%s does not exist", cfg.kernel_config)
-            raise SystemExit(1)
-        docker_args.extend(["-v", f"{kernel_cfg_path}:/work/kernel-config:ro"])
-        docker_args.extend(["-e", "KERNEL_CONFIG=/work/kernel-config"])
-
-    docker_args.extend(extra_args)
-    log.debug("Docker args (builder): %s", docker_args)
-    run(docker_args)
+    # Handle exceptions: when re-launching in Docker, the inner instance already showed
+    # the full error with traceback, so we can suppress the redundant outer traceback.
+    try:
+        run(docker_args)
+    except CalledProcessError as e:
+        log.error(
+            "Command '%s' failed with exit code %d.", " ".join(command_and_args), e.returncode
+        )
+        raise SystemExit(e.returncode) from None
 
 
-def run_mkosi(cfg: Config, *mkosi_args: str) -> None:
+def run_captain_in_builder(
+    cfg: Config, command_and_args: list[str], extra_docker_args: list[str] | None = None
+):
+    log.debug("Running 'captain %s' in builder container...", command_and_args)
+    run_in_builder(
+        cfg,
+        [
+            "/usr/bin/uv",
+            *(["--verbose"] if cfg.verbose_uv else ["--quiet"]),
+            "run",
+            "captain",
+            *command_and_args,
+        ],
+        extra_docker_args=extra_docker_args,
+    )
+
+
+def run_mkosi_in_builder(cfg: Config, *mkosi_args: str) -> None:
     """Run mkosi inside the builder container."""
     ensure_binfmt(cfg)
     run_in_builder(
         cfg,
-        cfg.builder_image,
-        f"--architecture={cfg.arch_info.mkosi_arch}",
-        *mkosi_args,
+        command_and_args=[
+            "/usr/local/bin/mkosi",
+            f"--architecture={cfg.arch_info.mkosi_arch}",
+            *mkosi_args,
+        ],
     )
 
 

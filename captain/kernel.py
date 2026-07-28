@@ -1,13 +1,15 @@
-"""Kernel download, configuration, compilation, and installation.
+"""Kernel download, configuration, compilation, and packaging.
 
-Heavy lifting (make, strip) is still done via subprocess — only the
-orchestration is in Python.  Called directly by ``cli._build_kernel_stage``
-in both native and Docker modes (inside the container ``build.py kernel``
-re-enters via the CLI with all modes forced to native).
+Heavy lifting (make) is still done via subprocess — only the
+orchestration is in Python.  Called directly by ``cli.build_kernel_stage``
+in both native and Docker modes (inside the container we re-enter
+the CLI with all modes forced to native).
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
 import re
@@ -27,12 +29,69 @@ from rich.progress import (
 )
 
 from captain import console
-from captain.config import Config
+from captain.config import DEFAULT_KERNEL_VERSION, Config
 from captain.util import ensure_dir, run, safe_extractall
+
+KERNEL_BUILD_BASE_PATH = "/work/kernel-build"
+
+RELEASES_JSON_URL = "https://www.kernel.org/releases.json"
 
 log = logging.getLogger(__name__)
 
 _DOWNLOAD_TIMEOUT = 60  # seconds
+
+
+def _version_tuple(version: str) -> tuple[int, ...]:
+    """Parse a dotted kernel version into an int tuple for comparison."""
+    parts: list[int] = []
+    for piece in version.split("."):
+        # stop at the first non-numeric component (e.g. rc suffixes)
+        if not piece.isdigit():
+            break
+        parts.append(int(piece))
+    return tuple(parts)
+
+
+def latest_branch_version(branch: str | None = None) -> str:
+    """Return the newest kernel.org point release of *branch* (e.g. ``"6.18"``).
+
+    Consults kernel.org's ``releases.json``, which lists the latest release of
+    each active branch. *branch* defaults to the ``<major>.<minor>`` of
+    :data:`DEFAULT_KERNEL_VERSION`. Falls back to ``DEFAULT_KERNEL_VERSION`` on
+    any network/parse failure or when the branch is not listed — never returns
+    an empty string, so callers/CI always get a buildable version.
+    """
+    if branch is None:
+        branch = ".".join(DEFAULT_KERNEL_VERSION.split(".")[:2])
+
+    try:
+        req = urllib.request.Request(RELEASES_JSON_URL)
+        with urllib.request.urlopen(req, timeout=_DOWNLOAD_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode())
+    except (urllib.error.URLError, json.JSONDecodeError, OSError) as exc:
+        log.warning(
+            "Could not fetch %s (%s); using default %s",
+            RELEASES_JSON_URL,
+            exc,
+            DEFAULT_KERNEL_VERSION,
+        )
+        return DEFAULT_KERNEL_VERSION
+
+    prefix = f"{branch}."
+    matches = [
+        r["version"]
+        for r in data.get("releases", [])
+        if isinstance(r.get("version"), str) and r["version"].startswith(prefix)
+    ]
+    if not matches:
+        log.warning(
+            "No kernel.org release for branch %s; using default %s", branch, DEFAULT_KERNEL_VERSION
+        )
+        return DEFAULT_KERNEL_VERSION
+
+    latest = max(matches, key=_version_tuple)
+    log.info("Latest kernel for branch %s is %s", branch, latest)
+    return latest
 
 
 def _download_with_progress(url: str, filename: Path) -> None:
@@ -58,18 +117,18 @@ def _download_with_progress(url: str, filename: Path) -> None:
                     progress.update(task, advance=len(buf))
 
 
-def download_kernel(version: str, dest_dir: Path) -> Path:
+def download_kernel(cfg: Config, dest_dir: Path) -> Path:
     """Download and extract a kernel tarball.  Returns the source directory."""
-    src_dir = dest_dir / f"linux-{version}"
+    src_dir = dest_dir / f"linux-{cfg.kernel_version}"  # predict kernel tarball 1st-level dir name
     if src_dir.is_dir():
         log.info("Using cached kernel source at %s", src_dir)
         return src_dir
 
-    major = version.split(".")[0]
-    url = f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{version}.tar.xz"
-    tarball = dest_dir / f"linux-{version}.tar.xz"
+    major = cfg.kernel_version.split(".")[0]
+    url = f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{cfg.kernel_version}.tar.xz"
+    tarball = dest_dir / f"linux-{cfg.kernel_version}.tar.xz"
 
-    log.info("Downloading kernel %s...", version)
+    log.info("Downloading kernel %s...", cfg.kernel_version)
     log.info("  URL: %s", url)
     ensure_dir(dest_dir)
     try:
@@ -100,15 +159,6 @@ def _kernel_branch(version: str) -> str:
 
 def _find_defconfig(cfg: Config) -> Path:
     """Locate the defconfig for the current kernel version and architecture."""
-    if cfg.kernel_config:
-        explicit = Path(cfg.kernel_config)
-        if not explicit.is_absolute():
-            explicit = cfg.project_dir / explicit
-        if explicit.is_file():
-            return explicit
-        log.error("Kernel config not found: %s", explicit)
-        raise SystemExit(1)
-
     ai = cfg.arch_info
     branch = _kernel_branch(cfg.kernel_version)
     defconfig = cfg.project_dir / "kernel.configs" / f"{branch}.{ai.arch}"
@@ -147,6 +197,26 @@ def configure_kernel(cfg: Config, src_dir: Path) -> None:
     log.info("Using defconfig: %s", defconfig)
     shutil.copy2(defconfig, src_dir / ".config")
     run(["make", "olddefconfig"], env=make_env, cwd=src_dir)
+
+    log.debug(
+        "Considering whether to launch menuconfig for manual config tweaks... %s",
+        cfg.kernel_menuconfig,
+    )
+
+    if cfg.kernel_menuconfig:
+        log.info("Launching menuconfig...")
+        run(["make", "menuconfig"], env=make_env, cwd=src_dir)
+
+        # run `make savedefconfig`
+        log.info("Saving modified config...")
+        run(["make", "savedefconfig"], env=make_env, cwd=src_dir)
+
+        # copy the 'defconfig' back to the source - ready to commit
+        shutil.copy(src_dir / "defconfig", defconfig)
+        log.info("Updated defconfig saved to %s", defconfig)
+
+        raise SystemExit(0)  # exit after menuconfig - no build
+
     branch = _kernel_branch(cfg.kernel_version)
     resolved = cfg.project_dir / "kernel.configs" / f".config.resolved.{branch}.{ai.arch}"
     shutil.copy2(src_dir / ".config", resolved)
@@ -176,87 +246,81 @@ def build_kernel(cfg: Config, src_dir: Path) -> str:
     make_env = {"ARCH": ai.kernel_arch}
     if ai.cross_compile:
         make_env["CROSS_COMPILE"] = ai.cross_compile
+        make_env["DPKG_DEB_COMPRESSOR_TYPE"] = "none"  # don't waste time compressing .deb
 
-    log.info("Building kernel with %d jobs...", nproc)
-    run(
-        ["make", f"-j{nproc}", ai.image_target, "modules"],
-        env=make_env,
-        cwd=src_dir,
-    )
+    if cfg.kernel_clean:
+        log.info("Cleaning kernel...")
+        run(
+            ["make", f"-j{nproc}", "clean"],
+            env=make_env,
+            cwd=src_dir,
+        )
 
-    result = run(
+    built_kver = run(
         ["make", "-s", "kernelrelease"],
         env={"ARCH": ai.kernel_arch},
         capture=True,
         cwd=src_dir,
-    )
-    built_kver = result.stdout.strip()
-    log.info("Built kernel version: %s", built_kver)
-    return built_kver
+    ).stdout.strip()
 
-
-def install_kernel(cfg: Config, src_dir: Path, built_kver: str) -> None:
-    """Install modules and vmlinuz into mkosi.output/kernel/{version}/{arch}/."""
-    ai = cfg.arch_info
-    modules_root = cfg.modules_output
-
-    make_env = {"ARCH": ai.kernel_arch}
-    if ai.cross_compile:
-        make_env["CROSS_COMPILE"] = ai.cross_compile
-
-    log.info("Installing modules...")
+    log.info("Building kernel '%s' with %d jobs...", built_kver, nproc)
     run(
-        ["make", f"INSTALL_MOD_PATH={modules_root}", "modules_install"],
+        ["make", f"-j{nproc}", "bindeb-pkg"],
         env=make_env,
         cwd=src_dir,
     )
 
-    log.info("Stripping debug symbols from modules...")
-    strip_cmd = f"{ai.strip_prefix}strip"
-    for ko in modules_root.rglob("*.ko"):
-        run([strip_cmd, "--strip-unneeded", str(ko)], check=False)
+    log.info("Built kernel version: %s", built_kver)
+    return built_kver
 
-    log.info("Compressing kernel modules with zstd...")
-    for ko in modules_root.rglob("*.ko"):
-        run(["zstd", "--rm", "-q", "-19", str(ko)], check=True)
 
-    mod_base = modules_root / "lib" / "modules" / built_kver
-    (mod_base / "build").unlink(missing_ok=True)
-    (mod_base / "source").unlink(missing_ok=True)
+def obtain_target_artifact_path(cfg, ensure_parent: bool = False) -> Path:
+    if ensure_parent:
+        ensure_dir(cfg.kernel_output)
 
-    usr_moddir = ensure_dir(modules_root / "usr" / "lib" / "modules" / built_kver)
-    if mod_base.is_dir():
-        for item in mod_base.iterdir():
-            dest = usr_moddir / item.name
-            if dest.exists():
-                if dest.is_dir():
-                    shutil.rmtree(dest)
-                else:
-                    dest.unlink()
-            shutil.move(str(item), str(dest))
-        shutil.rmtree(modules_root / "lib", ignore_errors=True)
+    # let's hash:
+    # 1) the input defconfig
+    defconfig = _find_defconfig(cfg)
+    hex_digest_defconfig = hashlib.sha256(defconfig.read_bytes()).hexdigest()
+    # 2) the contents of this script (as an imperfect proxy for the build logic)
+    script_path = Path(__file__)
+    hex_digest_script = hashlib.sha256(script_path.read_bytes()).hexdigest()
+    # Combine and shorten to 8 chars for the final version hash
+    version_hash = hashlib.sha256((hex_digest_defconfig + hex_digest_script).encode()).hexdigest()
+    version_hash_shorten = version_hash[:8]
 
-    log.info("Running depmod for compressed modules...")
-    run(
-        ["depmod", "-a", "-b", str(modules_root / "usr"), built_kver],
-        check=True,
+    return (
+        cfg.kernel_output / f"linux-image-{cfg.kernel_version}-captainos"
+        f"_{cfg.kernel_version}-1-{version_hash_shorten}_"
+        f"{cfg.arch_info.kernel_arch}.deb"
     )
 
-    kernel_image = src_dir / ai.kernel_image_path
-    vmlinuz_dir = ensure_dir(cfg.kernel_output)
 
-    for old in vmlinuz_dir.glob("vmlinuz-*"):
-        old.unlink(missing_ok=True)
+def deploy_deb_to_output(cfg: Config, build_dir: Path, built_kver: str) -> None:
+    # Find the newest file in build_dir matching linux-image-{built_kver}*.deb
+    image_deb_package = build_dir.glob(f"linux-image-{built_kver}*.deb")
+    image_deb_package = sorted(image_deb_package, key=lambda p: p.stat().st_mtime, reverse=True)
+    if not image_deb_package:
+        log.error("No linux-image-*.deb package found in %s", build_dir)
+        raise SystemExit(1)
+    image_deb_package = image_deb_package[0]
+    log.info("Found built kernel package: %s", image_deb_package)
 
-    shutil.copy2(kernel_image, vmlinuz_dir / f"vmlinuz-{built_kver}")
+    # copy the deb package to the output directory
+    target_deb_output = obtain_target_artifact_path(cfg, ensure_parent=True)
+    log.debug("Copying built kernel package from %s to %s", image_deb_package, target_deb_output)
+    shutil.copy2(image_deb_package, target_deb_output)
+
+    # Show dpkg info for the copied package
+    log.info("Kernel package info:")
+    run(["dpkg", "-I", str(target_deb_output)])
 
     log.info("Kernel build complete:")
-    vmlinuz = vmlinuz_dir / f"vmlinuz-{built_kver}"
-    vmlinuz_size = vmlinuz.stat().st_size / (1024 * 1024)
-    log.info("    Image:   %s (%.1fM)", vmlinuz, vmlinuz_size)
-    log.info("    Modules: %s/", usr_moddir)
-    log.info("    Version: %s", built_kver)
-    log.info("    Output:  %s", cfg.kernel_output)
+    log.info(
+        "    linux-image:   %s (%.1fM)",
+        target_deb_output,
+        (target_deb_output.stat().st_size / (1024 * 1024)),
+    )
 
 
 def build(cfg: Config) -> None:
@@ -265,14 +329,20 @@ def build(cfg: Config) -> None:
         shutil.rmtree(cfg.kernel_output)
     ensure_dir(cfg.kernel_output)
 
-    build_dir = Path("/var/tmp/kernel-build")
+    log.info("Preparing kernel source...")
+    # We've a 2-deep because make bindeb-pkg outputs to parent directory of source proper
+    # Also because one can't share cache between architectures -- full rebuild everytime otherwise
+    build_dir = Path(KERNEL_BUILD_BASE_PATH) / f"build-{cfg.arch_info.kernel_arch}"
+    src_dir = download_kernel(cfg, build_dir)  # this is one down from build_dir
 
-    if cfg.kernel_src and Path(cfg.kernel_src).is_dir():
-        log.info("Using provided kernel source at %s", cfg.kernel_src)
-        src_dir = Path(cfg.kernel_src)
-    else:
-        src_dir = download_kernel(cfg.kernel_version, build_dir)
+    log.debug("Kernel source directory: %s", src_dir)
 
+    log.info("Configuring kernel...")
     configure_kernel(cfg, src_dir)
+
+    log.info("Building kernel...")
     built_kver = build_kernel(cfg, src_dir)
-    install_kernel(cfg, src_dir, built_kver)
+    log.debug("Built kernel version: %s", built_kver)
+
+    log.info("Installing kernel...")
+    deploy_deb_to_output(cfg, build_dir, built_kver)
