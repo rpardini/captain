@@ -197,3 +197,8 @@ Exit QEMU with `Ctrl-a x` (that's `Ctrl` + `a`, release, then press `x`).
 ## License
 
 See [Tinkerbell](https://github.com/tinkerbell/captain/blob/main/LICENSE) for license information.
+
+
+# TODO:
+
+- git sha1 based tagging doesnt' reflect fact flavour hash changes are possible externally (kernel/armbian-hash changes)
