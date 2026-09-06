@@ -201,4 +201,4 @@ See [Tinkerbell](https://github.com/tinkerbell/captain/blob/main/LICENSE) for li
 
 # TODO:
 
-- git sha1 based tagging doesnt' reflect fact flavour hash changes are possible externally (kernel/armbian-hash changes)
+- git sha1 based tagging doesnt' reflect fact flavour hash changes are possible externally (kernel/armbian-hash changes) - yet
