@@ -202,7 +202,8 @@ def _build_iso_stage(cfg: Config) -> None:
 
     # --- idempotency --------------------------------------------------
     iso_path = cfg.iso_output / f"captainos-{cfg.flavor_id}-{cfg.arch_info.output_arch}.iso"
-    if iso_path.is_file() and not cfg.force_iso:
+    layout_path = iso_path.with_name(iso_path.name + iso.BOOTSTRAP_LAYOUT_SUFFIX)
+    if iso_path.is_file() and layout_path.is_file() and not cfg.force_iso:
         log.info("ISO already built: %s (use --force-iso to rebuild)", iso_path)
         return
 
