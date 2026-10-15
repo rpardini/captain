@@ -191,6 +191,12 @@ def build(cfg: Config) -> None:
 
     iso_dir = ensure_dir(cfg.iso_output)
     iso_path = iso_dir / f"captainos-{cfg.flavor_id}-{cfg.arch_info.output_arch}.iso"
+    # A later build reuses any ISO at iso_path whose slot checks out, and the
+    # slot check cannot tell a truncated ISO from a complete one. So the ISO is
+    # built and checked under another name, and only moved into place once both
+    # succeed. The suffix keeps it out of the *.iso glob in collect_iso.
+    partial_path = iso_path.with_name(iso_path.name + ".partial")
+    partial_path.unlink(missing_ok=True)
 
     log.info("Building ISO with grub-mkrescue (%s)...", grub_platform)
     grub_mkrescue = shutil.which("grub-mkrescue")
@@ -198,26 +204,28 @@ def build(cfg: Config) -> None:
         log.error("grub-mkrescue not found. Install grub-common or use ISO_MODE=docker.")
         raise SystemExit(1)
 
-    run(
-        [
-            grub_mkrescue,
-            f"--directory=/usr/lib/grub/{grub_platform}",
-            "-o",
-            str(iso_path),
-            str(staging),
-        ]
-    )
+    try:
+        run(
+            [
+                grub_mkrescue,
+                f"--directory=/usr/lib/grub/{grub_platform}",
+                "-o",
+                str(partial_path),
+                str(staging),
+            ]
+        )
+        try:
+            offset = check_bootstrap_slot(partial_path)
+        except ValueError as err:
+            log.error("%s", err)
+            raise SystemExit(1) from err
+        partial_path.replace(iso_path)
+    except BaseException:
+        partial_path.unlink(missing_ok=True)
+        raise
 
     size_mb = iso_path.stat().st_size / (1024 * 1024)
     log.info("ISO created: %s (%.1fM)", iso_path, size_mb)
-
-    try:
-        offset = check_bootstrap_slot(iso_path)
-    except ValueError as err:
-        # A rejected ISO must not be left where a later build takes it as done.
-        iso_path.unlink()
-        log.error("%s", err)
-        raise SystemExit(1) from err
     log.info(
         "Bootstrap slot %s reserved at offset %d (%d bytes)",
         BOOTSTRAP_SLOT_ISO_PATH,
