@@ -6,6 +6,10 @@ CaptainOS boots via PXE/iPXE, runs entirely from RAM as a compressed CPIO initra
 environment for the [tink-agent](https://github.com/tinkerbell/tinkerbell) — the component that drives hardware
 provisioning workflows.
 
+The same building blocks also produce images for what gets provisioned: Kubernetes nodes for
+[CAPT](https://github.com/tinkerbell/cluster-api-provider-tinkerbell), either in-memory or as disk images for final
+deployment. Debian, Ubuntu and Rocky Linux bases are available; see [Flavors](#flavors).
+
 ## Why does CaptainOS exist?
 
 CaptainOS is the next generation of Tinkerbell's in-memory OS, building on years of experience building, maintaining,
@@ -33,11 +37,15 @@ entirely from RAM.
 
 The current CLI is click-based (`captain`) with flavor-driven image generation.
 
-- `captain build` runs: **tools -> initramfs (mkosi) -> iso (if flavor supports it) -> collect artifacts**
+- `captain build` runs: **tools -> mkosi (initramfs or disk image, per flavor) -> iso (if flavor supports it) ->
+  collect artifacts**
 - `captain kernel` is a separate stage used when building kernel artifacts directly (for example `trixie-slim`
   workflows)
-- Flavor templates and static overlays are rendered into generated `mkosi.*` files
+- The flavor's traits are rendered into a disposable `mkosi.generated/` tree, one mkosi drop-in directory per trait
+  (`mkosi.conf.d/10-core`, `20-distro`, …, `90-custom`); mkosi runs with `--directory=mkosi.generated`
 - `mkosi.output/` keeps hashed per-flavor build outputs; `out/` gets stable publishable filenames
+
+See `docs/design-decisions/flavor-traits.md` for the design (with diagrams), and `docs/gotchas.md` for known pitfalls.
 
 ## Build system Usage
 
@@ -63,6 +71,7 @@ We're investigating ways to make this more flexible using Python's Click library
 documented usage.
 
 ```bash
+uv run captain list-flavors
 uv run captain builder --help
 uv run captain build --help
 uv run captain kernel --help
@@ -91,8 +100,10 @@ mkosi drop-in content (see `captain/traits/__init__.py`). Here is a current list
 | `resolute-full`            | `amd64`, `arm64` | yes | Ubuntu 26.04 Resolute, standard Ubuntu linux-image-generic kernel (no linux-firmware), working `apt`                  |
 | `resolute-rockchip64`      | `arm64`          | no  | Ubuntu 26.04 Resolute for Rockchip boards, using Armbian's _mainline_ rockchip64 kernel                               |
 | `rockylinux10-full`        | `amd64`, `arm64` | yes | Rocky Linux 10 (+EPEL), standard Rocky kernel, working `dnf`. amd64 requires x86-64-v3 (Haswell or newer) CPUs        |
-| `img-k8s-capt-<base>`      | as `<base>`      | no  | Kubernetes node **disk image** for CAPT (as below, plus ssh, root locked, users via cloud-init); same bases           |
-| `mem-k8s-capt-<base>`      | as `<base>`      | as  | In-memory Kubernetes node for CAPT (kubeadm/kubelet/kubectl, containerd CRI, cloud-init for Hegel); bases: `trixie-full`, `resolute-full`, `rockylinux10-full`, `trixie-rockchip64` |
+| `mem-k8s-capt-<base>`      | as `<base>`      | as  | In-memory Kubernetes node for CAPT (kubeadm/kubelet/kubectl, containerd CRI, cloud-init for Hegel)                    |
+| `img-k8s-capt-<base>`      | as `<base>`      | no  | Kubernetes node **disk image** for CAPT (as above, plus ssh, root locked, users via cloud-init)                      |
+
+k8s `<base>`s: `trixie-full`, `resolute-full`, `rockylinux10-full`, `trixie-rockchip64`.
 
 The flavors above without a prefix run tink-agent from memory. `mem-k8s-capt-*` flavors install Kubernetes from
 pkgs.k8s.io; pick the minor with `--kubernetes-version` (or environment `KUBERNETES_VERSION`, default `1.36`).
@@ -131,10 +142,14 @@ The `custom/` directory is mounted automatically in docker-mode runs and applied
 
 - `custom/packages.txt`: one package per line (comments allowed)
 - `custom/files/`: copied into the image (mapped under `mkosi.extra/`)
-- `custom/mkosi-postinst/`: appended scripts for post-install phase
-- `custom/mkosi-finalize/`: appended scripts for finalize phase
+- `custom/mkosi-postinst/`: scripts for the post-install phase (concatenated, run after every flavor's own)
+- `custom/mkosi-finalize/`: scripts for the finalize phase (likewise)
 
-See examples under `custom/` in this repository.
+Scripts are Jinja-rendered and get `CAPTAIN_FLAVOR_ID`, `CAPTAIN_DISTRO`, `CAPTAIN_DISTRO_RELEASE` and
+`CAPTAIN_DISTRO_FAMILY` (`deb` or `rpm`) to branch on. Names in `packages.txt` go through the distro's package-name map
+(Debian names are translated on Rocky, eg. `iproute2` → `iproute`); distro-native names pass through unchanged.
+
+See examples under `custom/` in this repository (disabled by default).
 
 ## Output artifacts
 
@@ -174,7 +189,8 @@ For the rationale behind the Buildah + Skopeo approach, see `docs/design-decisio
 
 ## Testing with QEMU
 
-`captain qemu` boots artifacts from `out/` and forwards additional arguments to the kernel cmdline.
+`captain qemu` boots artifacts from `out/`. In-memory flavors boot kernel + initramfs directly and forward additional
+arguments to the kernel cmdline; `img-*` flavors boot the disk image under UEFI (see [Flavors](#flavors)).
 
 ```bash
 # boot with defaults
@@ -182,6 +198,13 @@ uv run captain --arch amd64 --flavor-id trixie-full qemu
 
 # pass extra kernel cmdline args after --
 uv run captain --arch amd64 --flavor-id trixie-full qemu -- tink_worker_image=ghcr.io/tinkerbell/tink-agent:latest
+
+# more memory/CPUs (eg. for kubeadm init on mem-k8s-capt-* flavors); also QEMU_MEM / QEMU_SMP
+uv run captain --arch arm64 --flavor-id mem-k8s-capt-trixie-full qemu --mem 6G --smp 4
+
+# disk image: boots a scratch copy grown to --disk-size, cloud-init user 'captain' gets --ssh-key
+uv run captain --arch arm64 --flavor-id img-k8s-capt-trixie-full qemu --ssh-key ~/.ssh/id_ed25519.pub
+ssh -p 2222 captain@localhost
 ```
 
 You will need OVMF firmware for the architecture installed on the host system:
@@ -190,6 +213,8 @@ You will need OVMF firmware for the architecture installed on the host system:
 - On Linux, you can install `ovmf` from your package manager:
     - Debian: x86: `ovmf`, arm64: `qemu-efi-aarch64`
     - Fedora: `edk2-ovmf` (both architectures)
+
+Booting disk images also needs `zstd` and `qemu-img` (part of `qemu`) on the host.
 
 On native-host architecture runs, acceleration is enabled when available (`hvf` on macOS, `kvm` on Linux).
 
@@ -213,8 +238,9 @@ Exit QEMU with `Ctrl-a x` (that's `Ctrl` + `a`, release, then press `x`).
 |  |- qemu.py                 # qemu launcher
 |  `- tools.py                # pinned tool downloads
 |- custom/                    # user customizations
-|- docs/                      # documentation
+|- docs/                      # documentation (design decisions, gotchas)
 |- kernel.configs/            # kernel configuration (defconfig) for trixie-slim kernel builds
+|- mkosi.generated/           # rendered mkosi config tree for the current flavor (disposable)
 |- mkosi.input/               # build inputs (generated and cached)
 |- mkosi.output/              # per-flavor hashed mkosi outputs
 `- out/                       # final artifacts for release/use
