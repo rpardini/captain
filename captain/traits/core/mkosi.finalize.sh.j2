@@ -28,3 +28,14 @@ for dir in usr/local/bin opt/cni/bin; do
         find "$target" -type f -exec chmod -v +x {} +
     fi
 done
+
+# Keep the kernel config where kubeadm's preflight (among others) finds it, also when /boot doesn't
+# survive: the mem output deletes it, and disk images with an ESP don't carry it in the root partition.
+for kconfig in "${BUILDROOT}"/boot/config-*; do
+	[[ -f "${kconfig}" ]] || continue
+	kver="${kconfig##*/config-}"
+	if [[ -d "${BUILDROOT}/usr/lib/modules/${kver}" && ! -f "${BUILDROOT}/usr/lib/modules/${kver}/config" ]]; then
+		log info "Keeping kernel config for ${kver} as /usr/lib/modules/${kver}/config"
+		cp -v "${kconfig}" "${BUILDROOT}/usr/lib/modules/${kver}/config"
+	fi
+done

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from captain.flavor import Flavor
 from captain.traits.distro import Debian, Rocky, Ubuntu
-from captain.traits.output import Mem
+from captain.traits.output import Img, Mem
 from captain.traits.platform import AcpiCaptainKernel, AcpiDistroKernel, Armbian
 from captain.traits.platform.rpi import ArmbianRpi
 from captain.traits.role import KubernetesCapt, Tink
@@ -109,10 +109,20 @@ FLAVORS: list[Flavor] = [
     ),
 ]
 
-# Kubernetes (CAPT) nodes, from the same bases as the tink flavors above.
+# Kubernetes (CAPT) nodes, from the same bases as the tink flavors above: as disk images
+# for final deployment (img-), and in-memory (mem-) for machines without a proper disk.
 for _base_id in ("trixie-full", "resolute-full", "rockylinux10-full", "trixie-rockchip64"):
     _base = next(f for f in FLAVORS if f.id == _base_id)
-    FLAVORS.append(
+    FLAVORS += [
+        Flavor(
+            id=f"img-k8s-capt-{_base_id}",
+            name=f"Kubernetes (CAPT) node disk image, {_base.name}",
+            description=f"Kubernetes node disk image for CAPT; {_base.description}",
+            distro=_base.distro,
+            platform=_base.platform,
+            role=KubernetesCapt(),
+            output=Img(),
+        ),
         Flavor(
             id=f"mem-k8s-capt-{_base_id}",
             name=f"In-memory Kubernetes (CAPT) node, {_base.name}",
@@ -121,5 +131,5 @@ for _base_id in ("trixie-full", "resolute-full", "rockylinux10-full", "trixie-ro
             platform=_base.platform,
             role=KubernetesCapt(),
             output=Mem(),
-        )
-    )
+        ),
+    ]

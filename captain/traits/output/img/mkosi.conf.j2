@@ -1,0 +1,11 @@
+[Output]
+Format=disk
+# Otherwise repart may pick 4K, formatting an ESP that firmware won't read on 512-byte-sector disks.
+SectorSize=512
+CompressOutput=zstd
+CompressLevel=19
+
+[Content]
+# The bootloader is set up by our own postinst (distro initrd + systemd-boot/extlinux)
+Bootable=no
+Autologin=no
