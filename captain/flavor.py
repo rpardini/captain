@@ -200,7 +200,10 @@ class Flavor:
                 continue
             mode = src.stat().st_mode & 0o7777
             if src.suffix == ".j2":
-                content = self._render(src, keep_trailing_newline=True).encode()
+                rendered = self._render(src, keep_trailing_newline=True)
+                if not rendered.strip():
+                    continue  # templates can opt out (eg. a repo file for the other distro family)
+                content = rendered.encode()
                 relative = relative.with_suffix("")
             else:
                 content = src.read_bytes()
