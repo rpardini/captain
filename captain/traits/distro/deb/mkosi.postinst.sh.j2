@@ -1,0 +1,7 @@
+#!/bin/bash
+# Debian-family post-install: runs outside the image chroot; use 'mkosi-chroot'.
+set -euo pipefail
+
+# Ensure CA certificate bundle is generated.
+log info "Generating fresh CA certificate bundle..."
+mkosi-chroot update-ca-certificates --fresh

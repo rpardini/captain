@@ -75,7 +75,9 @@ uv run captain shell --help
 
 ## Flavors
 
-Available flavors are discovered dynamically from `captain/flavors/`. Here is a current list:
+Flavors are listed in the registry `captain/flavors.py`. Each one is composed of one trait per axis — distro, platform
+(firmware interface + kernel), role and output — from `captain/traits/`; each trait contributes packages, hooks and
+mkosi drop-in content (see `captain/traits/__init__.py`). Here is a current list:
 
 | Flavor                     | Architectures    | ISO | Description                                                                                                           |
 |----------------------------|------------------|-----|-----------------------------------------------------------------------------------------------------------------------|
@@ -104,7 +106,7 @@ defaults to `--tools-mode docker`). Use `--help` on each command for current def
 
 ## Customization via `custom/`
 
-The `custom/` directory is mounted automatically in docker-mode runs and applied by Debian-based flavors.
+The `custom/` directory is mounted automatically in docker-mode runs and applied to every flavor, as the last mkosi drop-in.
 
 - `custom/packages.txt`: one package per line (comments allowed)
 - `custom/files/`: copied into the image (mapped under `mkosi.extra/`)
@@ -178,7 +180,9 @@ Exit QEMU with `Ctrl-a x` (that's `Ctrl` + `a`, release, then press `x`).
 |- build.py
 |- captain/
 |  |- cli/                    # click CLI groups/commands
-|  |- flavors/                # flavor definitions and mkosi overlays
+|  |- traits/                 # flavor building blocks (distro/platform/role/output) and their mkosi content
+|  |- flavor.py               # flavor composition and mkosi.generated/ rendering
+|  |- flavors.py              # the flavor registry
 |  |- oci/                    # OCI publish/pull/tag logic
 |  |- artifacts.py            # copy outputs into out/
 |  |- docker.py               # builder image + docker relaunch helpers
