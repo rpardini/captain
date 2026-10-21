@@ -88,6 +88,8 @@ mkosi drop-in content (see `captain/traits/__init__.py`). Here is a current list
 | `trixie-rockchip64`        | `arm64`          | no  | For Rockchip boards (rk35xx, rk33xx, etc) using Armbian's _mainline_ rockchip64 kernel                                |
 | `trixie-rockchip64-vendor` | `arm64`          | no  | For Rockchip boards (rk35xx) using the Rockchip vendor kernel from Armbian. Prefer the non-vendor flavor if possible. |
 | `trixie-genio`             | `arm64`          | no  | For MediaTek Genioboards, using Armbian's genio kernel                                                                |
+| `resolute-full`            | `amd64`, `arm64` | yes | Ubuntu 26.04 Resolute, standard Ubuntu linux-image-generic kernel (no linux-firmware), working `apt`                  |
+| `resolute-rockchip64`      | `arm64`          | no  | Ubuntu 26.04 Resolute for Rockchip boards, using Armbian's _mainline_ rockchip64 kernel                               |
 | `rockylinux10-full`        | `amd64`, `arm64` | yes | Rocky Linux 10 (+EPEL), standard Rocky kernel, working `dnf`. amd64 requires x86-64-v3 (Haswell or newer) CPUs        |
 
 Use `--flavor-id` (or environment `FLAVOR_ID`) to select one.
