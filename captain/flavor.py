@@ -32,8 +32,9 @@ BASH_HEADER = TRAITS_DIR / "core" / "bash.header.sh"
 
 @dataclass
 class _GeneratedFile:
-    content: bytes
+    content: bytes  # for symlinks, the link target
     mode: int
+    symlink: bool = False
 
 
 @dataclass
@@ -165,6 +166,9 @@ class Flavor:
         for relative_path, generated in files.items():
             target = out / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
+            if generated.symlink:
+                target.symlink_to(generated.content.decode())
+                continue
             target.write_bytes(generated.content)
             target.chmod(generated.mode)
 
@@ -186,9 +190,14 @@ class Flavor:
         if not src_dir.is_dir():
             return
         for src in sorted(src_dir.rglob("*")):
+            relative = src.relative_to(src_dir)
+            if src.is_symlink():
+                # eg units masked via /dev/null, or default.target -> multi-user.target
+                link = str(src.readlink()).encode()
+                files[f"{dest_prefix}/{relative}"] = _GeneratedFile(link, 0o777, symlink=True)
+                continue
             if not src.is_file():
                 continue
-            relative = src.relative_to(src_dir)
             mode = src.stat().st_mode & 0o7777
             if src.suffix == ".j2":
                 content = self._render(src, keep_trailing_newline=True).encode()
