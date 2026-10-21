@@ -85,7 +85,9 @@ class RpmFamily(Distro):
     kernel_dtb_glob = "usr/lib/modules/*/dtb"
     package_map: ClassVar[dict[str, str | None]] = {
         "apt": "dnf",
+        "conntrack": "conntrack-tools",
         "dmsetup": "device-mapper",
+        "ebtables": None,  # gone in EL10; iptables-nft covers kubeadm's needs
         "iproute2": "iproute",
         "iptables": "iptables-nft",
         "iputils-ping": "iputils",
