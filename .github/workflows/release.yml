@@ -16,6 +16,17 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      # The release pulls every flavor's artifacts (~10G) onto one runner: make room first.
+      # Only on GitHub-hosted runners; never touch a self-hosted runner's toolchains.
+      - name: Free disk space (GitHub-hosted runners only)
+        if: runner.environment == 'github-hosted'
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/local/share/powershell /usr/local/share/chromium
+          sudo docker image prune --all --force > /dev/null
+          df -h /
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
