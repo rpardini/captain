@@ -6,13 +6,14 @@ Existing IDs (e.g. ``trixie-full``) are implicitly in-memory + tink-agent.
 from __future__ import annotations
 
 from captain.flavor import Flavor
-from captain.traits.distro import Debian, Rocky
+from captain.traits.distro import Debian, Rocky, Ubuntu
 from captain.traits.output import Mem
 from captain.traits.platform import AcpiCaptainKernel, AcpiDistroKernel, Armbian
 from captain.traits.platform.rpi import ArmbianRpi
 from captain.traits.role import Tink
 
 TRIXIE = Debian("trixie")
+RESOLUTE = Ubuntu("resolute")
 ROCKY10 = Rocky("10")
 
 FLAVORS: list[Flavor] = [
@@ -85,6 +86,24 @@ FLAVORS: list[Flavor] = [
         description="Rocky Linux 10 (+EPEL) with the standard Rocky kernel",
         distro=ROCKY10,
         platform=AcpiDistroKernel(),
+        role=Tink(),
+        output=Mem(),
+    ),
+    Flavor(
+        id="resolute-full",
+        name="Resolute Full",
+        description="Ubuntu 26.04 Resolute with the standard linux-image-generic Ubuntu kernel",
+        distro=RESOLUTE,
+        platform=AcpiDistroKernel(),
+        role=Tink(),
+        output=Mem(),
+    ),
+    Flavor(
+        id="resolute-rockchip64",
+        name="Resolute for Rockchip 64-bit ARM machines",
+        description="Ubuntu 26.04 Resolute with Armbian's rockchip64-edge kernel",
+        distro=RESOLUTE,
+        platform=Armbian("linux-image-edge-rockchip64"),
         role=Tink(),
         output=Mem(),
     ),
