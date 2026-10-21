@@ -123,6 +123,9 @@ apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends debhelper libdw-
 
 # For mkosi using Content.PackageDirectories (creating local repo)
 apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends apt-utils
+
+# For mkosi building RPM-based distros (Rocky Linux)
+apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends dnf rpm distribution-gpg-keys
 EXTRA_FRAG
 
 RUN <<-CONFIG_FRAG

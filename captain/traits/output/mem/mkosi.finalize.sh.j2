@@ -83,10 +83,7 @@ fi
 log info "Listing 20 biggest remaining kernel modules du: ${MODDIR}"
 du -h -x -d 5 "$MODDIR" | sort -h | tail -n20 || true
 
-log info "Removing /boot from the image to save space"
-rm -rf "${BUILDROOT:?}"/boot
-
-DTB_SRC_DIR=$(echo -n "${BUILDROOT}"/usr/lib/linux-image-*)
+DTB_SRC_DIR=$(echo -n "${BUILDROOT}"/{{ flavor.distro.kernel_dtb_glob }})
 if [[ -d "$DTB_SRC_DIR" ]]; then
 	log info "Exporting kernel DTBs; DTB_DIR: ${DTB_SRC_DIR}"
 	mkdir -pv "${BUILDROOT}/root/dtb"
@@ -99,6 +96,9 @@ if [[ -d "$DTB_SRC_DIR" ]]; then
 else
 	log info "No DTB source directory found at ${DTB_SRC_DIR}; skipping DTB export"
 fi
+
+log info "Removing /boot from the image to save space"
+rm -rf "${BUILDROOT:?}"/boot
 
 log info "Final contents of root filesystem (up to depth 4, top 30):"
 du -h -x -d 4 "$BUILDROOT" | sort -h | tail -n30 || true
