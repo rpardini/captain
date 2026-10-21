@@ -19,6 +19,7 @@ ROCKY10 = Rocky("10")
 FLAVORS: list[Flavor] = [
     Flavor(
         id="trixie-full",
+        release_tag_suffix="",
         name="Trixie Full",
         description="Debian Trixie based with linux-image-generic standard Debian kernel",
         distro=TRIXIE,
@@ -28,6 +29,7 @@ FLAVORS: list[Flavor] = [
     ),
     Flavor(
         id="trixie-slim",
+        release_tag_suffix="-slim",
         name="Trixie Slim",
         description="Debian Trixie based with captainos slim kernel",
         distro=TRIXIE,
@@ -37,6 +39,7 @@ FLAVORS: list[Flavor] = [
     ),
     Flavor(
         id="trixie-armbian-rpi",
+        release_tag_suffix="-rpi",
         name="Trixie for Raspberry Pi - Armbian bcm2711-current Kernel",
         description="Debian Trixie based on Armbian's bcm2711-current kernel",
         distro=TRIXIE,
@@ -46,6 +49,7 @@ FLAVORS: list[Flavor] = [
     ),
     Flavor(
         id="trixie-genio",
+        release_tag_suffix="-genio",
         name="Trixie for Mediatek Genio 64-bit ARM machines",
         description="Debian Trixie with Armbian's genio-edge kernel",
         distro=TRIXIE,
@@ -55,6 +59,7 @@ FLAVORS: list[Flavor] = [
     ),
     Flavor(
         id="trixie-meson64",
+        release_tag_suffix="-meson64",
         name="Trixie for Meson (Amlogic) 64-bit ARM machines",
         description="Debian Trixie based with Armbian's meson64-edge kernel",
         distro=TRIXIE,
@@ -64,6 +69,7 @@ FLAVORS: list[Flavor] = [
     ),
     Flavor(
         id="trixie-rockchip64",
+        release_tag_suffix="-rockchip64",
         name="Trixie for Rockchip 64-bit ARM machines",
         description="Debian Trixie based with Armbian's rockchip64-edge kernel",
         distro=TRIXIE,
@@ -73,6 +79,7 @@ FLAVORS: list[Flavor] = [
     ),
     Flavor(
         id="trixie-rockchip64-vendor",
+        release_tag_suffix="-rockchip64-vendor",
         name="Trixie for Rockchip 64-bit ARM machines - Rockchip Vendor Kernel",
         description="Debian Trixie based with Armbian's rk35xx-vendor kernel",
         distro=TRIXIE,

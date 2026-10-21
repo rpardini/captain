@@ -26,6 +26,9 @@ jobs:
     outputs:
       kernel_version: ${{ steps.versions.outputs.kernel_version }}
       armbian_version: ${{ steps.versions.outputs.armbian_version }}
+      matrix_with_kernel: ${{ steps.flavors.outputs.matrix_with_kernel }}
+      matrix: ${{ steps.flavors.outputs.matrix }}
+      matrix_combined: ${{ steps.flavors.outputs.matrix_combined }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -42,6 +45,12 @@ jobs:
       - name: Resolve dynamic version tokens
         id: versions
         run: uv run captain prepare-versions >> "$GITHUB_OUTPUT"
+
+      - name: Build matrices from the flavor registry (captain/flavors.py)
+        id: flavors
+        run: |
+          uv run captain list-flavors
+          uv run captain list-flavors --github-output >> "$GITHUB_OUTPUT"
 
   # -------------------------------------------------------------------
   # Download tools (containerd, runc, nerdctl, CNI plugins)
@@ -188,10 +197,7 @@ jobs:
     needs: [ prepare, download-tools, build-dockerfile, build-captainos-kernel ]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { arch: amd64, output_arch: x86_64, captainos_kernel: true, iso: true, FLAVOR_ID: "trixie-slim" }
-          - { arch: arm64, output_arch: aarch64, captainos_kernel: true, iso: true, FLAVOR_ID: "trixie-slim" }
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix_with_kernel) }}
     env: &build_env
       ARCH: ${{ matrix.arch }}
       MKOSI_MODE: docker
@@ -232,7 +238,9 @@ jobs:
         id: initramfs-cache
         uses: actions/cache/restore@v5
         with:
-          path: mkosi.output/initramfs
+          path: |
+            mkosi.output/initramfs
+            mkosi.output/image
           key: initramfs-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--k${{ needs.prepare.outputs.kernel_version }}-a${{ needs.prepare.outputs.armbian_version }}--${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
           # any "previous" cache can also be useful; we'll just churn cache misses more often, but that's better than a complete cache miss and rebuild every time
           restore-keys: initramfs-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--
@@ -240,7 +248,7 @@ jobs:
       - name: Show initramfs cache restore SHA256's
         run: |
           echo "initramfs cache hit: ${{ steps.initramfs-cache.outputs.cache-hit }}"
-          sha256sum $(find mkosi.output/initramfs -type f || true) || true
+          sha256sum $(find mkosi.output/initramfs mkosi.output/image -type f 2>/dev/null || true) || true
 
       - name: Restore iso cache
         id: iso-cache
@@ -267,13 +275,15 @@ jobs:
       - name: Show initramfs cache save SHA256's
         run: |
           echo "initramfs cache hit: ${{ steps.initramfs-cache.outputs.cache-hit }}"
-          sha256sum $(find mkosi.output/initramfs -type f || true) || true
+          sha256sum $(find mkosi.output/initramfs mkosi.output/image -type f 2>/dev/null || true) || true
 
       - name: Save initramfs cache
         if: github.ref == 'refs/heads/main' && steps.initramfs-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
-          path: mkosi.output/initramfs
+          path: |
+            mkosi.output/initramfs
+            mkosi.output/image
           key: initramfs-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--k${{ needs.prepare.outputs.kernel_version }}-a${{ needs.prepare.outputs.armbian_version }}--${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
 
       - name: Show iso cache save SHA256's
@@ -339,15 +349,7 @@ jobs:
     needs: [ prepare, download-tools, build-dockerfile ]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { arch: amd64, output_arch: x86_64, captainos_kernel: false, iso: true, FLAVOR_ID: "trixie-full" }
-          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: true, FLAVOR_ID: "trixie-full" }
-          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-rockchip64" }
-          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-rockchip64-vendor" }
-          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-genio" }
-          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-meson64" }
-          - { arch: arm64, output_arch: aarch64, captainos_kernel: false, iso: false, FLAVOR_ID: "trixie-armbian-rpi" }
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
 
   # -------------------------------------------------------------------
   # Publish combined multi-arch image (reuses per-arch registry blobs)
@@ -356,10 +358,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { combined_flavor: "trixie-full" }
-          - { combined_flavor: "trixie-slim" }
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix_combined) }}
     name: "publish-combined ${{ matrix.combined_flavor }}"
     runs-on: ubuntu-latest
     needs: [ build-captainos, build-captainos-with-kernel ] # depend on all flavors being built
@@ -381,6 +380,7 @@ jobs:
           path: out
 
       - name: Download ISO artifact (amd64)
+        if: ${{ matrix.iso }}
         uses: actions/download-artifact@v8
         with:
           name: iso-${{ matrix.combined_flavor }}-amd64
@@ -393,6 +393,7 @@ jobs:
           path: out
 
       - name: Download ISO artifact (arm64)
+        if: ${{ matrix.iso }}
         uses: actions/download-artifact@v8
         with:
           name: iso-${{ matrix.combined_flavor }}-arm64
