@@ -43,6 +43,8 @@ class Config:
     arch: str = "amd64"
     flavor_id: str = DEFAULT_FLAVOR_ID
     flavor_hash: str | None = None  # resolved at runtime
+    # What mkosi produces for the flavor ("initramfs" or "image"); set by the flavor's output trait.
+    output_kind: str = "initramfs"
 
     # For kernel build
     build_kernel: bool = False
@@ -142,9 +144,9 @@ class Config:
 
     @property
     def initramfs_output(self) -> Path:
-        """Per-version, per-arch directory for mkosi initramfs output."""
+        """Per-version, per-arch directory for mkosi output (initramfs or disk image)."""
         base_dir: Path = self.project_dir
-        return self.calc_initramfs_output(base_dir, "initramfs")
+        return self.calc_initramfs_output(base_dir, self.output_kind)
 
     @property
     def iso_output(self) -> Path:

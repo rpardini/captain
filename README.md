@@ -91,10 +91,22 @@ mkosi drop-in content (see `captain/traits/__init__.py`). Here is a current list
 | `resolute-full`            | `amd64`, `arm64` | yes | Ubuntu 26.04 Resolute, standard Ubuntu linux-image-generic kernel (no linux-firmware), working `apt`                  |
 | `resolute-rockchip64`      | `arm64`          | no  | Ubuntu 26.04 Resolute for Rockchip boards, using Armbian's _mainline_ rockchip64 kernel                               |
 | `rockylinux10-full`        | `amd64`, `arm64` | yes | Rocky Linux 10 (+EPEL), standard Rocky kernel, working `dnf`. amd64 requires x86-64-v3 (Haswell or newer) CPUs        |
+| `img-k8s-capt-<base>`      | as `<base>`      | no  | Kubernetes node **disk image** for CAPT (as below, plus ssh, root locked, users via cloud-init); same bases           |
 | `mem-k8s-capt-<base>`      | as `<base>`      | as  | In-memory Kubernetes node for CAPT (kubeadm/kubelet/kubectl, containerd CRI, cloud-init for Hegel); bases: `trixie-full`, `resolute-full`, `rockylinux10-full`, `trixie-rockchip64` |
 
 The flavors above without a prefix run tink-agent from memory. `mem-k8s-capt-*` flavors install Kubernetes from
 pkgs.k8s.io; pick the minor with `--kubernetes-version` (or environment `KUBERNETES_VERSION`, default `1.36`).
+
+`img-*` flavors produce a raw GPT disk image (`out/captainos-<flavor-id>-<arch>.img.zst`) for final deployment
+(eg. Tinkerbell's `image2disk`/`oci2disk`), booting with the distro's own initrd and `root=PARTLABEL=root`:
+
+- UEFI/ACPI bases: ESP with systemd-boot (removable-media path) and one BLS entry.
+- DeviceTree (Armbian) bases: a single root partition with `/boot/extlinux/extlinux.conf` for U-Boot, which is assumed
+  to live on the board's SPI/eMMC boot partitions.
+
+cloud-init grows the root partition on first boot. `captain qemu` boots `img-*` flavors from a scratch copy of the
+image grown to `--disk-size`, seeding cloud-init over NoCloud (via SMBIOS) with a `captain` user holding `--ssh-key`;
+then `ssh -p 2222 captain@localhost`.
 
 Use `--flavor-id` (or environment `FLAVOR_ID`) to select one.
 
@@ -130,6 +142,7 @@ Final artifacts are copied to `out/` with flavor-aware names:
 - `out/initramfs-<flavor-id>-<arch>`
 - `out/captainos-<flavor-id>-<arch>.iso` (only for ISO-capable flavors)
 - `out/dtb-<flavor-id>-<arch>/` (directory, arm64 flavors that export DTBs)
+- `out/captainos-<flavor-id>-<arch>.img.zst` (disk image, `img-*` flavors only; instead of the above)
 
 `<arch>` uses Linux output architecture names (`x86_64`, `aarch64`).
 

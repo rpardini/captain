@@ -46,6 +46,12 @@ class Distro(Trait):
         """
         raise NotImplementedError
 
+    # The distro's default initramfs generator, for disk images: "initramfs-tools" or "dracut".
+    initramfs_generator: ClassVar[str] = "dracut"
+
+    def default_initramfs_packages(self) -> set[str]:
+        return {self.initramfs_generator}
+
 
 class DebFamily(Distro):
     family = "deb"
@@ -59,6 +65,7 @@ class DebFamily(Distro):
 class Debian(DebFamily):
     mkosi_distribution = "debian"
     os_release_id_like = "debian"
+    initramfs_generator = "initramfs-tools"
 
     def generic_kernel_packages(self) -> set[str]:
         return {"linux-image-generic"}
@@ -85,6 +92,8 @@ class RpmFamily(Distro):
     kernel_dtb_glob = "usr/lib/modules/*/dtb"
     package_map: ClassVar[dict[str, str | None]] = {
         "apt": "dnf",
+        "cloud-guest-utils": "cloud-utils-growpart",
+        "systemd-boot-efi": "systemd-boot-unsigned",
         "conntrack": "conntrack-tools",
         "dmsetup": "device-mapper",
         "ebtables": None,  # gone in EL10; iptables-nft covers kubeadm's needs

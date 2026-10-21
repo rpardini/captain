@@ -64,6 +64,16 @@ Relative paths in a drop-in directory's config are resolved against that drop-in
 
 The user's `custom/` directory is always the last drop-in (`90-custom`).
 
+### Outputs
+
+- **`Mem`** (in-memory): `Format=cpio`; a custom `/init` switch_roots from rootfs to a tmpfs; the kernel's
+  initramfs-generator dependency is satisfied as cheaply as possible (tiny-initramfs on Debian/Ubuntu).
+- **`Img`** (disk image): `Format=disk` with our own `mkosi.repart/` definitions and `Bootable=no`: the img postinst
+  generates the initrd with the distro's own generator (initramfs-tools on Debian, dracut on Ubuntu/Rocky,
+  `--no-hostonly` as it runs in a container) and sets up either systemd-boot + a BLS entry in the ESP (`uefi` platforms)
+  or `/boot/extlinux/extlinux.conf` (`extlinux` platforms). `SectorSize=512` is pinned: repart otherwise may format the
+  ESP with 4K sectors, which UEFI firmware won't read on 512-byte-sector disks.
+
 ## Consequences
 
 - Adding a flavor is one registry entry; adding a distro, platform, role or output is one trait.
