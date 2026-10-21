@@ -108,7 +108,9 @@ cloud-init grows the root partition on first boot. `captain qemu` boots `img-*` 
 image grown to `--disk-size`, seeding cloud-init over NoCloud (via SMBIOS) with a `captain` user holding `--ssh-key`;
 then `ssh -p 2222 captain@localhost`.
 
-Use `--flavor-id` (or environment `FLAVOR_ID`) to select one.
+Use `--flavor-id` (or environment `FLAVOR_ID`) to select one. `uv run captain list-flavors` prints the registry; CI
+builds every registered flavor (matrices come from `captain list-flavors --github-output`), and releases tag each one
+as `<tag><suffix>` (see `release_tag_suffix` in `captain/flavors.py`).
 
 ## Build modes
 
