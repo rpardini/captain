@@ -128,4 +128,6 @@ class Rocky(RpmFamily):
         return super().packages(flavor) | {"rocky-release", "epel-release"}
 
     def generic_kernel_packages(self) -> set[str]:
-        return {"kernel"}
+        # EL10 moved nft_compat and the xt_* matches/targets to kernel-modules-extra;
+        # CNI's iptables(-nft) rules need them, as does kube-proxy.
+        return {"kernel", "kernel-modules-extra"}
