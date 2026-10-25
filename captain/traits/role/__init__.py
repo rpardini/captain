@@ -41,6 +41,8 @@ class Kubernetes(Role):
             "kubectl",
             "cri-tools",
             "cloud-init",
+            # cloud-init runs lsb_release on deb distros; resolute's cloud-init doesn't pull it in
+            "lsb-release",
             # kubeadm preflight requirements
             "conntrack",
             "socat",

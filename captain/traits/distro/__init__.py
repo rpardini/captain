@@ -101,6 +101,7 @@ class RpmFamily(Distro):
         "iptables": "iptables-nft",
         "iputils-ping": "iputils",
         "login": None,  # in util-linux
+        "lsb-release": None,  # redhat-lsb is gone in EL10; cloud-init reads os-release there
         "polkitd": "polkit",
         "procps": "procps-ng",
         "systemd-sysv": None,  # in systemd
