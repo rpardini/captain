@@ -19,6 +19,11 @@ class Tink(Role):
 
     content = "role/tink"
 
+    def packages(self, flavor: Flavor) -> set[str]:
+        # tink-agent-setup unpacks the image with tar (-z for OCI blobs);
+        # Essential on Debian, not on Rocky.
+        return {"tar", "gzip"}
+
 
 class Kubernetes(Role):
     """Kubernetes node: kubeadm/kubelet/kubectl from pkgs.k8s.io, containerd (CRI), cloud-init."""
