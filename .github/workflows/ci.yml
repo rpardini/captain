@@ -180,7 +180,8 @@ jobs:
         with:
           path: |
             mkosi.input/kernel/${{ matrix.arch }}
-          key: kernel-${{ matrix.arch }}-${{ needs.prepare.outputs.kernel_version }}-${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+          # the restore step's key: hashFiles() here would also hash the .venv/ uv just created
+          key: ${{ steps.kernel-cache.outputs.cache-primary-key }}
 
       - name: Upload kernel artifacts
         uses: actions/upload-artifact@v6
@@ -284,7 +285,7 @@ jobs:
           path: |
             mkosi.output/initramfs
             mkosi.output/image
-          key: initramfs-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--k${{ needs.prepare.outputs.kernel_version }}-a${{ needs.prepare.outputs.armbian_version }}--${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+          key: ${{ steps.initramfs-cache.outputs.cache-primary-key }}
 
       - name: Show iso cache save SHA256's
         if: ${{ matrix.iso }} # only if matrix entry had iso: true
@@ -297,7 +298,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: mkosi.output/iso
-          key: iso-${{ matrix.arch }}-${{matrix.FLAVOR_ID}}--k${{ needs.prepare.outputs.kernel_version }}-a${{ needs.prepare.outputs.armbian_version }}--${{ hashFiles('**/*.py', 'kernel.configs/*', 'Dockerfile', 'pyproject.toml') }}
+          key: ${{ steps.iso-cache.outputs.cache-primary-key }}
 
       - name: Upload initramfs artifacts
         uses: actions/upload-artifact@v6
