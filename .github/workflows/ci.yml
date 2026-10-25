@@ -237,6 +237,7 @@ jobs:
 
       - name: Restore initramfs cache
         id: initramfs-cache
+        if: ${{ matrix.cache }} # only if matrix entry had cache: true (flavor's ci_cache)
         uses: actions/cache/restore@v5
         with:
           path: |
@@ -253,7 +254,7 @@ jobs:
 
       - name: Restore iso cache
         id: iso-cache
-        if: ${{ matrix.iso }} # only if matrix entry had iso: true
+        if: ${{ matrix.iso && matrix.cache }} # only if matrix entry had iso: true and cache: true
         uses: actions/cache/restore@v5
         with:
           path: mkosi.output/iso
@@ -279,7 +280,7 @@ jobs:
           sha256sum $(find mkosi.output/initramfs mkosi.output/image -type f 2>/dev/null || true) || true
 
       - name: Save initramfs cache
-        if: github.ref == 'refs/heads/main' && steps.initramfs-cache.outputs.cache-hit != 'true'
+        if: matrix.cache && github.ref == 'refs/heads/main' && steps.initramfs-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: |
@@ -294,7 +295,7 @@ jobs:
           sha256sum $(find mkosi.output/iso -type f || true) || true
 
       - name: Save iso cache
-        if: matrix.iso && github.ref == 'refs/heads/main' && steps.iso-cache.outputs.cache-hit != 'true'
+        if: matrix.iso && matrix.cache && github.ref == 'refs/heads/main' && steps.iso-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: mkosi.output/iso

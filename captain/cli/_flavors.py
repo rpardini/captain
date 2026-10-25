@@ -36,6 +36,7 @@ def _matrix_entries(flavor: Flavor) -> list[dict[str, str | bool]]:
             "output_arch": get_arch_info(arch).output_arch,
             "captainos_kernel": isinstance(flavor.platform, AcpiCaptainKernel),
             "iso": flavor.has_iso(),
+            "cache": flavor.ci_cache,
             "FLAVOR_ID": flavor.id,
         }
         for arch in sorted(flavor.supported_architectures)
@@ -79,6 +80,7 @@ def list_flavors_cmd(as_json: bool, github_output: bool, release: bool) -> None:
                 "output": f.output.name,
                 "iso": f.has_iso(),
                 "combined": _is_combined(f),
+                "ci_cache": f.ci_cache,
                 "tag_suffix": f.tag_suffix,
             }
             click.echo(json.dumps(entry))

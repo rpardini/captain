@@ -26,6 +26,7 @@ FLAVORS: list[Flavor] = [
         platform=AcpiDistroKernel(),
         role=Tink(),
         output=Mem(),
+        ci_cache=True,
     ),
     Flavor(
         id="trixie-slim",
@@ -36,6 +37,7 @@ FLAVORS: list[Flavor] = [
         platform=AcpiCaptainKernel(),
         role=Tink(),
         output=Mem(),
+        ci_cache=True,
     ),
     Flavor(
         id="trixie-armbian-rpi",
@@ -76,6 +78,7 @@ FLAVORS: list[Flavor] = [
         platform=Armbian("linux-image-edge-rockchip64"),
         role=Tink(),
         output=Mem(),
+        ci_cache=True,
     ),
     Flavor(
         id="trixie-rockchip64-vendor",
