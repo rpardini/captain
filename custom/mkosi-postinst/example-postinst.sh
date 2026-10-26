@@ -2,32 +2,40 @@ log warn "Example custom post-install script (custom/mkosi-postinst/example-post
 # Runs *outside* the image chroot after packages are installed.
 # The target filesystem is at /buildroot; use 'mkosi-chroot' to run commands inside the chroot environment.
 
-declare -i ENABLE_EXAMPLE_CONTAINERD_MIRRORS=0 # flip to 1 to enable
+declare -i ENABLE_EXAMPLE_CONTAINERD_MIRRORS=1 # flip to 0 to disable
 declare -i ENABLE_EXAMPLE_CA_CERTS=0           # flip to 1 to enable
 
 ### Example: configure containerd registry mirrors for a few common registries.
 # Each target registry is a directory under /etc/containerd/certs.d with a hosts.toml file.
 # You could also do this with individual files and directories in custom/files/ dir.
+# The mirror is a zot pull-through cache (plain HTTP, anonymous), serving each upstream under /v2/<registry>.
+# The upstream stays as 'server', so pulls fall back to it if the mirror is down.
 
 if [[ ${ENABLE_EXAMPLE_CONTAINERD_MIRRORS} -gt 0 ]]; then
 
-    declare -A registry_mirrors=(
-        ["docker.io"]="http://harbor.app.192.168.66.171.nip.io/v2/docker.io"
-        ["quay.io"]="http://harbor.app.192.168.66.171.nip.io/v2/quay.io"
-        ["ghcr.io"]="http://harbor.app.192.168.66.171.nip.io/v2/ghcr.io"
-        ["registry.k8s.io"]="http://harbor.app.192.168.66.171.nip.io/v2/registry.k8s.io"
+    mirror_base="http://192.168.76.110/v2"
+    declare -A registry_upstreams=(
+        ["docker.io"]="https://registry-1.docker.io"
+        ["ghcr.io"]="https://ghcr.io"
+        ["quay.io"]="https://quay.io"
+        ["registry.k8s.io"]="https://registry.k8s.io"
+        ["gcr.io"]="https://gcr.io"
+        ["public.ecr.aws"]="https://public.ecr.aws"
+        ["codeberg.org"]="https://codeberg.org"
+        ["lscr.io"]="https://lscr.io"
     )
 
     log info "Configuring containerd registry mirrors..."
     mkdir -pv "${BUILDROOT}/etc/containerd/certs.d"
 
-    for registry in "${!registry_mirrors[@]}"; do
-        mirror="${registry_mirrors[$registry]}"
-        log info "Configuring mirror for registry '$registry' pointing to target '$mirror'"
+    for registry in "${!registry_upstreams[@]}"; do
+        upstream="${registry_upstreams[$registry]}"
+        mirror="${mirror_base}/${registry}"
+        log info "Configuring mirror for registry '$registry' pointing to target '$mirror' (fallback '$upstream')"
         mkdir -pv "${BUILDROOT}/etc/containerd/certs.d/${registry}"
 
         cat <<- ONE_HOSTS_TOML > "${BUILDROOT}/etc/containerd/certs.d/${registry}/hosts.toml"
-server = "${mirror}"
+server = "${upstream}"
 [host."${mirror}"]
 capabilities = ["pull", "resolve"]
 override_path = true
