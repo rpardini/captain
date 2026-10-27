@@ -65,7 +65,7 @@ Stumbling blocks hit while building the trait-based flavors (Rocky, Ubuntu, k8s 
 - kubeadm preflight (`SystemVerification`) needs the kernel config: the mem output deletes `/boot`, and disk images
   with an ESP lose it too. Keep it as `/usr/lib/modules/<kver>/config` (Rocky ships it there natively).
 - pkgs.k8s.io uses the same signing key for every minor and for deb/rpm; apt accepts an armored `.asc` in `signed-by`.
-- cloud-init's Ec2 datasource waits **240s** for metadata by default: boot stalls where there's no Hegel. Cap
+- cloud-init's Ec2 datasource waits **240s** for metadata by default: boot stalls where there's no Tootles. Cap
   `max_wait`/`timeout`.
 - ds-identify may disable cloud-init on non-AWS hardware: `policy: enabled` in `/etc/cloud/ds-identify.cfg`.
 - kubelet shows `activating` (crash-looping) until `kubeadm init/join` writes its config: expected.

@@ -15,7 +15,7 @@ Compared against: CAPT `image-builder/` at `a8b0891`, plus the workflow template
 - kubelet / kubeadm / kubectl / crictl, containerd + runc with `SystemdCgroup = true`, CNI plugins in `/opt/cni/bin`
 - `overlay` + `br_netfilter` modules; `bridge-nf-call-ip{,6}tables` and `ip_forward` sysctls; no swap
 - kubeadm preflight packages (`conntrack`, `socat`, `ethtool`, `iptables`; `ebtables` except on EL10)
-- cloud-init with an EC2 datasource for Hegel (`strict_id: false`), `ds-identify` not disabling it
+- cloud-init with an EC2 datasource for Tootles (`strict_id: false`), `ds-identify` not disabling it
 - `openssh-server`, `sudo`, growpart (`cloud-guest-utils`); host keys removed at build; fresh machine-id on first boot
 - containerd, kubelet, cloud-init and ssh enabled; kubelet crash-loops until `kubeadm init/join` (expected)
 - Built with mkosi in a Debian trixie container, per arch on native runners
@@ -94,7 +94,7 @@ Ordered by impact on actually replacing CAPT's builder.
 
 - Captain images include CaptainOS's catch-all `80-dhcp.network` (DHCP on every ethernet) and
   `captainos-static-network` (driven by `ipam=` on the kernel command line).
-- On a deployed node, cloud-init renders network config from Hegel metadata (bonds, VLANs, static addresses), and the
+- On a deployed node, cloud-init renders network config from Tootles metadata (bonds, VLANs, static addresses), and the
   two may conflict. CAPT's Ubuntu leaves networking to cloud-init + netplan.
 - Which cloud-init network renderer is chosen on Debian trixie / Rocky (networkd, or none) needs checking.
 
