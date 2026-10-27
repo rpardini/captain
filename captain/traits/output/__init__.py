@@ -25,6 +25,8 @@ class Output(Trait):
     output_kind: ClassVar[str]
     # The main file mkosi produces, for idempotency checks.
     mkosi_image_name: ClassVar[str]
+    # For humans: banner, motd, /etc/issue and /etc/os-release.
+    label: ClassVar[str]
 
     def kernel_initramfs_packages(self, flavor: Flavor) -> set[str]:
         """Packages providing the kernel's initramfs generator, for this output."""
@@ -42,6 +44,7 @@ class Mem(Output):
     supports_iso = True
     output_kind = "initramfs"
     mkosi_image_name = "image.cpio.zst"
+    label = "in-memory"
 
     def collect_artifacts(self, flavor: Flavor) -> None:
         collect_initramfs(flavor.cfg)
@@ -92,6 +95,7 @@ class Img(Output):
     content = "output/img"
     output_kind = "image"
     mkosi_image_name = "image.raw.zst"
+    label = "disk image"
 
     def kernel_initramfs_packages(self, flavor: Flavor) -> set[str]:
         return flavor.distro.default_initramfs_packages()

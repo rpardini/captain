@@ -39,3 +39,27 @@ for kconfig in "${BUILDROOT}"/boot/config-*; do
 		cp -v "${kconfig}" "${BUILDROOT}/usr/lib/modules/${kver}/config"
 	fi
 done
+
+# Our own /etc/os-release, on top of the distro's: ID, VERSION_ID etc. stay, so cloud-init, dnf, ansible...
+# still see the real distro; NAME/PRETTY_NAME/VARIANT/IMAGE_ID say what this actually is.
+# BUILD_ID is written here, not rendered, so it doesn't change the flavor hash.
+log info "Writing CaptainOS /etc/os-release..."
+distro_os_release="${BUILDROOT}/usr/lib/os-release"
+[[ -f "${distro_os_release}" ]] || distro_os_release="${BUILDROOT}/etc/os-release"
+distro_pretty_name="$(. "${distro_os_release}" && echo "${PRETTY_NAME:-${NAME:-Linux}}")"
+distro_fields="$(grep -vE '^(NAME|PRETTY_NAME|VARIANT|VARIANT_ID|IMAGE_ID|IMAGE_VERSION|BUILD_ID|HOME_URL|SUPPORT_URL|BUG_REPORT_URL|DOCUMENTATION_URL|PRIVACY_POLICY_URL|LOGO)=' "${distro_os_release}")"
+rm -fv "${BUILDROOT}/etc/os-release"
+cat > "${BUILDROOT}/etc/os-release" <<-OS_RELEASE
+	NAME="CaptainOS"
+	PRETTY_NAME="CaptainOS {{ flavor.role.title }}, {{ flavor.output.label }} (${distro_pretty_name})"
+	${distro_fields}
+	VARIANT="{{ flavor.role.title }}"
+	VARIANT_ID={{ flavor.role.name }}
+	IMAGE_ID={{ flavor.id }}
+	BUILD_ID=$(date -u +%Y%m%dT%H%M%SZ)
+	CAPTAINOS_OUTPUT={{ flavor.output.output_kind }}
+	CAPTAINOS_PLATFORM={{ flavor.platform.name }}
+	HOME_URL="https://tinkerbell.org"
+	BUG_REPORT_URL="https://github.com/tinkerbell/captain/issues"
+OS_RELEASE
+cat "${BUILDROOT}/etc/os-release"

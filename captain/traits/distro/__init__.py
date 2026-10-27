@@ -19,8 +19,6 @@ class Distro(Trait):
     package_map: ClassVar[dict[str, str | None]] = {}
     # Where the distro's own kernel installs its DTBs, relative to the root (a single-match glob).
     kernel_dtb_glob: ClassVar[str]
-    # ID_LIKE= for CaptainOS' own os-release (in-memory outputs).
-    os_release_id_like: ClassVar[str]
     # Packages providing switch_root(8), when not already in util-linux.
     switch_root_packages: ClassVar[frozenset[str]] = frozenset()
 
@@ -64,7 +62,6 @@ class DebFamily(Distro):
 
 class Debian(DebFamily):
     mkosi_distribution = "debian"
-    os_release_id_like = "debian"
     initramfs_generator = "initramfs-tools"
 
     def generic_kernel_packages(self) -> set[str]:
@@ -78,7 +75,6 @@ class Ubuntu(DebFamily):
     mkosi_distribution = "ubuntu"
     kernel_dtb_glob = "usr/lib/firmware/*/device-tree"
     switch_root_packages = frozenset(["util-linux-extra"])
-    os_release_id_like = "ubuntu debian"
 
     def generic_kernel_packages(self) -> set[str]:
         # linux-image-generic depends on linux-firmware (~770M of every firmware there is);
@@ -122,7 +118,6 @@ class Rocky(RpmFamily):
 
     content = "distro/rocky"
     mkosi_distribution = "rocky"
-    os_release_id_like = "rocky rhel centos fedora"
 
     def packages(self, flavor: Flavor) -> set[str]:
         return super().packages(flavor) | {"rocky-release", "epel-release"}
