@@ -187,10 +187,10 @@ flowchart LR
 
 ### ghcr.io notes
 
-- A package created by a push starts **private**. Once the `cache/*` packages exist, make them
-  public (package settings → visibility), so that local builds and forks can read them anonymously.
-  Manifests carry `org.opencontainers.image.source`, linking each package to its repository so
-  that the repository's `GITHUB_TOKEN` can keep pushing.
+- The `cache/*` packages are created by CI pushes with `GITHUB_TOKEN`, and their manifests carry
+  `org.opencontainers.image.source`; so each package is connected to its repository and inherits
+  its visibility (public for a public repo: local builds and forks read it anonymously), and the
+  repository's `GITHUB_TOKEN` can keep pushing to it. No manual setup needed.
 - ghcr.io answers anonymous requests for missing or private packages with HTTP 403; these count as
   misses.
 - Nothing prunes old cache tags yet; clean them up from the package settings if needed.
