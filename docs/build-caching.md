@@ -187,13 +187,18 @@ flowchart LR
     tools["download-tools<br/>(if cache_push)"]
     build["build-captainos<br/>(every flavor x arch;<br/>skips building when<br/>already published)"]
     combined["publish-combined<br/>(main only; --cache-only)"]
+    release["release<br/>(forks, main only:<br/>v0.0.0-ci.run_number)"]
     prepare --> builder & tools
     prepare --> build
     tools & builder --> build
     build --> combined
+    combined --> release
 ```
 
 - The registry is the only hand-off between jobs: no `actions/cache`, no workflow artifacts.
+- In forks, each push to `main` ends with `release` (the reusable `release.yml`): a GitHub
+  prerelease `v0.0.0-ci.<run number>` with every flavor's artifacts, and matching OCI tags. It
+  pulls, packs and uploads one flavor at a time to keep the runner's disk usage bounded.
 - `download-tools` is a cache warmer (tools are used by every flavor), run only when the run may
   push; otherwise (fork PRs) each build job downloads them itself on a miss.
 - The CaptainOS kernel has no job of its own: only `trixie-slim` uses it, and its build jobs

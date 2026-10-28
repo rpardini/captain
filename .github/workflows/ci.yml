@@ -245,3 +245,21 @@ jobs:
         env:
           ARCH: amd64
         run: uv run captain release publish
+
+  # -------------------------------------------------------------------
+  # Forks only: every push to main becomes a prerelease, so consumers get
+  # a stable, monotonically increasing version to bump to. Upstream keeps
+  # releasing from manually pushed v* tags (release.yml).
+  # -------------------------------------------------------------------
+  release:
+    name: "release v0.0.0-ci.${{ github.run_number }}"
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.repository != 'tinkerbell/captain'
+    needs: [ build-captainos, publish-combined ]
+    permissions:
+      contents: write
+      packages: write
+    uses: ./.github/workflows/release.yml
+    with:
+      version: v0.0.0-ci.${{ github.run_number }}
+      sha: ${{ github.sha }}
+      prerelease: true

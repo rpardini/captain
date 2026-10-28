@@ -189,6 +189,10 @@ Notes:
 
 - Base source tag defaults to `v0.0.0-<sha7>-<flavor-id>`.
 - Per-arch publish refs append `-amd64` or `-arm64`; combined uses the bare source tag.
+- Images are published once per content (content tag `c-…`) and then tagged with the source tag; see
+  `docs/build-caching.md`. `captain release status` tells whether the current outputs are published.
+- Releases: upstream pushes `v*` tags (`.github/workflows/release.yml`). In forks, every push to `main`
+  becomes a GitHub prerelease `v0.0.0-ci.<run number>` with matching OCI tags, via the same workflow.
 - `publish` computes `sha256sums-<flavor-id>-<arch>.txt` and includes checksums as OCI layers.
 - `REGISTRY_INSECURE=1` can be used for insecure registries (propagated to buildah/skopeo wrappers).
 
