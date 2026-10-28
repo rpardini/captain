@@ -52,14 +52,15 @@ flowchart LR
 ## Image tags
 
 `<owner>` is the fork owner, lowercased. Multi-arch flavors get a multi-arch image (`linux/amd64` and
-`linux/arm64`), and per-arch ones as well; arm64-only flavors get a single tag.
+`linux/arm64`) plus per-arch ones (`-amd64`, `-arm64`); arm64-only flavors get their tag both bare and
+with `-arm64`.
 
 | Flavor | Version tag |
 |---|---|
 | `trixie-full` | `v0.0.0-ci.<n>` (and `-amd64`, `-arm64`) |
 | `trixie-slim` | `v0.0.0-ci.<n>-slim` (and `-slim-amd64`, `-slim-arm64`) |
-| `trixie-armbian-rpi` | `v0.0.0-ci.<n>-rpi` |
-| `trixie-genio`, `trixie-meson64`, `trixie-rockchip64`, `trixie-rockchip64-vendor` | `v0.0.0-ci.<n>-genio`, `-meson64`, `-rockchip64`, `-rockchip64-vendor` |
+| `trixie-armbian-rpi` | `v0.0.0-ci.<n>-rpi` (and `-rpi-arm64`) |
+| `trixie-genio`, `trixie-meson64`, `trixie-rockchip64`, `trixie-rockchip64-vendor` | `v0.0.0-ci.<n>-genio`, `-meson64`, `-rockchip64`, `-rockchip64-vendor` (each also with `-arm64`) |
 | other flavors | `v0.0.0-ci.<n>-<flavor id>` (with `-amd64` / `-arm64` for multi-arch ones) |
 
 `uv run captain list-flavors --release` prints the authoritative list (`<id> <target> <arch> <suffix>`).
@@ -81,11 +82,10 @@ and `sha256sums-<flavor>-<arch>.txt`.
         pullPolicy: IfNotPresent
   ```
 
-- **Files on disk**: for multi-arch flavors, `uv run captain --flavor-id <flavor> release --target
-  combined --src-tag v0.0.0-ci.<n><suffix> pull --pull-output <dir>` extracts both arches under
-  `out/<dir>`. (`--target amd64|arm64` appends `-<arch>` to the tag, so for arm64-only flavors, whose
-  version tag has no arch suffix, use an OCI tool instead.) Any OCI tool works, eg. `skopeo copy` or
-  `oras pull`.
+- **Files on disk**: `uv run captain --flavor-id <flavor> release --target <combined|amd64|arm64>
+  --src-tag v0.0.0-ci.<n><suffix> pull --pull-output <dir>` extracts them under `out/<dir>`
+  (`--target <arch>` appends `-<arch>` to the tag; `combined` gets both arches of a multi-arch
+  flavor). Any OCI tool works too, eg. `skopeo copy` or `oras pull`.
 
 ## Optional: GitHub Releases
 
