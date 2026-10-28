@@ -185,7 +185,7 @@ flowchart LR
     prepare["prepare<br/>(lint, versions,<br/>matrix, cache_push)"]
     builder["build-dockerfile"]
     tools["download-tools<br/>(if cache_push)"]
-    build["build-captainos<br/>(every flavor x arch)"]
+    build["build-captainos<br/>(every flavor x arch;<br/>skips building when<br/>already published)"]
     combined["publish-combined<br/>(main only; --cache-only)"]
     prepare --> builder & tools
     prepare --> build
@@ -204,6 +204,24 @@ flowchart LR
   this repo's, then upstream's. `build-dockerfile` runs `captain builder --ensure-remote`, which only
   checks the registries (no pull) and builds/pushes only when neither has it; jobs that actually
   run something in Docker pull it from the first registry that has it.
+
+### Release images: content tags
+
+`captain release publish` publishes each image under a **content tag** in the `artifacts` repository,
+derived from the build-cache keys of what it contains plus how it is packaged:
+`c-<flavor>-<arch>-<digest>`, and `c-<flavor>-combined-<digest>` for the multi-arch image (whose
+per-arch bases are the arches' content tags). When the content tag already exists, nothing is built
+or pushed, and the builder isn't even pulled; either way, the image is then tagged with this
+commit's source tag (`v0.0.0-<sha7>-<flavor>[-<arch>]`) by re-tagging its manifest (no blob
+transfer), so `release pull` / `release tag` / `release.yml` keep working off source tags.
+
+`captain release status [--github-output]` tells whether the content tag exists without needing any
+build outputs; CI uses it to skip `captain build` (and `publish-combined`'s restores) entirely.
+
+| Key | Inputs |
+|---|---|
+| per-arch release | mkosi key; ISO key (if any); `Dockerfile` (buildah); `artifacts.py`, `buildah.py`, `oci/_build.py`, `oci/_publish.py`, `traits/output/__init__.py`, `traits/platform/rpi.py` |
+| combined release | both per-arch release keys |
 
 ### What to expect
 

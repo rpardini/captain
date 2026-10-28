@@ -167,7 +167,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # On main, a release image of these exact outputs may already exist (content tag): then
+      # there's nothing to build or restore, and publishing just adds this commit's tag.
+      - name: Check whether already published
+        id: release
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          TARGET: ${{ matrix.arch }}
+        run: uv run captain release status --github-output >> "$GITHUB_OUTPUT"
+
       - name: Build (or restore from the cache)
+        if: steps.release.outputs.published != 'true'
         run: uv run captain build # full build, incl initramfs and iso when appropriate
 
       # -------------------------------------------------------------------
@@ -183,7 +193,8 @@ jobs:
   # -------------------------------------------------------------------
   # Publish combined multi-arch image (reuses per-arch registry blobs).
   # Both arches' outputs come from the build cache, which the build jobs
-  # just filled; --cache-only makes sure nothing is rebuilt here.
+  # just filled; --cache-only makes sure nothing is rebuilt here. Skipped
+  # when the combined image of these outputs is already published.
   # -------------------------------------------------------------------
   publish-combined:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
@@ -216,10 +227,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check whether already published
+        id: release
+        env:
+          ARCH: amd64
+        run: uv run captain release status --github-output >> "$GITHUB_OUTPUT"
+
       - name: Restore amd64 outputs from the cache
+        if: steps.release.outputs.published != 'true'
         run: uv run captain --arch amd64 build
 
       - name: Restore arm64 outputs from the cache
+        if: steps.release.outputs.published != 'true'
         run: uv run captain --arch arm64 build
 
       - name: Publish combined image to GHCR

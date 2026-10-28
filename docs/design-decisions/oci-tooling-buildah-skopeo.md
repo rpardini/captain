@@ -108,3 +108,10 @@ uv run captain release tag --help
   commands).
 - Per-arch and combined images still use deterministic layers to preserve blob deduplication behavior.
 
+## Addendum: existence checks and re-tags in Python
+
+Building, pulling and tagging release images still use buildah and skopeo. Checking whether an image
+already exists (`captain release status`, publish's content-tag check) and adding a commit's source
+tag to an existing image are done by captain's own OCI client (`captain/cache/_registry.py`): they
+need no Docker, so CI doesn't pull the builder image just to find there's nothing to do. See
+`docs/build-caching.md`.
