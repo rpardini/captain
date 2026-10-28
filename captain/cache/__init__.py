@@ -38,6 +38,7 @@ __all__ = [
     "CacheKey",
     "CacheScope",
     "Location",
+    "announce",
     "combined_release_key",
     "iso_key",
     "kernel_key",
@@ -64,11 +65,22 @@ def scope(cfg: Config) -> CacheScope:
     global _resolved_scope
     if _resolved_scope is None:
         resolved = _resolved_scope = resolve_scope(cfg)
-        log.info("Cache: %s", resolved.context)
-        log.info("Cache: read from %s", ", ".join(map(str, resolved.read)) or "nowhere")
-        log.info("Cache: write to %s", resolved.write or "nowhere")
+        if not resolved.read:
+            log.info("Cache: %s (%s)", resolved.context, resolved.no_write_reason)
+            return resolved
+        log.info("Cache: %s; reading from %s", resolved.context, ", ".join(map(str, resolved.read)))
+        if resolved.write:
+            log.info("Cache: pushing to %s", resolved.write)
+        else:
+            log.info("Cache: not pushing (%s)", resolved.no_write_reason)
         return resolved
     return _resolved_scope
+
+
+def announce(cfg: Config) -> None:
+    """Log the cache scope up front, rather than at the first remote lookup."""
+    if not _in_docker():
+        scope(cfg)
 
 
 def _registry(host: str) -> Registry:

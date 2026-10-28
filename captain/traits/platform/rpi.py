@@ -143,10 +143,4 @@ class ArmbianRpi(Armbian):
                     output_path,
                 )
                 continue
-            log.info(
-                "Raspberry Pi firmware file %s does not exist at %s, downloading...",
-                url,
-                output_path,
-            )
-            log.info("Downloading Raspberry Pi firmware file %s to %s", url, output_path)
-            _download_binary(url, output_path)
+            _download_binary(url, output_path)  # logs the URL
