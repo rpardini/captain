@@ -169,19 +169,19 @@ flowchart LR
     prepare["prepare<br/>(lint, versions,<br/>matrix, cache_push)"]
     builder["build-dockerfile"]
     tools["download-tools<br/>(if cache_push)"]
-    kernel["build-captainos-kernel<br/>(if cache_push)"]
     build["build-captainos<br/>(every flavor x arch)"]
     combined["publish-combined<br/>(main only; --cache-only)"]
     prepare --> builder & tools
-    builder --> kernel
     prepare --> build
-    tools & kernel & builder --> build
+    tools & builder --> build
     build --> combined
 ```
 
 - The registry is the only hand-off between jobs: no `actions/cache`, no workflow artifacts.
-- `download-tools` and `build-captainos-kernel` are cache warmers, run only when the run may push;
-  otherwise (fork PRs) each build job builds whatever it misses itself.
+- `download-tools` is a cache warmer (tools are used by every flavor), run only when the run may
+  push; otherwise (fork PRs) each build job downloads them itself on a miss.
+- The CaptainOS kernel has no job of its own: only `trixie-slim` uses it, and its build jobs
+  restore it from the cache or build (and push) it, so no other flavor waits on a kernel build.
 - `publish-combined` restores both arches' outputs with `--cache-only`, so it never rebuilds.
 - All jobs log in to `ghcr.io` with `GITHUB_TOKEN` (`permissions: packages: write`).
 

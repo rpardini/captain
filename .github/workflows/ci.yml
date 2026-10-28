@@ -95,10 +95,10 @@ jobs:
         if: github.event_name != 'pull_request'
 
   # -------------------------------------------------------------------
-  # Cache warmers: tools (containerd, runc, nerdctl, CNI plugins) and the
-  # CaptainOS kernel. Each restores from, or builds and pushes to, the
-  # build cache, so the build jobs below find them there. Only useful when
-  # this run may push; otherwise the build jobs just build what they miss.
+  # Cache warmer: tools (containerd, runc, nerdctl, CNI plugins), used by
+  # every flavor. Restores from, or downloads and pushes to, the build cache,
+  # so the build jobs below find them there. Only useful when this run may
+  # push; otherwise the build jobs just download what they miss.
   # -------------------------------------------------------------------
   download-tools:
     needs: [ prepare ]
@@ -128,43 +128,17 @@ jobs:
       - name: Download tools (or restore them from the cache)
         run: uv run captain tools
 
-  build-captainos-kernel:
-    needs: [ prepare, build-dockerfile ]
-    if: needs.prepare.outputs.cache_push == 'true'
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [ amd64, arm64 ]
-    env:
-      ARCH: ${{ matrix.arch }}
-      KERNEL_VERSION: ${{ needs.prepare.outputs.kernel_version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build kernel (or restore it from the cache)
-        run: uv run captain --verbose kernel
-
   # -------------------------------------------------------------------
   # Build every flavor; mkosi outputs and ISOs come from the build cache
   # when their inputs are unchanged (then tools and kernel aren't needed).
+  # The CaptainOS kernel (trixie-slim only) is restored or built (and
+  # pushed) by the flavor's own job, so no other flavor waits for it.
   # -------------------------------------------------------------------
   build-captainos:
     name: "build-captainos ${{ matrix.FLAVOR_ID }} (${{ matrix.arch }})"
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    needs: [ prepare, download-tools, build-dockerfile, build-captainos-kernel ]
-    # The warmers are skipped when this run can't push; build anyway.
+    needs: [ prepare, download-tools, build-dockerfile ]
+    # The tools warmer is skipped when this run can't push; build anyway.
     if: ${{ !cancelled() && !failure() }}
     strategy:
       fail-fast: false
