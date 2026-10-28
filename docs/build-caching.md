@@ -73,11 +73,11 @@ sequenceDiagram
     else
         S->>D: wipe
         loop downstream, then upstream
-            S->>R: manifest <repo>:<tag>?
+            S->>R: manifest repo:tag exists?
             R-->>S: found: download layer, verify digest, extract, write marker
         end
         alt miss everywhere
-            S->>S: build (native or Docker); --cache-only fails here instead
+            S->>S: build (native or Docker), or fail under --cache-only
             S->>D: write marker
             opt this build may write
                 S->>W: push layer + manifest (unless the tag already exists)
