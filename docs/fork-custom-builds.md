@@ -20,9 +20,10 @@ visibility: public for a public fork, so they can be pulled anonymously.
 
 Most customizations go in `custom/` (see "Customization via `custom/`" in `README.md`): extra
 packages (`custom/packages.txt`), files dropped into the image (`custom/files/`), and post-install /
-finalize scripts. They apply to every flavor. Flavors themselves are defined in `captain/flavors.py`.
+finalize scripts. They apply to every flavor; `custom.by-<axis>/<value>/` dirs (eg.
+`custom.by-flavor/trixie-slim/`, `custom.by-arch/arm64/`) apply to matching flavors only. Flavors themselves are defined in `captain/flavors.py`.
 
-Commit them to the fork's `main`. `custom/` is part of every flavor's cache key, so customized flavors
+Commit them to the fork's `main`. `custom/` (and each matching `custom.by-*/` dir) is part of the flavor's cache key, so customized flavors
 are rebuilt, while unchanged pieces (tools, the CaptainOS kernel) are reused.
 
 ## What CI does on each push to `main`

@@ -32,6 +32,9 @@ class Distro(Trait):
     def name(self) -> str:
         return f"{self.mkosi_distribution}-{self.release}"
 
+    def custom_names(self) -> list[str]:
+        return [self.mkosi_distribution, self.name]
+
     def cache_bust_token(self, flavor: Flavor) -> str:
         return f"{self.name}-epoch-{self.cache_epoch}" if self.cache_epoch else ""
 

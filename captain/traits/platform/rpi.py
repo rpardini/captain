@@ -25,6 +25,9 @@ class ArmbianRpi(Armbian):
     def __init__(self) -> None:
         super().__init__("linux-image-current-bcm2711")
 
+    def custom_names(self) -> list[str]:
+        return [*super().custom_names(), "rpi"]
+
     def add_arch_artifacts(
         self, flavor: Flavor, output_arch: str, artifacts: list[OutputArchArtifact]
     ) -> None:

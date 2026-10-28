@@ -23,6 +23,10 @@ class Platform(Trait):
         """Where the kernel installs its DTBs, relative to the root (a single-match glob)."""
         return flavor.distro.kernel_dtb_glob
 
+    def kernel_names(self) -> list[str]:
+        """Dir names this platform's kernel matches under custom.by-kernel/."""
+        raise NotImplementedError
+
 
 class Acpi(Platform):
     """UEFI+ACPI machines."""
@@ -31,12 +35,18 @@ class Acpi(Platform):
     iso_capable = True
     boot_scheme = "uefi"
 
+    def custom_names(self) -> list[str]:
+        return ["acpi"]
+
     def packages(self, flavor: Flavor) -> set[str]:
         return {"acpid", "efibootmgr"}
 
 
 class AcpiDistroKernel(Acpi):
     """UEFI+ACPI with the distro's own generic kernel and a full userland."""
+
+    def kernel_names(self) -> list[str]:
+        return ["distro"]
 
     def packages(self, flavor: Flavor) -> set[str]:
         return (
@@ -56,6 +66,9 @@ class AcpiCaptainKernel(Acpi):
     """UEFI+ACPI with the slim CaptainOS kernel, built from source (deb family only)."""
 
     ships_dtbs = False
+
+    def kernel_names(self) -> list[str]:
+        return ["captainos"]
 
     def pre_mkosi(self, flavor: Flavor) -> None:
         from captain.cli import stages
@@ -91,6 +104,12 @@ class Armbian(Platform):
     @property
     def name(self) -> str:
         return f"armbian-{self.kernel_package.removeprefix('linux-image-')}"
+
+    def custom_names(self) -> list[str]:
+        return ["armbian"]
+
+    def kernel_names(self) -> list[str]:
+        return [self.name]
 
     def packages(self, flavor: Flavor) -> set[str]:
         return {self.kernel_package} | flavor.output.kernel_initramfs_packages(flavor)

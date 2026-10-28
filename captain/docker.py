@@ -15,6 +15,7 @@ from subprocess import CalledProcessError
 from rich.table import Table
 
 import captain
+from captain import custom
 from captain.config import Config
 from captain.kernel import KERNEL_BUILD_BASE_PATH
 from captain.util import run
@@ -113,6 +114,8 @@ def run_in_builder(
 
     if cfg.custom_dir.exists() and cfg.custom_dir.is_dir():
         docker_args += ["-v", f"{cfg.custom_dir}:/work/custom"]
+    for axis_dir in custom.axis_dirs(cfg.project_dir):
+        docker_args += ["-v", f"{axis_dir}:/work/{axis_dir.name}"]
 
     docker_args += ["-v", f"{cfg.project_dir}/kernel.configs:/work/kernel.configs"]
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.output:/work/mkosi.output"]
