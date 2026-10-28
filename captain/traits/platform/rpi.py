@@ -20,6 +20,14 @@ log: logging.Logger = logging.getLogger(__name__)
 
 
 class ArmbianRpi(Armbian):
+    """Raspberry Pi 4B and newer. Netboot (mem): Tinkerbell serves config.txt/cmdline.txt.
+
+    Disk images (img) boot natively from a FAT partition with the firmware, kernel, initrd,
+    DTBs and a generic config.txt/cmdline.txt (no U-Boot); workflows may customize them.
+    """
+
+    content = "platform/rpi"
+    boot_scheme = "rpi"
     rpi_fw_tag = "1.20260408"
 
     def __init__(self) -> None:
@@ -28,19 +36,38 @@ class ArmbianRpi(Armbian):
     def custom_names(self) -> list[str]:
         return [*super().custom_names(), "rpi"]
 
+    def kernel_cmdline_extra(self) -> list[str]:
+        return ["rootwait", "console=serial0,115200", "console=tty1"]
+
+    def cache_inputs(self, flavor: Flavor) -> dict[str, str]:
+        return super().cache_inputs(flavor) | {"rpi_firmware": self.rpi_fw_tag}
+
+    def _netboot(self, flavor: Flavor) -> bool:
+        return flavor.output.output_kind == "initramfs"
+
     def add_arch_artifacts(
         self, flavor: Flavor, output_arch: str, artifacts: list[OutputArchArtifact]
     ) -> None:
+        if not self._netboot(flavor):
+            return
         artifacts.append(
             OutputArchArtifact(
                 type=OutputArchArtifactType.DIRECTORY, name=self.firmware_out_dirname()
             )
         )
 
+    def pre_mkosi(self, flavor: Flavor) -> None:
+        # Disk images carry the firmware in their boot partition, via ExtraTrees (mkosi.conf.j2).
+        if not self._netboot(flavor):
+            self._download_firmware(flavor.cfg.project_dir / self.firmware_input_relative())
+
     def post_mkosi(self, flavor: Flavor) -> None:
-        self.download_rpi_firmware(flavor.cfg)
+        if self._netboot(flavor):
+            self._download_firmware(self.firmware_output(flavor.cfg))
 
     def post_artifact_collect(self, flavor: Flavor) -> None:
+        if not self._netboot(flavor):
+            return
         cfg = flavor.cfg
         out: Path = ensure_dir(cfg.output_dir)
         log.debug("Copying firmware directory from %s to %s", self.firmware_output(cfg), out)
@@ -108,6 +135,10 @@ class ArmbianRpi(Armbian):
     def firmware_output(self, cfg: Config) -> Path:
         return ensure_dir(cfg.initramfs_output / "firmware")
 
+    def firmware_input_relative(self) -> str:
+        """Firmware for disk images, relative to the project dir (merged into /efi by mkosi)."""
+        return f"mkosi.input/rpi-firmware/{self.rpi_fw_tag}"
+
     def rpi_firmware_base_url(self) -> str:
         return (
             "https://raw.githubusercontent.com/raspberrypi/firmware/refs/tags/"
@@ -115,7 +146,7 @@ class ArmbianRpi(Armbian):
             + "/boot/"
         )
 
-    def download_rpi_firmware(self, cfg: Config) -> None:
+    def _download_firmware(self, dest: Path) -> None:
         rpi_fw_files = [
             "bootcode.bin",
             "fixup4cd.dat",
@@ -138,7 +169,7 @@ class ArmbianRpi(Armbian):
         ]
         for filename in rpi_fw_files:
             url = self.rpi_firmware_base_url() + filename
-            output_path = self.firmware_output(cfg) / filename
+            output_path = dest / filename
             if output_path.is_file():
                 log.debug(
                     "Raspberry Pi firmware file %s already exists at %s, skipping download",

@@ -54,6 +54,7 @@ Ordered by impact on actually replacing CAPT's builder.
 | CAPT arm64         | ESP 1G                           | root ext4    | –               |
 | Captain UEFI       | ESP 256M (systemd-boot, BLS)     | root ext4    | –               |
 | Captain extlinux   | root ext4 (`/boot/extlinux`)     | –            | –               |
+| Captain RPi        | vfat `boot` 256M (RPi firmware)  | root ext4    | –               |
 
 - CAPT's quick-start template writes cloud-init config to **p3** (amd64 only) and kexecs from **p1 (vfat)**.
 - CAPT's controller default template writes cloud-init config to **p1 as ext4**, which matches neither CAPT's own

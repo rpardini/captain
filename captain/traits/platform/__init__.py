@@ -16,7 +16,7 @@ class Platform(Trait):
     iso_capable: ClassVar[bool] = False
     # The kernel ships DTBs worth exporting (arm64 only).
     ships_dtbs: ClassVar[bool] = True
-    # How disk images boot: "uefi" (ESP + systemd-boot) or "extlinux" (U-Boot)
+    # How disk images boot: "uefi" (ESP + systemd-boot), "extlinux" (U-Boot) or "rpi" (RPi firmware)
     boot_scheme: ClassVar[str]
 
     def kernel_dtb_glob(self, flavor: Flavor) -> str:
@@ -26,6 +26,10 @@ class Platform(Trait):
     def kernel_names(self) -> list[str]:
         """Dir names this platform's kernel matches under custom.by-kernel/."""
         raise NotImplementedError
+
+    def kernel_cmdline_extra(self) -> list[str]:
+        """Extra kernel command line arguments for disk images."""
+        return []
 
 
 class Acpi(Platform):

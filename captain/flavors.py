@@ -118,7 +118,13 @@ FLAVORS: list[Flavor] = [
 
 # Kubernetes (CAPT) nodes, from the same bases as the tink flavors above: as disk images
 # for final deployment (img-), and in-memory (mem-) for machines without a proper disk.
-for _base_id in ("trixie-full", "resolute-full", "rockylinux10-full", "trixie-rockchip64"):
+for _base_id in (
+    "trixie-full",
+    "resolute-full",
+    "rockylinux10-full",
+    "trixie-rockchip64",
+    "trixie-armbian-rpi",
+):
     _base = next(f for f in FLAVORS if f.id == _base_id)
     FLAVORS += [
         Flavor(

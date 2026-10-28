@@ -103,7 +103,10 @@ mkosi drop-in content (see `captain/traits/__init__.py`). Here is a current list
 | `mem-k8s-capt-<base>`      | as `<base>`      | as  | In-memory Kubernetes node for CAPT (kubeadm/kubelet/kubectl, containerd CRI, cloud-init for Tootles)                  |
 | `img-k8s-capt-<base>`      | as `<base>`      | no  | Kubernetes node **disk image** for CAPT (as above, plus ssh, root locked, users via cloud-init)                      |
 
-k8s `<base>`s: `trixie-full`, `resolute-full`, `rockylinux10-full`, `trixie-rockchip64`.
+k8s `<base>`s: `trixie-full`, `resolute-full`, `rockylinux10-full`, `trixie-rockchip64`, `trixie-armbian-rpi`.
+`img-k8s-capt-trixie-armbian-rpi` boots natively on Raspberry Pi 4B and newer (no U-Boot): its vfat `boot` partition
+holds the RPi firmware, `kernel8.img`, initrd, DTBs and a generic `config.txt`/`cmdline.txt`, which provisioning
+workflows may customize. `mem-k8s-capt-trixie-armbian-rpi` netboots like `trixie-armbian-rpi`.
 
 The flavors above without a prefix run tink-agent from memory. `mem-k8s-capt-*` flavors install Kubernetes from
 pkgs.k8s.io; pick the minor with `--kubernetes-version` (or environment `KUBERNETES_VERSION`, default `1.36`).
