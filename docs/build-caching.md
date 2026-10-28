@@ -159,8 +159,24 @@ matter — eg. a CVE fix landed in Debian — bump an epoch:
   it is rendered as a cache-bust token into the flavor's mkosi config, so only its flavors rebuild;
 - everything: bump `CACHE_EPOCH` in `captain/cache/_keys.py`.
 
-The Armbian flavors already fold in the armbian-next repository version (`ARMBIAN_VERSION`, resolved
-by CI), and the CaptainOS kernel the latest kernel.org release of its branch (`KERNEL_VERSION`).
+The Armbian flavors already fold in the armbian-next repository version (`ARMBIAN_VERSION`), and the
+CaptainOS kernel the latest kernel.org release of its branch (`KERNEL_VERSION`); see
+[Version tokens](#version-tokens).
+
+## Version tokens
+
+`KERNEL_VERSION` (latest kernel.org release of the kernel branch) and `ARMBIAN_VERSION` (a token
+from the armbian-next repository's `Release` ETag) are inputs to cache keys, so local builds and CI
+must agree on them:
+
+- **CI**: the `prepare` job resolves both once (`captain prepare-versions`) and passes them to every
+  job, so a run is consistent even if upstream changes mid-run.
+- **Local**: when not given, both are resolved the same way and cached in the gitignored
+  `mkosi.input/.versions.json` for 6 hours, so kernel.org and armbian aren't hit on every
+  invocation. When offline, a stale cached value is used; with no cache at all, the defaults
+  (`DEFAULT_KERNEL_VERSION`, no armbian token) — whose keys won't match CI's.
+- `--kernel-version` / `KERNEL_VERSION` and `--armbian-version` / `ARMBIAN_VERSION` override; delete
+  `mkosi.input/.versions.json` to re-resolve right away.
 
 ## GitHub Actions
 
@@ -198,9 +214,8 @@ The remaining time on a fully-cached run is fixed overhead: lint, the builder im
 start-up, and `publish-combined` re-publishing the release images.
 
 Keys computed locally match CI's (eg. `trixie-full-arm64-320c0c10…`), so a local build of an
-unchanged flavor restores CI's outputs. Note that CI resolves the latest kernel.org release of the
-branch (`KERNEL_VERSION`) while local builds default to `DEFAULT_KERNEL_VERSION`; pass CI's
-`KERNEL_VERSION` locally to reuse its CaptainOS kernel (and `trixie-slim`) entries.
+unchanged flavor restores CI's outputs (within 6 hours of an upstream kernel/armbian release, local
+and CI may briefly disagree; see [Version tokens](#version-tokens)).
 
 ### ghcr.io notes
 

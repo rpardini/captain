@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import Any
 import click
 from trogon import tui
 
+from captain import versions
 from captain.config import (
     DEFAULT_FLAVOR_ID,
     DEFAULT_KERNEL_VERSION,
@@ -43,12 +45,31 @@ class CliContext:
     cache_mode: str
     cache_push: bool
     cache_only: bool
-    kernel_version: str
-    armbian_version: str | None
+    kernel_version: str | None  # None: resolve (see _resolve_versions)
+    armbian_version: str | None  # None: resolve; "" means no cache-bust
     kubernetes_version: str
+
+    def _resolve_versions(self) -> None:
+        """Resolve unset version tokens like CI's prepare job does, so local cache keys match.
+
+        Only on a local host: in CI the prepare job passes them explicitly, and the
+        Docker-relaunched process gets the host's (Click reads an empty env var as
+        unset, so there None means "").
+        """
+        local = (
+            not os.environ.get("CAPTAIN_IN_DOCKER") and os.environ.get("GITHUB_ACTIONS") != "true"
+        )
+        if self.kernel_version is None:
+            self.kernel_version = (
+                versions.kernel_version(self.project_dir) if local else DEFAULT_KERNEL_VERSION
+            )
+        if self.armbian_version is None:
+            self.armbian_version = versions.armbian_version(self.project_dir) if local else ""
 
     def make_config(self, **overrides: Any) -> Config:
         """Build a :class:`Config` from the common options plus per-command *overrides*."""
+        self._resolve_versions()
+        assert self.kernel_version is not None
         return Config(
             project_dir=self.project_dir,
             output_dir=self.project_dir / "out",
@@ -192,9 +213,12 @@ CONTEXT_SETTINGS = dict(
 @click.option(
     "--kernel-version",
     envvar="KERNEL_VERSION",
-    default=DEFAULT_KERNEL_VERSION,
-    show_default=True,
-    help="Kernel version to build/reference. Must match an official tarball (env: KERNEL_VERSION).",
+    default=None,
+    help=(
+        "Kernel version to build/reference. Must match an official tarball (env: KERNEL_VERSION). "
+        "Default: the latest kernel.org release of the branch, cached 6h "
+        f"(else {DEFAULT_KERNEL_VERSION})."
+    ),
 )
 @click.option(
     "--armbian-version",
@@ -202,7 +226,8 @@ CONTEXT_SETTINGS = dict(
     default=None,
     help=(
         "Armbian repo version token folded into armbian flavors' hash so they rebuild "
-        "when armbian-next updates (env: ARMBIAN_VERSION). Empty = no cache-bust."
+        "when armbian-next updates (env: ARMBIAN_VERSION). Default: resolved from the "
+        "armbian-next repo, cached 6h."
     ),
 )
 @click.option(
@@ -226,7 +251,7 @@ def cli(
     cache_mode: str,
     cache_push: bool,
     cache_only: bool,
-    kernel_version: str,
+    kernel_version: str | None,
     armbian_version: str | None,
     kubernetes_version: str,
 ) -> None:

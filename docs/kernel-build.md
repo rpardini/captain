@@ -15,7 +15,8 @@ Important options:
 
 - `--kernel-mode {docker,native,skip}`
 - `--force-kernel` (rebuild even if cached)
-- `--kernel-version`
+- `--kernel-version` (default: the latest kernel.org release of the branch, cached for 6h; see
+  `docs/build-caching.md`)
 - `--config` (interactive `menuconfig` flow; implies rebuild)
 
 ## Build outputs and handoff
