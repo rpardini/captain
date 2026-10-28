@@ -234,11 +234,15 @@ Measured on a fork (October 2026, 28 flavor×arch builds, 10 combined publishes)
 
 | Run | Wall time | Flavor build jobs | What happens |
 |---|---|---|---|
-| cold (empty cache) | ~40 min | ~2–13 min (median ~4); kernel ~10–21 min more for `trixie-slim` | everything built and pushed; `publish-combined` restores all of it (`--cache-only`) |
-| inputs unchanged (eg. doc-only commit) | ~8.5 min | ~1–1.5 min each | every mkosi output and ISO restored; no tools, kernel or mkosi work; nothing pushed |
+| cold (empty cache) | ~40 min | ~2–6 min each (all but `trixie-slim` done ~13 min in); `trixie-slim` 11 min (arm64) / 19 min (amd64), as they also build the kernel | everything built and pushed; `publish-combined` restores all of it (`--cache-only`); in forks, `release` adds ~13 min |
+| inputs unchanged (eg. doc-only commit), before content-tagged releases | ~8.5 min | ~1–1.5 min each | every mkosi output and ISO restored; no tools, kernel or mkosi work; nothing pushed |
 
-The remaining time on a fully-cached run is fixed overhead: lint, the builder image job, runner
-start-up, and `publish-combined` re-publishing the release images.
+The remaining time on a fully-cached run is fixed overhead: lint, the builder image job and runner
+start-up. With content-tagged release images, an unchanged flavor's job doesn't build or restore
+anything, nor pull the builder: it only checks its content tag and adds the commit's tag.
+
+The fork `release` job (the reusable `release.yml`) uploaded 105 assets (~9.7 GiB) for 18 flavors,
+one flavor at a time: the runner's disk stayed at ~22% used throughout.
 
 Keys computed locally match CI's (eg. `trixie-full-arm64-320c0c10…`), so a local build of an
 unchanged flavor restores CI's outputs (within 6 hours of an upstream kernel/armbian release, local
