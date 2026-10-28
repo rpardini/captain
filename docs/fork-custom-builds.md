@@ -22,13 +22,13 @@ Most customizations go in `custom/` (see "Customization via `custom/`" in `READM
 packages (`custom/packages.txt`), files dropped into the image (`custom/files/`), and post-install /
 finalize scripts. They apply to every flavor.
 
-To customize only some flavors, use `custom.by-<axis>/<value>/` dirs, shaped like `custom/`: by
-package family, distro, arch, role, output, platform, kernel or flavor (eg. `custom.by-flavor/trixie-slim/`,
-`custom.by-arch/arm64/`, `custom.by-role/k8s-capt/`). Matching dirs merge with `custom/`, more specific
-ones winning by file/script name; symlink a `custom.by-flavor/` dir to share it between flavors.
+To customize only some flavors, use `custom/by-<axis>/<value>/` dirs, shaped like `custom/`: by
+package family, distro, arch, role, output, platform, kernel or flavor (eg. `custom/by-flavor/trixie-slim/`,
+`custom/by-arch/arm64/`, `custom/by-role/k8s-capt/`). Matching dirs merge with `custom/`, more specific
+ones winning by file/script name; symlink a `custom/by-flavor/` dir to share it between flavors.
 Flavors themselves are defined in `captain/flavors.py`.
 
-Commit them to the fork's `main`. `custom/` and each matching `custom.by-*/` dir are part of the
+Commit them to the fork's `main`. `custom/` and each matching `custom/by-*/` dir are part of the
 flavor's cache key, so only customized flavors are rebuilt, while unchanged pieces (tools, the
 CaptainOS kernel) are reused.
 

@@ -261,7 +261,7 @@ class Flavor:
         files[conf_path] = _GeneratedFile(content.encode(), 0o644)
 
     def _generate_custom(self, files: dict[str, _GeneratedFile]) -> None:
-        """The user's custom/ dir and matching custom.by-<axis>/<value>/ dirs, as the last
+        """The user's custom/ dir and matching custom/by-<axis>/<value>/ dirs, as the last
         drop-in. Use-cases:
         - add CA root certificate to global trust store (via ca-certificates package)
         - add some package (eg firmware) via custom/packages.txt

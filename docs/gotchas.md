@@ -84,7 +84,7 @@ Stumbling blocks hit while building the trait-based flavors (Rocky, Ubuntu, k8s 
 - The example postinst assumed Debian's CA store (`update-ca-certificates`); scripts now get `CAPTAIN_DISTRO_FAMILY`
   (and `CAPTAIN_DISTRO`, `CAPTAIN_DISTRO_RELEASE`, `CAPTAIN_FLAVOR_ID`, `CAPTAIN_ARCH`, `CAPTAIN_ROLE`,
   `CAPTAIN_OUTPUT`, `CAPTAIN_PLATFORM`, `CAPTAIN_KERNEL`) to branch on.
-- `custom.by-<axis>/<value>/` dirs only apply when the name matches exactly (eg. `custom.by-distro/debian-trixie`, not
+- `custom/by-<axis>/<value>/` dirs only apply when the name matches exactly (eg. `custom/by-distro/debian-trixie`, not
   `trixie`); unmatched ones get a warning, never an error. Same-named scripts/files in a more specific layer *replace*
   the general one, they don't add to it.
 

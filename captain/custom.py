@@ -1,4 +1,4 @@
-"""User customization layers: custom/ for every flavor, plus custom.by-<axis>/<value>/.
+"""User customization layers: custom/ for every flavor, plus custom/by-<axis>/<value>/.
 
 Each layer has the shape of custom/ (files/, packages.txt, mkosi-postinst/,
 mkosi-finalize/). Layers apply general to specific, in AXES order; see
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-PREFIX = "custom.by-"
+PREFIX = "by-"
 
 # General to specific: a later layer's same-named file or script replaces an earlier one's.
 AXES: dict[str, Callable[[Flavor, str], list[str]]] = {
@@ -34,9 +34,9 @@ AXES: dict[str, Callable[[Flavor, str], list[str]]] = {
 _warned: set[Path] = set()
 
 
-def axis_dirs(project_dir: Path) -> list[Path]:
-    """The custom.by-<axis>/ dirs present in *project_dir*."""
-    return sorted(p for p in project_dir.glob(f"{PREFIX}*") if p.is_dir())
+def axis_dirs(custom_dir: Path) -> list[Path]:
+    """The by-<axis>/ dirs present in *custom_dir*."""
+    return sorted(p for p in custom_dir.glob(f"{PREFIX}*") if p.is_dir())
 
 
 def _known_values(axis: str) -> set[str]:
@@ -50,22 +50,24 @@ def _known_values(axis: str) -> set[str]:
     }
 
 
-def _warn_unknown(project_dir: Path) -> None:
-    for axis_dir in axis_dirs(project_dir):
+def _warn_unknown(custom_dir: Path) -> None:
+    for axis_dir in axis_dirs(custom_dir):
         if axis_dir in _warned:
             continue
         _warned.add(axis_dir)
         axis = axis_dir.name.removeprefix(PREFIX)
         if axis not in AXES:
             log.warning(
-                "Custom: ignoring %s: unknown axis (one of: %s)", axis_dir.name, ", ".join(AXES)
+                "Custom: ignoring custom/%s: unknown axis (one of: %s)",
+                axis_dir.name,
+                ", ".join(AXES),
             )
             continue
         known = _known_values(axis)
         for value_dir in sorted(p for p in axis_dir.iterdir() if p.is_dir()):
             if value_dir.name not in known:
                 log.warning(
-                    "Custom: %s/%s matches no flavor (known: %s)",
+                    "Custom: custom/%s/%s matches no flavor (known: %s)",
                     axis_dir.name,
                     value_dir.name,
                     ", ".join(sorted(known)),
@@ -75,11 +77,11 @@ def _warn_unknown(project_dir: Path) -> None:
 def layers(flavor: Flavor) -> list[Path]:
     """The customization dirs applying to *flavor*, general to specific."""
     cfg = flavor.cfg
-    _warn_unknown(cfg.project_dir)
+    _warn_unknown(cfg.custom_dir)
     found = [cfg.custom_dir]
     for axis, values in AXES.items():
         for value in values(flavor, cfg.arch_info.arch):
-            layer = cfg.project_dir / f"{PREFIX}{axis}" / value
+            layer = cfg.custom_dir / f"{PREFIX}{axis}" / value
             if layer.is_dir():
                 found.append(layer)
     if len(found) > 1:

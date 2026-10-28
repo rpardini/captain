@@ -20,7 +20,7 @@ to read or write the cache).
 |---|---|---|---|
 | tools | `cache/tools` | `mkosi.input/tools/<arch>` | arch; `tools.py` (holds the pinned `TOOLS` manifest) |
 | kernel | `cache/kernel` | `mkosi.input/kernel/<arch>` | arch; kernel version; defconfig; `kernel.py`; `Dockerfile` (toolchain) |
-| mkosi output | `cache/initramfs`, `cache/image` | `mkosi.output/<kind>/<flavor>/<arch>/<flavor_hash>` | arch; flavor id; `flavor_hash` (the whole rendered mkosi tree: traits, `custom/` and matching `custom.by-*/` dirs, cache-bust tokens such as the Armbian repo version, Kubernetes version, distro epochs); tools key; kernel key (CaptainOS-kernel flavors); RPi firmware tag (Raspberry Pi flavors); `Dockerfile` (mkosi version, apt/dnf); `cli/stages.py`, `docker.py` |
+| mkosi output | `cache/initramfs`, `cache/image` | `mkosi.output/<kind>/<flavor>/<arch>/<flavor_hash>` | arch; flavor id; `flavor_hash` (the whole rendered mkosi tree: traits, `custom/` and matching `custom/by-*/` dirs, cache-bust tokens such as the Armbian repo version, Kubernetes version, distro epochs); tools key; kernel key (CaptainOS-kernel flavors); RPi firmware tag (Raspberry Pi flavors); `Dockerfile` (mkosi version, apt/dnf); `cli/stages.py`, `docker.py` |
 | ISO | `cache/iso` | `mkosi.output/iso/<flavor>/<arch>/<flavor_hash>` (minus `staging/`) | mkosi key; `iso.py`; `Dockerfile` (grub) |
 
 Repositories are under the cache location, eg. `ghcr.io/tinkerbell/captain/cache/kernel`. Tags are
@@ -35,7 +35,7 @@ Every key also folds in `CACHE_SCHEMA` (artifact format) and `CACHE_EPOCH` (see
 flowchart LR
     tools["tools<br/>(tools.py)"]
     kernel["kernel<br/>(version, defconfig,<br/>kernel.py, Dockerfile)"]
-    flavor["flavor_hash<br/>(rendered mkosi tree,<br/>custom/ + custom.by-*/, tokens, epochs)"]
+    flavor["flavor_hash<br/>(rendered mkosi tree,<br/>custom/ + custom/by-*/, tokens, epochs)"]
     mkosi["mkosi output<br/>(initramfs / image)"]
     iso["ISO"]
     docker["Dockerfile"]

@@ -170,28 +170,28 @@ Scripts are Jinja-rendered and get `CAPTAIN_FLAVOR_ID`, `CAPTAIN_DISTRO`, `CAPTA
 `CAPTAIN_KERNEL` to branch on. Names in `packages.txt` go through the distro's package-name map
 (Debian names are translated on Rocky, eg. `iproute2` → `iproute`); distro-native names pass through unchanged.
 
-### Only for some flavors: `custom.by-<axis>/<value>/`
+### Only for some flavors: `custom/by-<axis>/<value>/`
 
-Next to `custom/`, dirs shaped exactly like it apply only to matching flavors:
+Inside `custom/`, `by-<axis>/<value>/` dirs shaped exactly like `custom/` itself apply only to matching flavors:
 
 | dir                              | values                                                                  |
 |----------------------------------|-------------------------------------------------------------------------|
-| `custom.by-family/<value>/`      | `deb`, `rpm`                                                            |
-| `custom.by-distro/<value>/`      | `debian`, `debian-trixie`, `ubuntu`, `ubuntu-resolute`, `rocky`, `rocky-10` |
-| `custom.by-arch/<value>/`        | `amd64`, `arm64`                                                        |
-| `custom.by-role/<value>/`        | `tink`, `k8s-capt`                                                      |
-| `custom.by-output/<value>/`      | `mem`, `img`                                                            |
-| `custom.by-platform/<value>/`    | `acpi`, `armbian`, `rpi`                                                |
-| `custom.by-kernel/<value>/`      | `distro`, `captainos`, `armbian-<branch>-<family>` (eg. `armbian-edge-rockchip64`) |
-| `custom.by-flavor/<value>/`      | a flavor id, eg. `trixie-slim`                                          |
+| `custom/by-family/<value>/`      | `deb`, `rpm`                                                            |
+| `custom/by-distro/<value>/`      | `debian`, `debian-trixie`, `ubuntu`, `ubuntu-resolute`, `rocky`, `rocky-10` |
+| `custom/by-arch/<value>/`        | `amd64`, `arm64`                                                        |
+| `custom/by-role/<value>/`        | `tink`, `k8s-capt`                                                      |
+| `custom/by-output/<value>/`      | `mem`, `img`                                                            |
+| `custom/by-platform/<value>/`    | `acpi`, `armbian`, `rpi`                                                |
+| `custom/by-kernel/<value>/`      | `distro`, `captainos`, `armbian-<branch>-<family>` (eg. `armbian-edge-rockchip64`) |
+| `custom/by-flavor/<value>/`      | a flavor id, eg. `trixie-slim`                                          |
 
 All matching dirs apply, general to specific: `custom/`, then the table's order top to bottom. They merge by name:
 `packages.txt` add up; a file (by path) or script (by filename) in a more specific dir replaces the general one; scripts
 from all dirs run together, sorted by filename. To share one flavor's dir with another, symlink it:
-`ln -s trixie-meson64 custom.by-flavor/trixie-genio`. A dir matching no flavor gets a warning (typos). For combinations
-(eg. arm64 *and* rpm), use a `custom.by-flavor/` dir or branch on the variables above.
+`ln -s trixie-meson64 custom/by-flavor/trixie-genio`. A dir matching no flavor gets a warning (typos). For combinations
+(eg. arm64 *and* rpm), use a `custom/by-flavor/` dir or branch on the variables above.
 
-See examples under `custom/` and `custom.by-*/` in this repository (disabled by default). In a fork, commit them and push: CI builds and
+See examples under `custom/` and `custom/by-*/` in this repository (disabled by default). In a fork, commit them and push: CI builds and
 publishes your images ([docs/fork-custom-builds.md](docs/fork-custom-builds.md)).
 
 ## Output artifacts
@@ -290,7 +290,7 @@ Exit QEMU with `Ctrl-a x` (that's `Ctrl` + `a`, release, then press `x`).
 |  |- qemu.py                 # qemu launcher
 |  `- tools.py                # pinned tool downloads
 |- custom/                    # user customizations (all flavors)
-|- custom.by-<axis>/<value>/  # user customizations for matching flavors only
+|  `- by-<axis>/<value>/      # user customizations for matching flavors only
 |- docs/                      # documentation (see below)
 |- kernel.configs/            # kernel configuration (defconfig) for trixie-slim kernel builds
 |- mkosi.generated/           # rendered mkosi config tree for the current flavor (disposable)

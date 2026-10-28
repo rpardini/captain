@@ -24,7 +24,7 @@ class Platform(Trait):
         return flavor.distro.kernel_dtb_glob
 
     def kernel_names(self) -> list[str]:
-        """Dir names this platform's kernel matches under custom.by-kernel/."""
+        """Dir names this platform's kernel matches under custom/by-kernel/."""
         raise NotImplementedError
 
     def kernel_cmdline_extra(self) -> list[str]:

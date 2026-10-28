@@ -95,7 +95,7 @@ A trait (`captain/traits/__init__.py`) contributes:
   "is a kind of" relationships within one axis (`ArmbianRpi(Armbian)`), never across axes.
 - **hooks** (`pre_mkosi`, `post_mkosi`, `post_artifact_collect`), **artifacts**, and answers to flavor-wide questions
   (`keep_package_manager`, `keep_hwdb`, `cache_bust_token`, `cache_inputs`).
-- **custom names** (`custom_names()`, and `Platform.kernel_names()`): the `custom.by-<axis>/<value>/` dirs it matches
+- **custom names** (`custom_names()`, and `Platform.kernel_names()`): the `custom/by-<axis>/<value>/` dirs it matches
   (see "User customizations" below).
 
 The trait classes, by axis. Inheritance only ever happens *within* an axis; the boxes' `content` is the directory (under
@@ -231,7 +231,7 @@ mkosi resolves relative paths in a drop-in's config against that drop-in directo
 ### User customizations
 
 The user's customizations are always the last drop-in (`90-custom`), merged from layers, general to specific:
-`custom/` (every flavor), then `custom.by-<axis>/<value>/` for each matching value, in the order family, distro, arch,
+`custom/` (every flavor), then `custom/by-<axis>/<value>/` for each matching value, in the order family, distro, arch,
 role, output, platform, kernel, flavor (`captain/custom.py`). Each layer has the shape of `custom/` (`files/`,
 `packages.txt`, `mkosi-postinst/`, `mkosi-finalize/`). They merge by name: packages add up, a same-path file or
 same-named script in a later layer replaces an earlier one, and all scripts run together sorted by filename. Values
@@ -241,10 +241,10 @@ shares one flavor's layer with another. Only matching layers are rendered, so th
 
 ```mermaid
 flowchart LR
-    c["custom/"] --> fam["custom.by-family/deb"] --> dis["custom.by-distro/debian<br/>custom.by-distro/debian-trixie"]
-    dis --> arch["custom.by-arch/arm64"] --> role["custom.by-role/k8s-capt"] --> out["custom.by-output/img"]
-    out --> plat["custom.by-platform/armbian<br/>custom.by-platform/rpi"] --> ker["custom.by-kernel/armbian-current-bcm2711"]
-    ker --> fl["custom.by-flavor/img-k8s-capt-trixie-armbian-rpi"] --> d90["90-custom drop-in"]
+    c["custom/"] --> fam["custom/by-family/deb"] --> dis["custom/by-distro/debian<br/>custom/by-distro/debian-trixie"]
+    dis --> arch["custom/by-arch/arm64"] --> role["custom/by-role/k8s-capt"] --> out["custom/by-output/img"]
+    out --> plat["custom/by-platform/armbian<br/>custom/by-platform/rpi"] --> ker["custom/by-kernel/armbian-current-bcm2711"]
+    ker --> fl["custom/by-flavor/img-k8s-capt-trixie-armbian-rpi"] --> d90["90-custom drop-in"]
 ```
 
 ### Outputs

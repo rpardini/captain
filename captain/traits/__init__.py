@@ -54,7 +54,7 @@ class Trait:
         return type(self).__name__.lower()
 
     def custom_names(self) -> list[str]:
-        """Dir names this trait matches under custom.by-<axis>/, general to specific."""
+        """Dir names this trait matches under custom/by-<axis>/, general to specific."""
         return [self.name]
 
     def content_dirs(self) -> list[Path]:
