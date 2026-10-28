@@ -31,7 +31,11 @@ Stumbling blocks hit while building the trait-based flavors (Rocky, Ubuntu, k8s 
 - repart may format the ESP with **4K sectors**; EDK2 then sees no filesystem on a 512-byte-sector disk (falls to the
   EFI shell). Pin `SectorSize=512`.
 - With an ESP defined, the root partition's `CopyFiles=/` ends up with an **empty `/boot`**. Fine for UEFI (kernel +
-  initrd live on the ESP); extlinux layouts (no ESP) keep `/boot`.
+  initrd live on the ESP) and RPi (they live on the vfat `boot` partition); extlinux layouts (no ESP) keep `/boot`.
+- RPi disk images use an `esp`-typed vfat `boot` partition on GPT: the Pi 4/5 EEPROM reads GPT (Pi 3's `bootcode.bin`
+  doesn't, hence Pi 4B and newer only). The RPi kernel ships bcm2712 (Pi 5) DTBs too; all are copied.
+- `out/firmware-rpi/` has the same name for every in-memory RPi flavor: locally, the last build wins (CI builds each
+  flavor in its own job, so its artifacts don't collide).
 - systemd-repart 257 **ignores `Flags=`** (eg. 0x4, legacy BIOS bootable). U-Boot distro boot falls back to partition 1.
 - `qemu-img resize` leaves the backup GPT mid-disk: harmless, firmware and growpart cope.
 - On Rocky, systemd's gpt-auto generator mounts the ESP at `/boot` (empty `/boot`).
@@ -78,11 +82,18 @@ Stumbling blocks hit while building the trait-based flavors (Rocky, Ubuntu, k8s 
 - The example postinst's registry mirrors set `server =` to the mirror: **no fallback** to upstream, so pulls hang
   wherever that Harbor is unreachable. Keep the examples disabled in committed code.
 - The example postinst assumed Debian's CA store (`update-ca-certificates`); scripts now get `CAPTAIN_DISTRO_FAMILY`
-  (and `CAPTAIN_DISTRO`, `CAPTAIN_DISTRO_RELEASE`, `CAPTAIN_FLAVOR_ID`) to branch on.
+  (and `CAPTAIN_DISTRO`, `CAPTAIN_DISTRO_RELEASE`, `CAPTAIN_FLAVOR_ID`, `CAPTAIN_ARCH`, `CAPTAIN_ROLE`,
+  `CAPTAIN_OUTPUT`, `CAPTAIN_PLATFORM`, `CAPTAIN_KERNEL`) to branch on.
+- `custom.by-<axis>/<value>/` dirs only apply when the name matches exactly (eg. `custom.by-distro/debian-trixie`, not
+  `trixie`); unmatched ones get a warning, never an error. Same-named scripts/files in a more specific layer *replace*
+  the general one, they don't add to it.
 
 ## Build tooling / CI
 
-- `--flavor-id` and `--arch` are **global** options: `captain --flavor-id X build`, not `captain build --flavor-id X`.
+- `--flavor-id` (alias `--flavor`) and `--arch` are **global** options: `captain --flavor-id X build`, not
+  `captain build --flavor-id X`.
+- The cache keys hash whole modules (eg. `tools.py`, `kernel.py`, `docker.py`; see `cache/_keys.py`): even a log-only
+  edit there rebuilds everything downstream.
 - Values folded into the flavor hash (`ARMBIAN_VERSION`, `KUBERNETES_VERSION`) must be passed into the builder
   container, or in-container stages (`captain iso`, release) compute a different hash and miss the outputs.
 - `docker run -v` on a non-existent host path creates it as root: create generated dirs first.

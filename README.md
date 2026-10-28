@@ -92,7 +92,7 @@ mkosi drop-in content (see `captain/traits/__init__.py`). Here is a current list
 |----------------------------|------------------|-----|-----------------------------------------------------------------------------------------------------------------------|
 | `trixie-full`              | `amd64`, `arm64` | yes | Debian Trixie, standard Debian linux-generic kernel, working `apt` package manager                                    |
 | `trixie-slim`              | `amd64`, `arm64` | yes | Kernel built from source, slimmed down Debian userspace, ACPI/UEFI only                                               |
-| `trixie-armbian-rpi`       | `arm64`          | no  | For RaspberryPi's, using Armbian's bcm2711 kernel; produces `rpi-firmware` which is ready-to-netboot on RPi's         |
+| `trixie-armbian-rpi`       | `arm64`          | no  | For RaspberryPi's, using Armbian's bcm2711 kernel; produces `firmware-rpi/` which is ready-to-netboot on RPi's        |
 | `trixie-meson64`           | `arm64`          | no  | For Amlogic boards, using Armbian's meson64 kernel                                                                    |
 | `trixie-rockchip64`        | `arm64`          | no  | For Rockchip boards (rk35xx, rk33xx, etc) using Armbian's _mainline_ rockchip64 kernel                                |
 | `trixie-rockchip64-vendor` | `arm64`          | no  | For Rockchip boards (rk35xx) using the Rockchip vendor kernel from Armbian. Prefer the non-vendor flavor if possible. |
@@ -104,9 +104,6 @@ mkosi drop-in content (see `captain/traits/__init__.py`). Here is a current list
 | `img-k8s-capt-<base>`      | as `<base>`      | no  | Kubernetes node **disk image** for CAPT (as above, plus ssh, root locked, users via cloud-init)                      |
 
 k8s `<base>`s: `trixie-full`, `resolute-full`, `rockylinux10-full`, `trixie-rockchip64`, `trixie-armbian-rpi`.
-`img-k8s-capt-trixie-armbian-rpi` boots natively on Raspberry Pi 4B and newer (no U-Boot): its vfat `boot` partition
-holds the RPi firmware, `kernel8.img`, initrd, DTBs and a generic `config.txt`/`cmdline.txt`, which provisioning
-workflows may customize. `mem-k8s-capt-trixie-armbian-rpi` netboots like `trixie-armbian-rpi`.
 
 The flavors above without a prefix run tink-agent from memory. `mem-k8s-capt-*` flavors install Kubernetes from
 pkgs.k8s.io; pick the minor with `--kubernetes-version` (or environment `KUBERNETES_VERSION`, default `1.36`).
@@ -117,12 +114,16 @@ pkgs.k8s.io; pick the minor with `--kubernetes-version` (or environment `KUBERNE
 - UEFI/ACPI bases: ESP with systemd-boot (removable-media path) and one BLS entry.
 - DeviceTree (Armbian) bases: a single root partition with `/boot/extlinux/extlinux.conf` for U-Boot, which is assumed
   to live on the board's SPI/eMMC boot partitions.
+- Raspberry Pi (`trixie-armbian-rpi`), Pi 4B and newer: no U-Boot; a vfat `boot` partition with the RPi firmware,
+  `kernel8.img`, initrd, DTBs/overlays and a generic `config.txt`/`cmdline.txt` (provisioning workflows may customize
+  them). The in-memory `mem-k8s-capt-trixie-armbian-rpi` netboots like `trixie-armbian-rpi` instead (Tinkerbell
+  serves `config.txt`/`cmdline.txt`).
 
 cloud-init grows the root partition on first boot. `captain qemu` boots `img-*` flavors from a scratch copy of the
 image grown to `--disk-size`, seeding cloud-init over NoCloud (via SMBIOS) with a `captain` user holding `--ssh-key`;
 then `ssh -p 2222 captain@localhost`.
 
-Use `--flavor-id` (or environment `FLAVOR_ID`) to select one. `uv run captain list-flavors` prints the registry; CI
+Use `--flavor-id` (alias `--flavor`, or environment `FLAVOR_ID`) to select one. `uv run captain list-flavors` prints the registry; CI
 builds every registered flavor (matrices come from `captain list-flavors --github-output`), and releases tag each one
 as `<tag><suffix>` (see `release_tag_suffix` in `captain/flavors.py`).
 
@@ -146,7 +147,8 @@ first (detected from git remotes), then `tinkerbell/captain`'s. Unchanged inputs
 and in CI alike.
 
 - `uv run captain cache info`: what would be read/written, and what's cached for the flavor
-- `--cache-push`: push local builds to your fork's cache; `--cache off|read`, `--cache-only`
+- `--cache-push`: push local builds to your fork's cache (without it, the log says `Cache: not pushing (…)` and why);
+  `--cache off|read`, `--cache-only`; a cache hit is downloaded (with a progress bar on a terminal) instead of built
 - The kernel version and armbian token are resolved like CI does (cached 6h in `mkosi.input/.versions.json`)
 
 See [docs/build-caching.md](docs/build-caching.md).
@@ -197,6 +199,8 @@ Final artifacts are copied to `out/` with flavor-aware names:
 - `out/initramfs-<flavor-id>-<arch>`
 - `out/captainos-<flavor-id>-<arch>.iso` (only for ISO-capable flavors)
 - `out/dtb-<flavor-id>-<arch>/` (directory, arm64 flavors that export DTBs)
+- `out/firmware-rpi/` (directory, in-memory Raspberry Pi flavors: ready-to-netboot firmware with `kernel8.img`,
+  `initramfs8` and DTBs symlinked; each RPi build overwrites it)
 - `out/captainos-<flavor-id>-<arch>.img.zst` (disk image, `img-*` flavors only; instead of the above)
 
 `<arch>` uses Linux output architecture names (`x86_64`, `aarch64`).

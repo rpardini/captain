@@ -20,11 +20,17 @@ visibility: public for a public fork, so they can be pulled anonymously.
 
 Most customizations go in `custom/` (see "Customization via `custom/`" in `README.md`): extra
 packages (`custom/packages.txt`), files dropped into the image (`custom/files/`), and post-install /
-finalize scripts. They apply to every flavor; `custom.by-<axis>/<value>/` dirs (eg.
-`custom.by-flavor/trixie-slim/`, `custom.by-arch/arm64/`) apply to matching flavors only. Flavors themselves are defined in `captain/flavors.py`.
+finalize scripts. They apply to every flavor.
 
-Commit them to the fork's `main`. `custom/` (and each matching `custom.by-*/` dir) is part of the flavor's cache key, so customized flavors
-are rebuilt, while unchanged pieces (tools, the CaptainOS kernel) are reused.
+To customize only some flavors, use `custom.by-<axis>/<value>/` dirs, shaped like `custom/`: by
+package family, distro, arch, role, output, platform, kernel or flavor (eg. `custom.by-flavor/trixie-slim/`,
+`custom.by-arch/arm64/`, `custom.by-role/k8s-capt/`). Matching dirs merge with `custom/`, more specific
+ones winning by file/script name; symlink a `custom.by-flavor/` dir to share it between flavors.
+Flavors themselves are defined in `captain/flavors.py`.
+
+Commit them to the fork's `main`. `custom/` and each matching `custom.by-*/` dir are part of the
+flavor's cache key, so only customized flavors are rebuilt, while unchanged pieces (tools, the
+CaptainOS kernel) are reused.
 
 ## What CI does on each push to `main`
 
@@ -73,7 +79,8 @@ Every image is also tagged with the flavor id instead of the suffix, exactly lik
 
 Each image's layers are plain files at its root: `vmlinuz-<flavor>-<arch>`,
 `initramfs-<flavor>-<arch>`, the ISO and disk image where the flavor has them, `dtb-…/` directories,
-and `sha256sums-<flavor>-<arch>.txt`.
+`firmware-rpi/` (ready-to-netboot, for the in-memory Raspberry Pi flavors) and
+`sha256sums-<flavor>-<arch>.txt`.
 
 ## Consuming the images
 
@@ -110,6 +117,7 @@ uv run captain cache info          # which caches are read/written, and what's i
 uv run captain build               # restores whatever CI already built
 ```
 
-To push local builds to the fork's cache, log in with a token that can write packages
-(`docker login ghcr.io`) and pass `--cache-push`. Version tokens (kernel, armbian) are resolved like
+Without `--cache-push`, local builds only read caches (the log says `Cache: not pushing (…)` and why),
+and a cache hit is downloaded instead of built. To push local builds to the fork's cache, log in with a
+token that can write packages (`docker login ghcr.io`) and pass `--cache-push`. Version tokens (kernel, armbian) are resolved like
 CI does, so local and CI cache keys match; see `docs/build-caching.md`.

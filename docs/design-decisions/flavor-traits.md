@@ -71,6 +71,7 @@ flowchart LR
         b2["resolute-full<br/>Ubuntu · ACPI distro kernel"]
         b3["rockylinux10-full<br/>Rocky · ACPI distro kernel"]
         b4["trixie-rockchip64<br/>Debian · Armbian edge-rockchip64"]
+        b6["trixie-armbian-rpi<br/>Debian · Armbian current-bcm2711"]
         b5["trixie-slim, trixie-meson64,<br/>resolute-rockchip64, …"]
     end
     subgraph combos["role + output"]
@@ -78,9 +79,9 @@ flowchart LR
         c2["mem-k8s-capt-<br/>k8s-capt + mem"]
         c3["img-k8s-capt-<br/>k8s-capt + img"]
     end
-    b1 & b2 & b3 & b4 & b5 --> c1
-    b1 & b2 & b3 & b4 --> c2
-    b1 & b2 & b3 & b4 --> c3
+    b1 & b2 & b3 & b4 & b5 & b6 --> c1
+    b1 & b2 & b3 & b4 & b6 --> c2
+    b1 & b2 & b3 & b4 & b6 --> c3
 ```
 
 ### Traits
@@ -93,7 +94,9 @@ A trait (`captain/traits/__init__.py`) contributes:
   `Debian` gets `distro/` (generic `[Distribution]` settings) plus `distro/deb/` (apt bits). Inheritance is kept for
   "is a kind of" relationships within one axis (`ArmbianRpi(Armbian)`), never across axes.
 - **hooks** (`pre_mkosi`, `post_mkosi`, `post_artifact_collect`), **artifacts**, and answers to flavor-wide questions
-  (`keep_package_manager`, `keep_hwdb`, `cache_bust_token`).
+  (`keep_package_manager`, `keep_hwdb`, `cache_bust_token`, `cache_inputs`).
+- **custom names** (`custom_names()`, and `Platform.kernel_names()`): the `custom.by-<axis>/<value>/` dirs it matches
+  (see "User customizations" below).
 
 The trait classes, by axis. Inheritance only ever happens *within* an axis; the boxes' `content` is the directory (under
 `captain/traits/`) each class adds, collected along the MRO:
@@ -121,7 +124,7 @@ classDiagram
     class AcpiDistroKernel
     class AcpiCaptainKernel
     class Armbian { content = platform/armbian; boot_scheme = extlinux }
-    class ArmbianRpi
+    class ArmbianRpi { content = platform/rpi; boot_scheme = rpi }
     class Role
     class Tink { content = role/tink }
     class Kubernetes { content = role/k8s }
@@ -221,10 +224,28 @@ flowchart TB
     merge --> trees["extra/sandbox trees overlay in order"]
     merge --> runs["every postinst, then every finalize, in order"]
 ```
- so project paths are rendered via
+
+mkosi resolves relative paths in a drop-in's config against that drop-in directory, so project paths are rendered via
 `flavor.project_relative()` (`../../../<path>`), which works natively and in the builder container alike.
 
-The user's `custom/` directory is always the last drop-in (`90-custom`).
+### User customizations
+
+The user's customizations are always the last drop-in (`90-custom`), merged from layers, general to specific:
+`custom/` (every flavor), then `custom.by-<axis>/<value>/` for each matching value, in the order family, distro, arch,
+role, output, platform, kernel, flavor (`captain/custom.py`). Each layer has the shape of `custom/` (`files/`,
+`packages.txt`, `mkosi-postinst/`, `mkosi-finalize/`). They merge by name: packages add up, a same-path file or
+same-named script in a later layer replaces an earlier one, and all scripts run together sorted by filename. Values
+come from the traits (`custom_names()`: eg. `debian` and `debian-trixie`; `armbian` and `rpi`); a symlinked value dir
+shares one flavor's layer with another. Only matching layers are rendered, so they only change matching flavors'
+`flavor_hash`.
+
+```mermaid
+flowchart LR
+    c["custom/"] --> fam["custom.by-family/deb"] --> dis["custom.by-distro/debian<br/>custom.by-distro/debian-trixie"]
+    dis --> arch["custom.by-arch/arm64"] --> role["custom.by-role/k8s-capt"] --> out["custom.by-output/img"]
+    out --> plat["custom.by-platform/armbian<br/>custom.by-platform/rpi"] --> ker["custom.by-kernel/armbian-current-bcm2711"]
+    ker --> fl["custom.by-flavor/img-k8s-capt-trixie-armbian-rpi"] --> d90["90-custom drop-in"]
+```
 
 ### Outputs
 
@@ -233,7 +254,9 @@ The user's `custom/` directory is always the last drop-in (`90-custom`).
 - **`Img`** (disk image): `Format=disk` with our own `mkosi.repart/` definitions and `Bootable=no`: the img postinst
   generates the initrd with the distro's own generator (initramfs-tools on Debian, dracut on Ubuntu/Rocky,
   `--no-hostonly` as it runs in a container) and sets up either systemd-boot + a BLS entry in the ESP (`uefi` platforms)
-  or `/boot/extlinux/extlinux.conf` (`extlinux` platforms). `SectorSize=512` is pinned: repart otherwise may format the
+  or `/boot/extlinux/extlinux.conf` (`extlinux` platforms), or fills a vfat `boot` partition for the Raspberry Pi
+  firmware (`rpi`: firmware blobs via `ExtraTrees=`, `kernel8.img`, initrd, DTBs/overlays and a generic
+  `config.txt`/`cmdline.txt`, no U-Boot). `SectorSize=512` is pinned: repart otherwise may format the
   ESP with 4K sectors, which UEFI firmware won't read on 512-byte-sector disks.
 
 ```mermaid
@@ -249,7 +272,15 @@ flowchart LR
         ub["U-Boot (SPI / eMMC boot partitions)"] --> ext["root: /boot/extlinux/extlinux.conf<br/>kernel, initrd, fdtdir"]
         ext --> root2["root (ext4, PARTLABEL=root, partition 1)"]
     end
+    subgraph rpi["platform boot_scheme = rpi (Raspberry Pi 4B and newer)"]
+        direction TB
+        eep["RPi EEPROM bootloader"] --> fat["boot (vfat): start4.elf, config.txt, cmdline.txt,<br/>kernel8.img, initrd.img, *.dtb, overlays/"]
+        fat --> root3["root (ext4, PARTLABEL=root)"]
+    end
 ```
+
+Netbooted (`mem`) Raspberry Pi flavors instead get an `out/firmware-rpi/` dir (firmware, `kernel8.img`, `initramfs8`,
+DTBs) for Tinkerbell to serve, which supplies `config.txt`/`cmdline.txt` itself.
 
 The output also drives the build pipeline: which mkosi output to look for, which artifacts to collect, and whether an
 ISO is built (only `Mem` on an ISO-capable platform):
@@ -263,11 +294,11 @@ sequenceDiagram
     B->>F: create_and_setup_flavor_for_id()
     F->>T: generate(): render content dirs into drop-ins
     F-->>B: flavor_hash
-    B->>T: pre_mkosi() (e.g. AcpiCaptainKernel builds the kernel .deb)
+    B->>T: pre_mkosi() (e.g. AcpiCaptainKernel builds the kernel .deb; ArmbianRpi fetches firmware for img)
     B->>M: mkosi --directory=mkosi.generated build
     M-->>B: image.cpio.zst (Mem) / image.raw.zst (Img)
     B->>T: output.collect_artifacts()
-    B->>T: post_mkosi() (e.g. ArmbianRpi downloads RPi firmware)
+    B->>T: post_mkosi() (e.g. ArmbianRpi downloads RPi firmware for mem netboot)
     opt flavor.has_iso()
         B->>M: captain iso
     end
