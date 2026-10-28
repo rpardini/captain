@@ -140,9 +140,13 @@ defaults to `--tools-mode docker`). Use `--help` on each command for current def
 
 Tools, kernels, mkosi outputs and ISOs are cached as content-hashed OCI artifacts in `ghcr.io`: your fork's cache
 first (detected from git remotes), then `tinkerbell/captain`'s. Unchanged inputs are restored instead of rebuilt, locally
-and in CI alike. `uv run captain cache info` shows what would be used; `--cache-push` pushes local builds to your fork's
-cache. See `docs/build-caching.md`; for custom builds in a fork of this repository, see
-`docs/fork-custom-builds.md`.
+and in CI alike.
+
+- `uv run captain cache info`: what would be read/written, and what's cached for the flavor
+- `--cache-push`: push local builds to your fork's cache; `--cache off|read`, `--cache-only`
+- The kernel version and armbian token are resolved like CI does (cached 6h in `mkosi.input/.versions.json`)
+
+See [docs/build-caching.md](docs/build-caching.md).
 
 ## Customization via `custom/`
 
@@ -157,7 +161,8 @@ Scripts are Jinja-rendered and get `CAPTAIN_FLAVOR_ID`, `CAPTAIN_DISTRO`, `CAPTA
 `CAPTAIN_DISTRO_FAMILY` (`deb` or `rpm`) to branch on. Names in `packages.txt` go through the distro's package-name map
 (Debian names are translated on Rocky, eg. `iproute2` → `iproute`); distro-native names pass through unchanged.
 
-See examples under `custom/` in this repository (disabled by default).
+See examples under `custom/` in this repository (disabled by default). In a fork, commit them and push: CI builds and
+publishes your images ([docs/fork-custom-builds.md](docs/fork-custom-builds.md)).
 
 ## Output artifacts
 
@@ -189,13 +194,12 @@ uv run captain release --src-tag v0.0.0-abcdef1-trixie-full tag --new-tag v1.0.0
 Notes:
 
 - Base source tag defaults to `v0.0.0-<sha7>-<flavor-id>`.
-- Per-arch publish refs append `-amd64` or `-arm64`; combined uses the bare source tag.
-- Images are published once per content (content tag `c-…`) and then tagged with the source tag; see
-  `docs/build-caching.md`. `captain release status` tells whether the current outputs are published.
-- Releases: upstream pushes `v*` tags (`.github/workflows/release.yml`): GitHub Release with artifacts plus
-  OCI tags. In forks, every push to `main` gets the OCI tags `v0.0.0-ci.<run number>[<suffix>]`, via the
-  same workflow; set the repository variable `CAPTAIN_FORK_GH_RELEASE=true` to also get a GitHub prerelease.
-- `release tag` re-tags manifests in the registry with captain's own OCI client: no Docker needed.
+- Per-arch refs append `-amd64` or `-arm64`; combined uses the bare tag; arm64-only flavors get both.
+- Images are published once per content (content tag `c-…`), then tagged; `captain release status` tells whether
+  the current outputs are published.
+- Upstream releases from `v*` tags (GitHub Release + OCI tags). Forks: each push to `main` gets OCI tags
+  `v0.0.0-ci.<run number>[<suffix>]`; `CAPTAIN_FORK_GH_RELEASE=true` (repo variable) adds a GitHub prerelease.
+- `status` and `tag` need no Docker (captain's own OCI client).
 - `publish` computes `sha256sums-<flavor-id>-<arch>.txt` and includes checksums as OCI layers.
 - `REGISTRY_INSECURE=1` can be used for insecure registries (propagated to buildah/skopeo wrappers).
 
@@ -253,13 +257,24 @@ Exit QEMU with `Ctrl-a x` (that's `Ctrl` + `a`, release, then press `x`).
 |  |- qemu.py                 # qemu launcher
 |  `- tools.py                # pinned tool downloads
 |- custom/                    # user customizations
-|- docs/                      # documentation (design decisions, gotchas)
+|- docs/                      # documentation (see below)
 |- kernel.configs/            # kernel configuration (defconfig) for trixie-slim kernel builds
 |- mkosi.generated/           # rendered mkosi config tree for the current flavor (disposable)
 |- mkosi.input/               # build inputs (generated and cached)
 |- mkosi.output/              # per-flavor hashed mkosi outputs
 `- out/                       # final artifacts for release/use
 ```
+
+## Documentation
+
+- [docs/build-caching.md](docs/build-caching.md): content-hashed build cache (OCI registries), CI, release content tags
+- [docs/fork-custom-builds.md](docs/fork-custom-builds.md): custom builds and versioned images from a fork
+- [docs/gha-uv-python-deps-caching.md](docs/gha-uv-python-deps-caching.md): uv, CPython and dependency caching in CI
+- [docs/kernel-build.md](docs/kernel-build.md): the CaptainOS kernel (`trixie-slim`)
+- [docs/gotchas.md](docs/gotchas.md): known pitfalls
+- Design decisions: [flavor traits](docs/design-decisions/flavor-traits.md),
+  [OCI tooling (buildah/skopeo)](docs/design-decisions/oci-tooling-buildah-skopeo.md),
+  [replacing CAPT's image-builder](docs/design-decisions/k8s-capt-image-builder-replace.md)
 
 ## License
 
