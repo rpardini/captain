@@ -54,6 +54,7 @@ __all__ = [
 
 _resolved_scope: CacheScope | None = None
 _registries: dict[str, Registry] = {}
+_hit_explained = False
 
 
 def _in_docker() -> bool:
@@ -134,6 +135,7 @@ def restore(cfg: Config, key: CacheKey, directory: Path, *, force: bool = False)
             if _artifact.pull(_registry(location.host), repo, key, directory, _work_dir(cfg)):
                 (directory / MARKER).write_text(key.digest + "\n")
                 log.info("Cache: hit %s from %s", key, location)
+                _explain_hit()
                 return True
         except (RegistryError, urllib.error.URLError, OSError) as exc:
             log.warning("Cache: could not restore %s from %s: %s", key, location, exc)
@@ -141,6 +143,16 @@ def restore(cfg: Config, key: CacheKey, directory: Path, *, force: bool = False)
                 shutil.rmtree(directory)
     log.info("Cache: miss %s", key)
     return False
+
+
+def _explain_hit() -> None:
+    global _hit_explained
+    if not _hit_explained:
+        _hit_explained = True
+        log.info(
+            "Cache: identical inputs were already built and pushed there, so it was downloaded "
+            "instead of built; use --cache off to build everything locally."
+        )
 
 
 def require_build(cfg: Config, key: CacheKey) -> None:
