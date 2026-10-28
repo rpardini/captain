@@ -110,8 +110,8 @@ uv run captain release tag --help
 
 ## Addendum: existence checks and re-tags in Python
 
-Building, pulling and tagging release images still use buildah and skopeo. Checking whether an image
-already exists (`captain release status`, publish's content-tag check) and adding a commit's source
-tag to an existing image are done by captain's own OCI client (`captain/cache/_registry.py`): they
-need no Docker, so CI doesn't pull the builder image just to find there's nothing to do. See
-`docs/build-caching.md`.
+Building and pulling release images still use buildah and skopeo. Checking whether an image already
+exists (`captain release status`, publish's content-tag check), adding a commit's source tag to an
+existing image, and `captain release tag` are manifest operations done by captain's own OCI client
+(`captain/cache/_registry.py`): they need no Docker, so CI doesn't pull the builder image just to
+find there's nothing to do, or to add tags. See `docs/build-caching.md`.

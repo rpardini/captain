@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 
 from captain import skopeo
+from captain.cache._registry import Registry
 
 from ._common import _image_ref
 
@@ -49,10 +50,13 @@ def tag_image(
     src_tag: str,
     new_tag: str,
 ) -> None:
-    """Tag an existing OCI artifact image with a new version."""
+    """Tag an existing OCI artifact image with a new version.
+
+    Both tags live in the same repository, so this is a manifest re-tag (what
+    ``skopeo copy --all`` amounted to): no blobs move.
+    """
     src_ref = _image_ref(registry, repository, artifact_name, src_tag)
-    dest_ref = _image_ref(registry, repository, artifact_name, new_tag)
-    skopeo.copy(src_ref, dest_ref)
+    Registry(registry).retag(f"{repository}/{artifact_name}", src_tag, new_tag)
     log.info("Tagged %s → %s", src_ref, new_tag)
 
 

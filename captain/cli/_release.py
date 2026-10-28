@@ -169,12 +169,17 @@ def pull_command(cfg: Config, pull_output: Path) -> None:
 )
 @click.pass_obj
 def tag_command(cfg: Config, new_tag: str) -> None:
-    """Tag an existing release image with a new version."""
+    """Tag an existing release image with a new version.
+
+    A manifest re-tag within the repository, done by captain's own OCI client:
+    no Docker (or builder image) needed, whatever the release mode.
+    """
     log.debug("Release tag with Config: %s and new_tag %s", cfg, new_tag)
 
     cfg.release_new_tag = new_tag
 
-    if skip_or_relaunch_in_docker(cfg, "tag"):
+    if cfg.release_mode == "skip":
+        log.info("RELEASE_MODE=skip — nothing to do.")
         return
 
     flavor = captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)

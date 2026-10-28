@@ -191,8 +191,10 @@ Notes:
 - Per-arch publish refs append `-amd64` or `-arm64`; combined uses the bare source tag.
 - Images are published once per content (content tag `c-…`) and then tagged with the source tag; see
   `docs/build-caching.md`. `captain release status` tells whether the current outputs are published.
-- Releases: upstream pushes `v*` tags (`.github/workflows/release.yml`). In forks, every push to `main`
-  becomes a GitHub prerelease `v0.0.0-ci.<run number>` with matching OCI tags, via the same workflow.
+- Releases: upstream pushes `v*` tags (`.github/workflows/release.yml`): GitHub Release with artifacts plus
+  OCI tags. In forks, every push to `main` gets the OCI tags `v0.0.0-ci.<run number>[<suffix>]`, via the
+  same workflow; set the repository variable `CAPTAIN_FORK_GH_RELEASE=true` to also get a GitHub prerelease.
+- `release tag` re-tags manifests in the registry with captain's own OCI client: no Docker needed.
 - `publish` computes `sha256sums-<flavor-id>-<arch>.txt` and includes checksums as OCI layers.
 - `REGISTRY_INSECURE=1` can be used for insecure registries (propagated to buildah/skopeo wrappers).
 
