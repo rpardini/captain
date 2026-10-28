@@ -187,7 +187,7 @@ flowchart LR
     tools["download-tools<br/>(if cache_push)"]
     build["build-captainos<br/>(every flavor x arch;<br/>skips building when<br/>already published)"]
     combined["publish-combined<br/>(main only; --cache-only)"]
-    release["release<br/>(forks, main only:<br/>v0.0.0-ci.run_number)"]
+    release["release<br/>(forks, main only:<br/>v0.0.0-ci.run_number tags)"]
     prepare --> builder & tools
     prepare --> build
     tools & builder --> build
@@ -195,10 +195,20 @@ flowchart LR
     combined --> release
 ```
 
-- The registry is the only hand-off between jobs: no `actions/cache`, no workflow artifacts.
-- In forks, each push to `main` ends with `release` (the reusable `release.yml`): a GitHub
-  prerelease `v0.0.0-ci.<run number>` with every flavor's artifacts, and matching OCI tags. It
-  pulls, packs and uploads one flavor at a time to keep the runner's disk usage bounded.
+- The registry is the only hand-off between jobs: no workflow artifacts, and no build outputs in the
+  GitHub Actions cache (which only holds uv itself; see below).
+- In forks, each push to `main` ends with `release` (the reusable `release.yml`): OCI tags
+  `v0.0.0-ci.<run number>[<suffix>]` for every flavor, by manifest re-tags (seconds). With the
+  repository variable `CAPTAIN_FORK_GH_RELEASE=true`, also a GitHub prerelease with every flavor's
+  artifacts, pulled, packed and uploaded one flavor at a time to keep the runner's disk usage
+  bounded (~10 min more). Upstream `v*` tags always get the GitHub Release.
+- Every job sets up uv through the local action `.github/actions/setup-uv`, which keeps uv itself in
+  the GitHub Actions cache: the uv binary (pinned version, restored into the runner's tool cache),
+  CPython (CI pins 3.13 via `UV_PYTHON`; local builds are unaffected) and the downloaded wheels
+  (keyed on `pyproject.toml`; `uv.lock` stays gitignored, so bump the action's `cache-suffix` to pick
+  up newer dependencies). Jobs then download nothing from astral.sh, python-build-standalone or PyPI.
+  Following setup-uv, these caches are skipped for tag pushes, releases, `pull_request_target` and
+  `workflow_run` (cache poisoning).
 - `download-tools` is a cache warmer (tools are used by every flavor), run only when the run may
   push; otherwise (fork PRs) each build job downloads them itself on a miss.
 - The CaptainOS kernel has no job of its own: only `trixie-slim` uses it, and its build jobs

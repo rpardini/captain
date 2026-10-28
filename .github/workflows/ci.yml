@@ -34,10 +34,10 @@ jobs:
       matrix_combined: ${{ steps.flavors.outputs.matrix_combined }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: ./.github/actions/setup-uv
 
       - name: Install lint tools
         run: make lint-install
@@ -73,10 +73,10 @@ jobs:
       ARCH: ${{ matrix.arch }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: ./.github/actions/setup-uv
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -114,10 +114,10 @@ jobs:
       TOOLS_MODE: native
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: ./.github/actions/setup-uv
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -155,10 +155,10 @@ jobs:
       ARMBIAN_VERSION: ${{ needs.prepare.outputs.armbian_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: ./.github/actions/setup-uv
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -212,13 +212,13 @@ jobs:
       TARGET: combined
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Load shared config
         run: cat .github/config.env >> "$GITHUB_ENV"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: ./.github/actions/setup-uv
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -247,9 +247,12 @@ jobs:
         run: uv run captain release publish
 
   # -------------------------------------------------------------------
-  # Forks only: every push to main becomes a prerelease, so consumers get
-  # a stable, monotonically increasing version to bump to. Upstream keeps
-  # releasing from manually pushed v* tags (release.yml).
+  # Forks only: every push to main gets a version, v0.0.0-ci.<run number>,
+  # so consumers have a stable, monotonically increasing one to bump to.
+  # By default just OCI tags (consumers use the images, eg. as k8s image
+  # volumes); set the repo variable CAPTAIN_FORK_GH_RELEASE=true to also
+  # get a GitHub prerelease with every flavor's artifacts (much slower).
+  # Upstream keeps releasing from manually pushed v* tags (release.yml).
   # -------------------------------------------------------------------
   release:
     name: "release v0.0.0-ci.${{ github.run_number }}"
@@ -263,3 +266,4 @@ jobs:
       version: v0.0.0-ci.${{ github.run_number }}
       sha: ${{ github.sha }}
       prerelease: true
+      github-release: ${{ vars.CAPTAIN_FORK_GH_RELEASE == 'true' }}
