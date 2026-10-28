@@ -200,6 +200,10 @@ flowchart LR
   restore it from the cache or build (and push) it, so no other flavor waits on a kernel build.
 - `publish-combined` restores both arches' outputs with `--cache-only`, so it never rebuilds.
 - All jobs log in to `ghcr.io` with `GITHUB_TOKEN` (`permissions: packages: write`).
+- The Docker builder image (`<repo>/builder:<arch>-<Dockerfile sha256>`) follows the same two levels:
+  this repo's, then upstream's. `build-dockerfile` runs `captain builder --ensure-remote`, which only
+  checks the registries (no pull) and builds/pushes only when neither has it; jobs that actually
+  run something in Docker pull it from the first registry that has it.
 
 ### What to expect
 
