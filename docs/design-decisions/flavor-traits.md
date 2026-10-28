@@ -126,7 +126,7 @@ classDiagram
     class Tink { content = role/tink }
     class Kubernetes { content = role/k8s }
     class KubernetesCapt { content = role/k8s-capt }
-    class Output { output_kind; mkosi_image_name }
+    class Output { output_kind }
     class Mem { content = output/mem }
     class Img { content = output/img }
 

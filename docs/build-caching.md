@@ -1,0 +1,196 @@
+# Build caching
+
+CaptainOS caches every expensive build piece as an OCI artifact in a container registry
+(`ghcr.io` by default). The same cache serves GitHub Actions and local builds, on any host.
+
+- **Content-hashed**: an entry's key is a hash of its declared inputs only — never git revisions,
+  hostnames, paths or timestamps. A rebuild with only doc/CI-YAML changes resolves to the same
+  keys, and finishes fast.
+- **Two levels**: a *downstream* cache (a fork, eg. `ghcr.io/rpardini/captain`) is tried first,
+  then the *upstream* one (`ghcr.io/tinkerbell/captain`). A build only ever writes to its own level.
+- **ORAS-style artifacts**: an OCI image manifest with an `artifactType`, an empty config, and a
+  single layer: a deterministic tar of the piece's output directory (file modes kept).
+
+The implementation lives in `captain/cache/` (pure Python; no `oras`, `skopeo` or Docker needed
+to read or write the cache).
+
+## What is cached
+
+| Piece | Repository | Output directory | Key inputs |
+|---|---|---|---|
+| tools | `cache/tools` | `mkosi.input/tools/<arch>` | arch; `tools.py` (holds the pinned `TOOLS` manifest) |
+| kernel | `cache/kernel` | `mkosi.input/kernel/<arch>` | arch; kernel version; defconfig; `kernel.py`; `Dockerfile` (toolchain) |
+| mkosi output | `cache/initramfs`, `cache/image` | `mkosi.output/<kind>/<flavor>/<arch>/<flavor_hash>` | arch; flavor id; `flavor_hash` (the whole rendered mkosi tree: traits, `custom/`, cache-bust tokens such as the Armbian repo version, Kubernetes version, distro epochs); tools key; kernel key (CaptainOS-kernel flavors); `Dockerfile` (mkosi version, apt/dnf); `cli/stages.py`, `docker.py` |
+| ISO | `cache/iso` | `mkosi.output/iso/<flavor>/<arch>/<flavor_hash>` (minus `staging/`) | mkosi key; `iso.py`; `Dockerfile` (grub) |
+
+Repositories are under the cache location, eg. `ghcr.io/tinkerbell/captain/cache/kernel`. Tags are
+`<name>-<arch>-<first 24 hex of the key digest>`, eg. `linux-6.18.39-amd64-671da3c1d602fda942dc51bc`
+or `trixie-slim-arm64-6fa6019f6de405df4f374228`.
+
+Every key also folds in `CACHE_SCHEMA` (artifact format) and `CACHE_EPOCH` (see
+[Forcing rebuilds](#forcing-rebuilds)). The full canonical inputs are stored in each manifest's
+`io.tinkerbell.captain.cache.inputs` annotation, and checked on pull.
+
+```mermaid
+flowchart LR
+    tools["tools<br/>(tools.py)"]
+    kernel["kernel<br/>(version, defconfig,<br/>kernel.py, Dockerfile)"]
+    flavor["flavor_hash<br/>(rendered mkosi tree,<br/>custom/, tokens, epochs)"]
+    mkosi["mkosi output<br/>(initramfs / image)"]
+    iso["ISO"]
+    docker["Dockerfile"]
+    tools --> mkosi
+    kernel -- "CaptainOS-kernel<br/>flavors only" --> mkosi
+    flavor --> mkosi
+    docker --> mkosi
+    mkosi --> iso
+    docker --> iso
+```
+
+The key graph means a cache hit high up skips everything below it: when a flavor's mkosi output is
+cached, `captain build` doesn't download tools or build the kernel at all.
+
+Captain's own Python modules are folded in per piece (the modules listed above), not wholesale, so
+unrelated refactors don't rebuild everything. **When a change to another module alters what a piece
+produces, add that module to its key** in `captain/cache/_keys.py` (or bump `CACHE_EPOCH`) — the
+cache is only as trustworthy as these lists.
+
+## How a piece is resolved
+
+Each output directory holds a `.captain-cache-key` marker with the digest it was built or restored
+for, so local re-runs are content-addressed too: a stale directory (eg. after a tool version bump)
+is wiped and rebuilt, rather than reused because "the file exists".
+
+```mermaid
+sequenceDiagram
+    participant S as stage (tools/kernel/mkosi/iso)
+    participant D as output dir
+    participant R as registries (read list)
+    participant W as registry (write)
+    S->>D: marker == key digest?
+    alt local hit
+        D-->>S: up to date, done
+    else
+        S->>D: wipe
+        loop downstream, then upstream
+            S->>R: manifest <repo>:<tag>?
+            R-->>S: found: download layer, verify digest, extract, write marker
+        end
+        alt miss everywhere
+            S->>S: build (native or Docker); --cache-only fails here instead
+            S->>D: write marker
+            opt this build may write
+                S->>W: push layer + manifest (unless the tag already exists)
+            end
+        end
+    end
+```
+
+Registry errors never fail a build: they are logged and treated as misses (or skipped pushes).
+All remote cache work happens in the host process; the Docker-relaunched one only builds.
+
+## Who reads and writes what
+
+```mermaid
+flowchart TD
+    start{GITHUB_ACTIONS?}
+    start -- yes --> pr{pull_request from<br/>another repo?}
+    pr -- yes --> ro["read: PR head fork, this repo, upstream<br/>write: nothing"]
+    pr -- "no (push, dispatch,<br/>same-repo PR)" --> up{this repo is<br/>tinkerbell/captain?}
+    up -- yes --> wu["read: upstream<br/>write: upstream"]
+    up -- no --> wd["read: this fork, upstream<br/>write: this fork"]
+    start -- no --> git["downstream = GitHub repo of the current branch's<br/>tracking remote, else 'origin' (if not upstream)"]
+    git --> local["read: downstream, upstream<br/>write: downstream, only with --cache-push"]
+```
+
+| Context | Reads | Writes |
+|---|---|---|
+| upstream repo: push to main / dispatch / same-repo PR | upstream | upstream |
+| upstream repo: PR from a fork | fork, upstream | — |
+| fork repo: push / dispatch / same-repo PR | fork, upstream | fork |
+| fork repo: PR from a third repo | that repo, fork, upstream | — |
+| local build | downstream (from git remotes), upstream | downstream, with `--cache-push` |
+
+Same-repo PRs do write: the keys must fully describe the outputs, so a later main build can trust
+entries pushed from a PR branch.
+
+`captain cache info` shows the detected context, read/write locations, and every key of the
+selected flavor/arch with where it was found:
+
+```bash
+uv run captain --flavor-id trixie-slim --arch arm64 cache info
+```
+
+## Options
+
+| Option | Env | Meaning |
+|---|---|---|
+| `--cache on\|read\|off` | `CAPTAIN_CACHE` | `on` (default): read; push where allowed. `read`: never push. `off`: no remote cache (markers still apply). |
+| `--cache-push` | `CAPTAIN_CACHE_PUSH` | Local builds: push what was built to the downstream cache. |
+| `--cache-only` | `CAPTAIN_CACHE_ONLY` | Fail instead of building anything that is not cached. |
+| | `CAPTAIN_CACHE_DOWNSTREAM` | Override the downstream location (`host/prefix`, eg. `localhost:5000/captain`). |
+| | `CAPTAIN_CACHE_UPSTREAM` | Override the upstream location; `none` disables it. |
+| | `CAPTAIN_CACHE_TOKEN`, `GITHUB_TOKEN` | Token for `ghcr.io`. |
+| | `REGISTRY_USERNAME`, `REGISTRY_PASSWORD` | Credentials for any registry. |
+| | `REGISTRY_INSECURE=1` | Plain HTTP (implied for `localhost`). |
+
+Otherwise, credentials come from the Docker config (`~/.docker/config.json`: `auths`,
+`credHelpers`, `credsStore` — so `docker login ghcr.io` is enough, including the macOS keychain).
+Public repositories need no credentials to read. `--force`, `--force-kernel`, `--force-tools` and
+`--force-iso` skip restoring (but still push the fresh build, when allowed).
+
+### Trying it with a throwaway registry
+
+```bash
+docker run -d --rm --name captain-cache -p 5000:5000 registry:2
+export CAPTAIN_CACHE_DOWNSTREAM=localhost:5000/captain CAPTAIN_CACHE_UPSTREAM=none
+uv run captain --flavor-id trixie-slim --cache-push build    # builds and pushes everything
+rm -rf mkosi.input mkosi.output out
+uv run captain --flavor-id trixie-slim build                 # restores everything; no kernel/mkosi run
+curl -s localhost:5000/v2/_catalog
+```
+
+## Forcing rebuilds
+
+Inputs that live outside the repository (distro package repositories) are not hashed. When they
+matter — eg. a CVE fix landed in Debian — bump an epoch:
+
+- one distro: pass `cache_epoch=N` to its trait in `captain/flavors.py`, eg. `Debian("trixie", cache_epoch=1)`;
+  it is rendered as a cache-bust token into the flavor's mkosi config, so only its flavors rebuild;
+- everything: bump `CACHE_EPOCH` in `captain/cache/_keys.py`.
+
+The Armbian flavors already fold in the armbian-next repository version (`ARMBIAN_VERSION`, resolved
+by CI), and the CaptainOS kernel the latest kernel.org release of its branch (`KERNEL_VERSION`).
+
+## GitHub Actions
+
+```mermaid
+flowchart LR
+    prepare["prepare<br/>(lint, versions,<br/>matrix, cache_push)"]
+    builder["build-dockerfile"]
+    tools["download-tools<br/>(if cache_push)"]
+    kernel["build-captainos-kernel<br/>(if cache_push)"]
+    build["build-captainos<br/>(every flavor x arch)"]
+    combined["publish-combined<br/>(main only; --cache-only)"]
+    prepare --> builder & tools
+    builder --> kernel
+    prepare --> build
+    tools & kernel & builder --> build
+    build --> combined
+```
+
+- The registry is the only hand-off between jobs: no `actions/cache`, no workflow artifacts.
+- `download-tools` and `build-captainos-kernel` are cache warmers, run only when the run may push;
+  otherwise (fork PRs) each build job builds whatever it misses itself.
+- `publish-combined` restores both arches' outputs with `--cache-only`, so it never rebuilds.
+- All jobs log in to `ghcr.io` with `GITHUB_TOKEN` (`permissions: packages: write`).
+
+### ghcr.io notes
+
+- A package created by a push starts **private**. Once the `cache/*` packages exist, make them
+  public (package settings → visibility), so that local builds and forks can read them anonymously.
+  Manifests carry `org.opencontainers.image.source`, linking each package to its repository so
+  that the repository's `GITHUB_TOKEN` can keep pushing.
+- ghcr.io answers anonymous requests for missing or private packages with HTTP 403; these count as
+  misses.
+- Nothing prunes old cache tags yet; clean them up from the package settings if needed.

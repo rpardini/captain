@@ -249,6 +249,8 @@ def run_in_builder(
     docker_args += ["-v", f"{cfg.project_dir}/captain:/work/captain"]
     docker_args += ["-v", f"{cfg.project_dir}/pyproject.toml:/work/pyproject.toml"]
     docker_args += ["-v", f"{cfg.project_dir}/build.py:/work/build.py"]
+    # Build-cache keys hash the Dockerfile (toolchain); not part of the image itself.
+    docker_args += ["-v", f"{cfg.project_dir}/Dockerfile:/work/Dockerfile:ro"]
 
     docker_args += ["--mount", "type=volume,source=captain-cache-packages,target=/cache/packages"]
     docker_args += [

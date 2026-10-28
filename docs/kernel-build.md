@@ -14,13 +14,15 @@ uv run captain kernel --help
 Important options:
 
 - `--kernel-mode {docker,native,skip}`
-- `--force-kernel`
+- `--force-kernel` (rebuild even if cached)
 - `--kernel-version`
 - `--config` (interactive `menuconfig` flow; implies rebuild)
 
 ## Build outputs and handoff
 
 - Kernel build artifacts are staged under `mkosi.input/kernel/<arch>/`.
+- They are cached by a hash of kernel version, defconfig, `kernel.py` and the `Dockerfile`; an unchanged kernel is
+  restored from the build cache instead of rebuilt (see `docs/build-caching.md`).
 - Flavor generation + mkosi consume the staged kernel/modules.
 - Final published kernel artifact is copied to `out/vmlinuz-<flavor-id>-<arch>`.
 

@@ -136,6 +136,13 @@ Most stages support `docker | native | skip`:
 Defaults are command-specific (for example, `captain build` defaults to `--tools-mode native`, while `captain tools`
 defaults to `--tools-mode docker`). Use `--help` on each command for current defaults.
 
+## Build cache
+
+Tools, kernels, mkosi outputs and ISOs are cached as content-hashed OCI artifacts in `ghcr.io`: your fork's cache
+first (detected from git remotes), then `tinkerbell/captain`'s. Unchanged inputs are restored instead of rebuilt, locally
+and in CI alike. `uv run captain cache info` shows what would be used; `--cache-push` pushes local builds to your fork's
+cache. See `docs/build-caching.md`.
+
 ## Customization via `custom/`
 
 The `custom/` directory is mounted automatically in docker-mode runs and applied to every flavor, as the last mkosi drop-in.
@@ -226,6 +233,7 @@ Exit QEMU with `Ctrl-a x` (that's `Ctrl` + `a`, release, then press `x`).
 .
 |- build.py
 |- captain/
+|  |- cache/                  # content-hashed build cache (OCI artifacts in registries)
 |  |- cli/                    # click CLI groups/commands
 |  |- traits/                 # flavor building blocks (distro/platform/role/output) and their mkosi content
 |  |- flavor.py               # flavor composition and mkosi.generated/ rendering

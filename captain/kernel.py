@@ -1,14 +1,13 @@
 """Kernel download, configuration, compilation, and packaging.
 
 Heavy lifting (make) is still done via subprocess — only the
-orchestration is in Python.  Called directly by ``cli.build_kernel_stage``
+orchestration is in Python.  Called directly by ``stages.build_kernel_stage``
 in both native and Docker modes (inside the container we re-enter
 the CLI with all modes forced to native).
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
@@ -157,7 +156,7 @@ def _kernel_branch(version: str) -> str:
     return f"{parts[0]}.{parts[1]}.y"
 
 
-def _find_defconfig(cfg: Config) -> Path:
+def find_defconfig(cfg: Config) -> Path:
     """Locate the defconfig for the current kernel version and architecture."""
     ai = cfg.arch_info
     branch = _kernel_branch(cfg.kernel_version)
@@ -188,7 +187,7 @@ def _find_defconfig(cfg: Config) -> Path:
 def configure_kernel(cfg: Config, src_dir: Path) -> None:
     """Apply defconfig and run olddefconfig."""
     ai = cfg.arch_info
-    defconfig = _find_defconfig(cfg)
+    defconfig = find_defconfig(cfg)
 
     make_env = {"ARCH": ai.kernel_arch}
     if ai.cross_compile:
@@ -275,19 +274,13 @@ def build_kernel(cfg: Config, src_dir: Path) -> str:
 
 
 def obtain_target_artifact_path(cfg, ensure_parent: bool = False) -> Path:
+    from captain.cache import kernel_key
+
     if ensure_parent:
         ensure_dir(cfg.kernel_output)
 
-    # let's hash:
-    # 1) the input defconfig
-    defconfig = _find_defconfig(cfg)
-    hex_digest_defconfig = hashlib.sha256(defconfig.read_bytes()).hexdigest()
-    # 2) the contents of this script (as an imperfect proxy for the build logic)
-    script_path = Path(__file__)
-    hex_digest_script = hashlib.sha256(script_path.read_bytes()).hexdigest()
-    # Combine and shorten to 8 chars for the final version hash
-    version_hash = hashlib.sha256((hex_digest_defconfig + hex_digest_script).encode()).hexdigest()
-    version_hash_shorten = version_hash[:8]
+    # The build-cache key covers defconfig, this module and the toolchain (Dockerfile).
+    version_hash_shorten = kernel_key(cfg).digest[:8]
 
     return (
         cfg.kernel_output / f"linux-image-{cfg.kernel_version}-captainos"
