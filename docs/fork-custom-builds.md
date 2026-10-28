@@ -129,3 +129,150 @@ Without `--cache-push`, local builds only read caches (the log says `Cache: not 
 and a cache hit is downloaded instead of built. To push local builds to the fork's cache, log in with a
 token that can write packages (`docker login ghcr.io`) and pass `--cache-push`. Version tokens (kernel, armbian) are resolved like
 CI does, so local and CI cache keys match; see `docs/build-caching.md`.
+
+## Without a fork: a repository holding only `custom/`
+
+Instead of forking, keep just your customizations in a repository of your own, eg. `OWNER/my-custom-captain`, whose
+root is the contents of `custom/`:
+
+```
+my-custom-captain/
+├── .github/workflows/build.yml
+├── packages.txt
+├── files/etc/...
+├── mkosi-postinst/10-my-setup.sh
+└── by-flavor/trixie-full/...        # custom/by-<axis>/<value>/ dirs work as usual
+```
+
+Its workflow checks out upstream `tinkerbell/captain` at a pinned ref, puts the repository in place of `custom/`, and
+runs the same `captain` commands as upstream's CI. Everything that depends on the repository follows
+`GITHUB_REPOSITORY`, so it lands in `OWNER/my-custom-captain`'s own namespace, with no extra configuration:
+
+| What | Where |
+|---|---|
+| build cache, read | `ghcr.io/owner/my-custom-captain/cache/*`, then `ghcr.io/tinkerbell/captain/cache/*` |
+| build cache, written | `ghcr.io/owner/my-custom-captain/cache/*` (pushes to `main`) |
+| builder image | upstream's when it has one for the same `Dockerfile`, else `ghcr.io/owner/my-custom-captain/builder` |
+| published images | `ghcr.io/owner/my-custom-captain/artifacts` |
+
+Pin `CAPTAIN_REF` to a commit or tag upstream CI built: then tools, kernels and every piece your customizations don't
+touch are restored from upstream's cache, and only the customized flavors are built (and cached in your namespace).
+Bumping `CAPTAIN_REF` is how you pick up upstream changes.
+
+### Example: `trixie-full`, both arches
+
+`trixie-full` is multi-arch: each arch is built and published, then combined into one multi-arch image, which is
+finally tagged with a version (`v0.0.0-ci.<run number>`, plus `-amd64`/`-arm64` and `-trixie-full` variants).
+
+```yaml
+# OWNER/my-custom-captain: .github/workflows/build.yml
+name: Build CaptainOS
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  CAPTAIN_REF: main          # pin to an upstream commit or tag that upstream CI built
+  FLAVOR_ID: trixie-full
+  FORCE_COLOR: "1"
+  GIT_SHA: ${{ github.sha }} # per-commit image tags follow this repository, not upstream's checkout
+
+jobs:
+  prepare: # resolve version tokens once, so every job computes the same cache keys
+    runs-on: ubuntu-latest
+    outputs:
+      kernel_version: ${{ steps.versions.outputs.kernel_version }}
+      armbian_version: ${{ steps.versions.outputs.armbian_version }}
+    steps:
+      - uses: actions/checkout@v7
+        with: { repository: tinkerbell/captain, ref: "${{ env.CAPTAIN_REF }}" }
+      - run: rm -rf custom
+      - uses: actions/checkout@v7
+        with: { path: custom }
+      - uses: ./.github/actions/setup-uv
+      - id: versions
+        run: uv run captain prepare-versions >> "$GITHUB_OUTPUT"
+      - run: uv run captain cache info # logs the cache scope and what's already cached
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix: { arch: [amd64, arm64] }
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    env:
+      ARCH: ${{ matrix.arch }}
+      TARGET: ${{ matrix.arch }}
+      KERNEL_VERSION: ${{ needs.prepare.outputs.kernel_version }}
+      ARMBIAN_VERSION: ${{ needs.prepare.outputs.armbian_version }}
+    steps:
+      - uses: actions/checkout@v7
+        with: { repository: tinkerbell/captain, ref: "${{ env.CAPTAIN_REF }}" }
+      - run: rm -rf custom
+      - uses: actions/checkout@v7
+        with: { path: custom }
+      - uses: ./.github/actions/setup-uv
+      - uses: docker/login-action@v4
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - run: uv run captain builder --push --ensure-remote # no-op when upstream (or you) already has it
+      - id: release
+        run: uv run captain release status --github-output >> "$GITHUB_OUTPUT"
+      - if: steps.release.outputs.published != 'true'
+        run: uv run captain build # restores whatever is cached, builds the rest
+      - run: uv run captain release publish
+
+  publish-combined:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    env:
+      TARGET: combined
+      CAPTAIN_CACHE_ONLY: "1" # both arches were just built and cached: restore, never build
+      KERNEL_VERSION: ${{ needs.prepare.outputs.kernel_version }}
+      ARMBIAN_VERSION: ${{ needs.prepare.outputs.armbian_version }}
+    steps:
+      - uses: actions/checkout@v7
+        with: { repository: tinkerbell/captain, ref: "${{ env.CAPTAIN_REF }}" }
+      - run: rm -rf custom
+      - uses: actions/checkout@v7
+        with: { path: custom }
+      - uses: ./.github/actions/setup-uv
+      - uses: docker/login-action@v4
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - id: release
+        run: uv run captain --arch amd64 release status --github-output >> "$GITHUB_OUTPUT"
+      - if: steps.release.outputs.published != 'true'
+        run: |
+          uv run captain --arch amd64 build
+          uv run captain --arch arm64 build
+      - run: uv run captain --arch amd64 release publish
+      - run: uv run captain --arch amd64 release tag --new-tag "v0.0.0-ci.${{ github.run_number }}"
+```
+
+Then pull it like any other Captain image, eg. `ghcr.io/owner/my-custom-captain/artifacts:v0.0.0-ci.<n>` (see
+"Consuming the images" above).
+
+- The custom checkout lands in `custom/`, replacing upstream's examples; its `.git/` is ignored.
+- An arm64-only flavor (eg. `trixie-armbian-rpi`) needs only the `build` job, with `matrix: { arch: [arm64] }`, plus
+  the tag step there (`release tag --new-tag "v0.0.0-ci.<n><suffix>"`, the suffix from `captain list-flavors
+  --release`, eg. `-rpi`).
+- More flavors: repeat the jobs per flavor, or generate the matrices like upstream's `ci.yml` does with
+  `uv run captain list-flavors --github-output` (honoring your `builds.txt`).
+- Customization changes rebuild only the flavors they apply to; upstream changes arrive when you bump `CAPTAIN_REF`.
+
+### Locally
+
+```bash
+git clone https://github.com/tinkerbell/captain && cd captain
+rm -rf custom && ln -s ../my-custom-captain custom   # your repository, as custom/
+export CAPTAIN_CACHE_DOWNSTREAM=ghcr.io/owner/my-custom-captain   # read your cache too (before upstream's)
+uv run captain --flavor-id trixie-full build                       # add --cache-push to write to it
+```
+
+The local clone's git remote is upstream's, so `CAPTAIN_CACHE_DOWNSTREAM` points the cache at your namespace instead.
+Docker-mode builds mount `custom/` through the symlink: on macOS, keep the target in a directory shared with the Docker
+VM (eg. under your home directory with colima/Docker Desktop defaults).
