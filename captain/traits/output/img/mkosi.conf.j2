@@ -8,4 +8,6 @@ CompressLevel=19
 [Content]
 # The bootloader is set up by our own postinst (distro initrd + systemd-boot/extlinux)
 Bootable=no
-Autologin=no
+# Root autologin on the consoles (tty1, serial: see serial-getty@.service.d), like the in-memory output.
+# Root's password stays locked: ssh and plain login prompts still need cloud-init's users.
+Autologin=yes

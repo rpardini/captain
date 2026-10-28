@@ -101,7 +101,7 @@ mkosi drop-in content (see `captain/traits/__init__.py`). Here is a current list
 | `resolute-rockchip64`      | `arm64`          | no  | Ubuntu 26.04 Resolute for Rockchip boards, using Armbian's _mainline_ rockchip64 kernel                               |
 | `rockylinux10-full`        | `amd64`, `arm64` | yes | Rocky Linux 10 (+EPEL), standard Rocky kernel, working `dnf`. amd64 requires x86-64-v3 (Haswell or newer) CPUs        |
 | `mem-k8s-capt-<base>`      | as `<base>`      | as  | In-memory Kubernetes node for CAPT (kubeadm/kubelet/kubectl, containerd CRI, cloud-init for Tootles)                  |
-| `img-k8s-capt-<base>`      | as `<base>`      | no  | Kubernetes node **disk image** for CAPT (as above, plus ssh, root locked, users via cloud-init)                      |
+| `img-k8s-capt-<base>`      | as `<base>`      | no  | Kubernetes node **disk image** for CAPT (as above, plus ssh; root autologin on consoles, password locked; users via cloud-init) |
 
 k8s `<base>`s: `trixie-full`, `resolute-full`, `rockylinux10-full`, `trixie-rockchip64`, `trixie-armbian-rpi`.
 
