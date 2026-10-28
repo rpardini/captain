@@ -173,6 +173,9 @@ def tag_command(cfg: Config, new_tag: str) -> None:
 
     A manifest re-tag within the repository, done by captain's own OCI client:
     no Docker (or builder image) needed, whatever the release mode.
+
+    *new_tag* is the version plus the flavor's release suffix (``list-flavors
+    --release``); the image is also tagged ``<version>-<flavor id>``.
     """
     log.debug("Release tag with Config: %s and new_tag %s", cfg, new_tag)
 
@@ -184,14 +187,20 @@ def tag_command(cfg: Config, new_tag: str) -> None:
 
     flavor = captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
 
-    oci.tag_all(
-        registry=str(cfg.release_registry),
-        repository=str(cfg.release_repository),
-        artifact_name=str(cfg.release_oci_artifact_name),
-        src_tag=str(cfg.release_src_tag),
-        new_tag=str(cfg.release_new_tag),
-        arches=list(flavor.supported_architectures),
-    )
+    # *new_tag* carries the flavor's release suffix (eg. "-rpi"). Also tag the image with
+    # the flavor id instead, the naming of the source tags (v0.0.0-<sha7>-<flavor id>), so
+    # consumers switching between per-commit and version tags only change the version.
+    suffix = flavor.tag_suffix
+    version = new_tag.removesuffix(suffix) if suffix else new_tag
+    for tag in dict.fromkeys([new_tag, f"{version}-{flavor.id}"]):
+        oci.tag_all(
+            registry=str(cfg.release_registry),
+            repository=str(cfg.release_repository),
+            artifact_name=str(cfg.release_oci_artifact_name),
+            src_tag=str(cfg.release_src_tag),
+            new_tag=tag,
+            arches=list(flavor.supported_architectures),
+        )
 
 
 @release_group.command("status")

@@ -195,6 +195,7 @@ Notes:
 
 - Base source tag defaults to `v0.0.0-<sha7>-<flavor-id>`.
 - Per-arch refs append `-amd64` or `-arm64`; combined uses the bare tag; arm64-only flavors get both.
+- `release tag --new-tag <version><suffix>` also tags `<version>-<flavor id>[-<arch>]`, the per-commit tags' naming.
 - Images are published once per content (content tag `c-…`), then tagged; `captain release status` tells whether
   the current outputs are published.
 - Upstream releases from `v*` tags (GitHub Release + OCI tags). Forks: each push to `main` gets OCI tags

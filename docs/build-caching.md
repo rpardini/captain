@@ -198,7 +198,8 @@ flowchart LR
 - The registry is the only hand-off between jobs: no workflow artifacts, and no build outputs in the
   GitHub Actions cache (which only holds uv itself; see below).
 - In forks, each push to `main` ends with `release` (the reusable `release.yml`): OCI tags
-  `v0.0.0-ci.<run number>[<suffix>]` for every flavor, by manifest re-tags (seconds). With the
+  `v0.0.0-ci.<run number>[<suffix>]` for every flavor (and `v0.0.0-ci.<run number>-<flavor id>`, the
+  per-commit tags' naming), by manifest re-tags (seconds). With the
   repository variable `CAPTAIN_FORK_GH_RELEASE=true`, also a GitHub prerelease with every flavor's
   artifacts, pulled, packed and uploaded one flavor at a time to keep the runner's disk usage
   bounded (~10 min more). Upstream `v*` tags always get the GitHub Release.

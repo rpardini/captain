@@ -65,6 +65,11 @@ with `-arm64`.
 
 `uv run captain list-flavors --release` prints the authoritative list (`<id> <target> <arch> <suffix>`).
 
+Every image is also tagged with the flavor id instead of the suffix, exactly like the per-commit tags:
+`v0.0.0-ci.<n>-<flavor id>[-<arch>]` (eg. `v0.0.0-ci.<n>-trixie-full`,
+`v0.0.0-ci.<n>-trixie-armbian-rpi-arm64`). So references written for per-commit tags
+(`v0.0.0-<sha7>-<flavor id>[-<arch>]`) switch to versions by changing only the version part.
+
 Each image's layers are plain files at its root: `vmlinuz-<flavor>-<arch>`,
 `initramfs-<flavor>-<arch>`, the ISO and disk image where the flavor has them, `dtb-…/` directories,
 and `sha256sums-<flavor>-<arch>.txt`.
