@@ -32,6 +32,14 @@ Commit them to the fork's `main`. `custom/` and each matching `custom.by-*/` dir
 flavor's cache key, so only customized flavors are rebuilt, while unchanged pieces (tools, the
 CaptainOS kernel) are reused.
 
+### Building only some flavors
+
+List the flavors CI should build in `custom/builds.txt`, one flavor id or glob per line (eg. `trixie-full`,
+`*-armbian-rpi`, `img-k8s-capt-*`). The shipped file lists every flavor commented out; an empty (or all-comments)
+file builds them all. Only CI reads it: the build matrix, version tags and GitHub Releases follow it, local builds
+don't. A line matching no flavor fails CI's `prepare` job. `uv run captain list-flavors` shows a `ci` column when the
+file selects only some.
+
 ## What CI does on each push to `main`
 
 ```mermaid

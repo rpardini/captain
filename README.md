@@ -124,7 +124,8 @@ image grown to `--disk-size`, seeding cloud-init over NoCloud (via SMBIOS) with 
 then `ssh -p 2222 captain@localhost`.
 
 Use `--flavor-id` (alias `--flavor`, or environment `FLAVOR_ID`) to select one. `uv run captain list-flavors` prints the registry; CI
-builds every registered flavor (matrices come from `captain list-flavors --github-output`), and releases tag each one
+builds every registered flavor, or those `custom/builds.txt` selects (matrices come from
+`captain list-flavors --github-output`), and releases tag each one
 as `<tag><suffix>` (see `release_tag_suffix` in `captain/flavors.py`).
 
 ## Build modes
@@ -161,6 +162,8 @@ The `custom/` directory is mounted automatically in docker-mode runs and applied
 - `custom/files/`: copied into the image (mapped under `mkosi.extra/`)
 - `custom/mkosi-postinst/`: scripts for the post-install phase (concatenated, run after every flavor's own)
 - `custom/mkosi-finalize/`: scripts for the finalize phase (likewise)
+- `custom/builds.txt`: which flavors CI builds and releases (ids or globs, one per line; empty: all). Local builds
+  ignore it.
 
 Scripts are Jinja-rendered and get `CAPTAIN_FLAVOR_ID`, `CAPTAIN_DISTRO`, `CAPTAIN_DISTRO_RELEASE`,
 `CAPTAIN_DISTRO_FAMILY` (`deb` or `rpm`), `CAPTAIN_ARCH`, `CAPTAIN_ROLE`, `CAPTAIN_OUTPUT`, `CAPTAIN_PLATFORM` and

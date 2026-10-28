@@ -90,6 +90,9 @@ Stumbling blocks hit while building the trait-based flavors (Rocky, Ubuntu, k8s 
 
 ## Build tooling / CI
 
+- `custom/builds.txt` lists every flavor commented out, but new flavors aren't added to it automatically (globs still
+  match them). `.github/mergify.yml` requires specific flavor jobs: a fork that deselects them must adjust it, if it
+  uses Mergify.
 - `--flavor-id` (alias `--flavor`) and `--arch` are **global** options: `captain --flavor-id X build`, not
   `captain build --flavor-id X`.
 - The cache keys hash whole modules (eg. `tools.py`, `kernel.py`, `docker.py`; see `cache/_keys.py`): even a log-only
