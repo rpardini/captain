@@ -141,7 +141,8 @@ defaults to `--tools-mode docker`). Use `--help` on each command for current def
 Tools, kernels, mkosi outputs and ISOs are cached as content-hashed OCI artifacts in `ghcr.io`: your fork's cache
 first (detected from git remotes), then `tinkerbell/captain`'s. Unchanged inputs are restored instead of rebuilt, locally
 and in CI alike. `uv run captain cache info` shows what would be used; `--cache-push` pushes local builds to your fork's
-cache. See `docs/build-caching.md`.
+cache. See `docs/build-caching.md`; for custom builds in a fork of this repository, see
+`docs/fork-custom-builds.md`.
 
 ## Customization via `custom/`
 

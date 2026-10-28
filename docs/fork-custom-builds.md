@@ -1,0 +1,109 @@
+# Custom CaptainOS builds in a fork
+
+A GitHub fork of `tinkerbell/captain` builds and publishes its own CaptainOS images with the same CI
+as upstream: push to the fork's `main`, and every flavor gets built (reusing whatever is unchanged),
+published as OCI images under the fork's own `ghcr.io` namespace, and versioned
+`v0.0.0-ci.<run number>`. Nothing needs a release process, secrets or a separate registry.
+
+## Setting up
+
+1. Fork `tinkerbell/captain` on GitHub.
+2. Enable GitHub Actions in the fork (GitHub disables workflows on new forks: **Actions** tab →
+   enable them).
+3. Push to the fork's `main` (eg. your customizations, see below).
+
+That's it. CI authenticates to `ghcr.io` with the workflow's own `GITHUB_TOKEN`
+(`permissions: packages: write`). Packages it creates are linked to the fork and inherit its
+visibility: public for a public fork, so they can be pulled anonymously.
+
+## Customizing
+
+Most customizations go in `custom/` (see "Customization via `custom/`" in `README.md`): extra
+packages (`custom/packages.txt`), files dropped into the image (`custom/files/`), and post-install /
+finalize scripts. They apply to every flavor. Flavors themselves are defined in `captain/flavors.py`.
+
+Commit them to the fork's `main`. `custom/` is part of every flavor's cache key, so customized flavors
+are rebuilt, while unchanged pieces (tools, the CaptainOS kernel) are reused.
+
+## What CI does on each push to `main`
+
+```mermaid
+flowchart LR
+    push["push to the fork's main"] --> build["build every flavor x arch<br/>(restore what's cached)"]
+    build --> publish["publish images<br/>ghcr.io/OWNER/captain/artifacts"]
+    publish --> tag["tag them<br/>v0.0.0-ci.RUN_NUMBER"]
+```
+
+- **Build cache**: pieces are looked up in the fork's own cache first
+  (`ghcr.io/<owner>/captain/cache/*`), then upstream's (`ghcr.io/tinkerbell/captain/cache/*`, once
+  upstream CI publishes one); whatever is built is pushed to the fork's cache. See
+  `docs/build-caching.md`. A push that changes no build inputs (eg. docs only) finishes in a few
+  minutes.
+- **Builder image**: the fork uses its own `ghcr.io/<owner>/captain/builder`, or upstream's when it has
+  one for the same `Dockerfile`; it only builds one when neither exists.
+- **Images**: published to `ghcr.io/<owner>/captain/artifacts` once per unique content, then tagged
+  for the commit (`v0.0.0-<sha7>-<flavor>[-<arch>]`).
+- **Version**: the final `release` job tags every flavor's image with `v0.0.0-ci.<run number>` plus
+  the flavor's suffix. Run numbers only increase, so consumers always have a newer version to bump
+  to. By default this is all it does (it takes under a minute).
+- Pull requests (including ones from the fork to upstream) build and test, but never tag versions;
+  PRs from other repositories can't push to any cache.
+
+## Image tags
+
+`<owner>` is the fork owner, lowercased. Multi-arch flavors get a multi-arch image (`linux/amd64` and
+`linux/arm64`), and per-arch ones as well; arm64-only flavors get a single tag.
+
+| Flavor | Version tag |
+|---|---|
+| `trixie-full` | `v0.0.0-ci.<n>` (and `-amd64`, `-arm64`) |
+| `trixie-slim` | `v0.0.0-ci.<n>-slim` (and `-slim-amd64`, `-slim-arm64`) |
+| `trixie-armbian-rpi` | `v0.0.0-ci.<n>-rpi` |
+| `trixie-genio`, `trixie-meson64`, `trixie-rockchip64`, `trixie-rockchip64-vendor` | `v0.0.0-ci.<n>-genio`, `-meson64`, `-rockchip64`, `-rockchip64-vendor` |
+| other flavors | `v0.0.0-ci.<n>-<flavor id>` (with `-amd64` / `-arm64` for multi-arch ones) |
+
+`uv run captain list-flavors --release` prints the authoritative list (`<id> <target> <arch> <suffix>`).
+
+Each image's layers are plain files at its root: `vmlinuz-<flavor>-<arch>`,
+`initramfs-<flavor>-<arch>`, the ISO and disk image where the flavor has them, `dtb-…/` directories,
+and `sha256sums-<flavor>-<arch>.txt`.
+
+## Consuming the images
+
+- **Kubernetes image volumes**: mount the image directly into a pod (on clusters with the
+  `ImageVolume` feature), eg. for something serving the kernel and initramfs:
+
+  ```yaml
+  volumes:
+    - name: captainos
+      image:
+        reference: ghcr.io/<owner>/captain/artifacts:v0.0.0-ci.<n>
+        pullPolicy: IfNotPresent
+  ```
+
+- **Files on disk**: for multi-arch flavors, `uv run captain --flavor-id <flavor> release --target
+  combined --src-tag v0.0.0-ci.<n><suffix> pull --pull-output <dir>` extracts both arches under
+  `out/<dir>`. (`--target amd64|arm64` appends `-<arch>` to the tag, so for arm64-only flavors, whose
+  version tag has no arch suffix, use an OCI tool instead.) Any OCI tool works, eg. `skopeo copy` or
+  `oras pull`.
+
+## Optional: GitHub Releases
+
+To also get a GitHub prerelease per push, with every flavor's artifacts attached (the way upstream's
+`v*` tags are released), set the repository variable `CAPTAIN_FORK_GH_RELEASE` to `true` (Settings →
+Secrets and variables → Actions → Variables). This adds about ten minutes per run: every flavor is
+pulled and uploaded, one at a time.
+
+## Building locally in the fork
+
+A local clone of the fork reads the same caches: `captain` detects the fork from the current branch's
+git remote (else `origin`), and tries its cache before upstream's.
+
+```bash
+uv run captain cache info          # which caches are read/written, and what's in them
+uv run captain build               # restores whatever CI already built
+```
+
+To push local builds to the fork's cache, log in with a token that can write packages
+(`docker login ghcr.io`) and pass `--cache-push`. Version tokens (kernel, armbian) are resolved like
+CI does, so local and CI cache keys match; see `docs/build-caching.md`.
