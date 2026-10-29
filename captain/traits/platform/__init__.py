@@ -71,10 +71,13 @@ class AcpiCaptainKernel(Acpi):
         return super().packages(flavor) | {f"linux-image-{flavor.cfg.kernel_version}-captainos"}
 
     def package_directories(self, flavor: Flavor) -> set[str]:
-        from captain.kernel import obtain_target_artifact_path
-
         cfg = flavor.cfg
-        return {str(obtain_target_artifact_path(cfg).parent.relative_to(cfg.project_dir))}
+        return {str(cfg.kernel_output.relative_to(cfg.project_dir))}
+
+    def cache_inputs(self, flavor: Flavor) -> dict[str, str]:
+        from captain.cache import kernel_key
+
+        return {"kernel": kernel_key(flavor.cfg).digest}
 
 
 class Armbian(Platform):

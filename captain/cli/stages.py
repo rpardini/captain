@@ -6,8 +6,9 @@ import logging
 import shutil
 from pathlib import Path
 
-from captain import docker, iso, kernel, tools
+from captain import cache, docker, iso, kernel, tools
 from captain.config import Config
+from captain.flavor import Flavor
 from captain.util import check_kernel_dependencies, check_mkosi_dependencies, run
 
 log = logging.getLogger(__name__)
@@ -22,16 +23,16 @@ def build_kernel_stage(cfg: Config) -> None:
         log.info("KERNEL_MODE=skip — skipping kernel build")
         return
 
-    # --- idempotency --------------------------------------------------
-    image_deb_package = kernel.obtain_target_artifact_path(cfg)
-    log.debug("Checking for existing kernel artifact at %s", image_deb_package)
-    if image_deb_package.is_file() and not cfg.force_kernel:
-        log.info("Kernel already built (use --force-kernel to rebuild)")
+    # --- cache --------------------------------------------------------
+    # menuconfig is interactive and never produces a build; keep it out of the cache.
+    key = cache.kernel_key(cfg)
+    if cfg.kernel_menuconfig:
+        if cfg.kernel_output.is_dir():
+            shutil.rmtree(cfg.kernel_output)
+    elif cache.restore(cfg, key, cfg.kernel_output, force=cfg.force_kernel):
         return
-
-    # Cleanup any existing outputs so that caches don't grow forever.
-    if cfg.kernel_output.is_dir():
-        shutil.rmtree(cfg.kernel_output)
+    else:
+        cache.require_build(cfg, key)
 
     # --- native -------------------------------------------------------
     if cfg.kernel_mode == "native":
@@ -42,6 +43,7 @@ def build_kernel_stage(cfg: Config) -> None:
             raise SystemExit(1)
         log.info("Building kernel (native)...")
         kernel.build(cfg)
+        cache.save(cfg, key, cfg.kernel_output)
         return
 
     # --- docker -------------------------------------------------------
@@ -55,10 +57,12 @@ def build_kernel_stage(cfg: Config) -> None:
     docker.fix_docker_ownership(
         cfg,
         [
-            f"/work/mkosi.input/kernel/{cfg.kernel_version}/{cfg.arch}",
+            f"/work/mkosi.input/kernel/{cfg.arch}",
             "/work/out",
         ],
     )
+    if not cfg.kernel_menuconfig:
+        cache.save(cfg, key, cfg.kernel_output)
 
 
 def _build_tools_stage(cfg: Config) -> None:
@@ -70,34 +74,31 @@ def _build_tools_stage(cfg: Config) -> None:
         log.info("TOOLS_MODE=skip — skipping tools download")
         return
 
+    # --- cache --------------------------------------------------------
+    key = cache.tools_key(cfg)
+    if cache.restore(cfg, key, cfg.tools_output, force=cfg.force_tools):
+        return
+    cache.require_build(cfg, key)
+
     # --- native -------------------------------------------------------
     if cfg.tools_mode == "native":
         log.info("Downloading tools (nerdctl, containerd, etc.) native...")
         tools.download_all(cfg)
-        return
-
     # --- docker -------------------------------------------------------
-    docker.obtain_builder(cfg)
-    log.info("Downloading tools (nerdctl, containerd, etc.) docker...")
-    docker.run_captain_in_builder(cfg, ["tools"])
-    docker.fix_docker_ownership(cfg, ["/work/mkosi.input"])
+    else:
+        docker.obtain_builder(cfg)
+        log.info("Downloading tools (nerdctl, containerd, etc.) docker...")
+        docker.run_captain_in_builder(cfg, ["tools"])
+        docker.fix_docker_ownership(cfg, ["/work/mkosi.input"])
+    cache.save(cfg, key, cfg.tools_output)
 
 
-def _build_mkosi_stage(cfg: Config, extra_args: list[str], mkosi_image_name: str) -> None:
-    """Run the mkosi image-assembly stage according to *cfg.mkosi_mode*."""
+def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
+    """Run the mkosi image-assembly stage according to *cfg.mkosi_mode*.
 
-    # --- skip ---------------------------------------------------------
-    if cfg.mkosi_mode == "skip":
-        log.info("MKOSI_MODE=skip — skipping image assembly")
-        return
-
-    # --- idempotency --------------------------------------------------
-    mkosi_image = cfg.initramfs_output / mkosi_image_name
-    force = "--force" in cfg.mkosi_args
-    if mkosi_image.is_file() and not force:
-        log.info("Image already built: %s (use --force to rebuild)", mkosi_image)
-        return
-
+    Always builds: the caller deals with skip mode and the build cache, since a
+    cache hit also makes the tools and kernel stages unnecessary.
+    """
     mkosi_args = list(cfg.mkosi_args) + list(extra_args)
 
     # Use a Rich Syntax and Rich Panel to display mkosi.conf before running it if debugging:
@@ -164,33 +165,7 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str], mkosi_image_name: str
     )
 
 
-def _prune_stale_output_dirs(cfg: Config) -> None:
-    """Drop sibling flavor-hash output dirs, keeping only the current hash.
-
-    Caches (``mkosi.output/initramfs`` / ``mkosi.output/iso``) are keyed on the
-    whole tree but outputs live under ``.../<flavor_id>/<arch>/<flavor_hash>``.
-    A restore-key (prefix) cache hit brings in the *previous* hash's dir, which
-    would otherwise be re-saved alongside the freshly-built one and accumulate
-    forever. When enabled, prune everything but the current hash so the cache
-    only contains the just-built version.
-
-    Opt-in via ``--drop-old-caches`` / ``CAPTAIN_DROP_OLD_CACHES``; a no-op
-    otherwise so local builds keep prior versions around.
-    """
-    if not cfg.drop_old_caches:
-        return
-
-    for current in (cfg.initramfs_output, cfg.iso_output):
-        parent = current.parent  # .../<flavor_id>/<arch>/
-        if not parent.is_dir():
-            continue
-        for child in parent.iterdir():
-            if child.is_dir() and child.name != current.name:
-                log.info("Dropping stale output dir %s", child)
-                shutil.rmtree(child)
-
-
-def _build_iso_stage(cfg: Config) -> None:
+def _build_iso_stage(cfg: Config, flavor: Flavor) -> None:
     """Run the ISO build stage according to *cfg.iso_mode*."""
 
     # --- skip ---------------------------------------------------------
@@ -198,31 +173,27 @@ def _build_iso_stage(cfg: Config) -> None:
         log.info("ISO_MODE=skip — skipping ISO build")
         return
 
-    # --- idempotency --------------------------------------------------
-    iso_path = cfg.iso_output / f"captainos-{cfg.flavor_id}-{cfg.arch_info.output_arch}.iso"
-    if iso_path.is_file() and not cfg.force_iso:
-        try:
-            iso.check_bootstrap_slot(iso_path)
-        except ValueError as err:
-            log.info("Rebuilding ISO: %s", err)
-        else:
-            log.info("ISO already built: %s (use --force-iso to rebuild)", iso_path)
-            return
+    # --- cache --------------------------------------------------------
+    key = cache.iso_key(cfg, flavor)
+    if cache.restore(cfg, key, cfg.iso_output, force=cfg.force_iso):
+        return
+    cache.require_build(cfg, key)
 
     # --- native -------------------------------------------------------
     if cfg.iso_mode == "native":
         log.info("Building ISO (native)...")
         iso.build(cfg)
-        return
-
     # --- docker -------------------------------------------------------
-    docker.obtain_builder(cfg)
-    log.info("Building ISO (docker)...")
-    docker.run_captain_in_builder(cfg, ["iso"])
-    docker.fix_docker_ownership(
-        cfg,
-        [
-            "/work/mkosi.output/iso",
-            "/work/out",
-        ],
-    )
+    else:
+        docker.obtain_builder(cfg)
+        log.info("Building ISO (docker)...")
+        docker.run_captain_in_builder(cfg, ["iso"])
+        docker.fix_docker_ownership(
+            cfg,
+            [
+                "/work/mkosi.output/iso",
+                "/work/out",
+            ],
+        )
+    # staging/ is just grub-mkrescue's input
+    cache.save(cfg, key, cfg.iso_output, exclude=["staging"])
