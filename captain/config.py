@@ -163,6 +163,11 @@ class Config:
         return self.iso_output / "staging"
 
     @property
+    def generated_dir(self) -> Path:
+        """Disposable directory the flavor renders its mkosi config tree into."""
+        return self.project_dir / "mkosi.generated"
+
+    @property
     def custom_dir(self) -> Path:
         """Directory for custom user files"""
         return self.project_dir / "custom"

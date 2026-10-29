@@ -1,0 +1,30 @@
+#!/bin/bash
+# mkosi.finalize — Runs after the image is assembled but before output.
+# The root filesystem is writable here.
+set -euo pipefail
+
+# Remove systemd-firstboot completely
+log info "Completely remove systemd-firstboot..."
+rm -fv "$BUILDROOT/usr/lib/systemd/system/systemd-firstboot.service"
+rm -fv "$BUILDROOT/usr/lib/systemd/system/sysinit.target.wants/systemd-firstboot.service"
+rm -fv "$BUILDROOT/usr/bin/systemd-firstboot"
+
+# Point /etc/resolv.conf at the non-stub resolv.conf written by
+# systemd-resolved.  This file contains upstream (DHCP-provided)
+# nameservers instead of 127.0.0.53.  tink-agent bind-mounts the host's
+# /etc/resolv.conf into action containers so they need real, routable
+# nameservers (the stub address is unreachable from container namespaces).
+log info "Handle resolv.conf..."
+ln -sfv /run/systemd/resolve/resolv.conf "$BUILDROOT/etc/resolv.conf"
+
+# Ensure tool binaries are executable.
+# GitHub Actions artifact upload/download and some archive tools strip
+# the execute bit.  Re-apply +x to every tool directory so containerd,
+# runc, nerdctl, and CNI plugins can actually run.
+log info "Ensure tool binaries are executable..."
+for dir in usr/local/bin opt/cni/bin; do
+    target="$BUILDROOT/$dir"
+    if [[ -d "$target" ]]; then
+        find "$target" -type f -exec chmod -v +x {} +
+    fi
+done

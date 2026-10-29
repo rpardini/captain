@@ -106,20 +106,16 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
         from rich.panel import Panel
         from rich.syntax import Syntax
 
-        mkosi_conf_path = cfg.project_dir / "mkosi.conf"
-        if mkosi_conf_path.is_file():
-            mkosi_conf_content = mkosi_conf_path.read_text()
+        for mkosi_conf_path in sorted(cfg.generated_dir.glob("**/mkosi.conf")):
             syntax = Syntax(
-                mkosi_conf_content,
+                mkosi_conf_path.read_text(),
                 "ini",
                 theme="monokai",
                 line_numbers=True,
                 background_color="default",
             )
-            panel = Panel(syntax, title="mkosi.conf", border_style="blue")
-            print(panel)
-        else:
-            log.debug("No mkosi.conf found at %s", mkosi_conf_path)
+            title = str(mkosi_conf_path.relative_to(cfg.generated_dir))
+            print(Panel(syntax, title=title, border_style="blue"))
 
     # --- native -------------------------------------------------------
     if cfg.mkosi_mode == "native":
@@ -134,6 +130,7 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
         run(
             [
                 "mkosi",
+                f"--directory={cfg.generated_dir}",
                 f"--architecture={cfg.arch_info.mkosi_arch}",
                 f"--extra-tree={tools_tree}",
                 f"--output-dir={output_dir}",
@@ -151,6 +148,7 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
     output_dir = cfg.calc_initramfs_output(Path("/work"), "initramfs")
     docker.run_mkosi_in_builder(
         cfg,
+        "--directory=/work/mkosi.generated",
         f"--extra-tree={tools_tree}",
         f"--output-dir={output_dir}",
         "--package-cache-dir=/cache/packages",

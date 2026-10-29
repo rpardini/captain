@@ -239,13 +239,9 @@ def run_in_builder(
     docker_args += ["-v", f"{cfg.project_dir}/mkosi.input:/work/mkosi.input"]
     docker_args += ["-v", f"{cfg.project_dir}/out:/work/out"]
 
-    docker_args += ["-v", f"{cfg.project_dir}/mkosi.extra:/work/mkosi.extra"]
-    docker_args += ["-v", f"{cfg.project_dir}/mkosi.sandbox:/work/mkosi.sandbox"]
-    docker_args += ["-v", f"{cfg.project_dir}/mkosi.skeleton:/work/mkosi.skeleton"]
-
-    docker_args += ["-v", f"{cfg.project_dir}/mkosi.conf:/work/mkosi.conf"]
-    docker_args += ["-v", f"{cfg.project_dir}/mkosi.finalize:/work/mkosi.finalize"]
-    docker_args += ["-v", f"{cfg.project_dir}/mkosi.postinst:/work/mkosi.postinst"]
+    # The flavor's generated mkosi tree; create it first so Docker doesn't (as root).
+    cfg.generated_dir.mkdir(parents=True, exist_ok=True)
+    docker_args += ["-v", f"{cfg.generated_dir}:/work/mkosi.generated"]
 
     docker_args += ["-v", f"{cfg.project_dir}/captain:/work/captain"]
     docker_args += ["-v", f"{cfg.project_dir}/pyproject.toml:/work/pyproject.toml"]
