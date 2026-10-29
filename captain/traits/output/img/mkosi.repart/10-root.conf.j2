@@ -6,5 +6,6 @@ Format=ext4
 CopyFiles=/
 ExcludeFiles=/efi/
 Minimize=guess
+# rpi boots from the vfat partition (00-esp) instead, like uefi.
 # No "legacy BIOS bootable" attribute (systemd-repart 257 doesn't set Flags= anyway): with extlinux,
 # root is the only partition, and U-Boot's distro boot falls back to partition 1 when none is marked.
