@@ -126,3 +126,29 @@ def iso_key(cfg: Config, flavor: Flavor) -> CacheKey:
             "modules": modules_sha("iso.py"),
         },
     )
+
+
+def release_key(cfg: Config, flavor: Flavor) -> CacheKey:
+    """The published release image of one arch: its outputs plus how they are packaged."""
+    inputs = {
+        "mkosi": mkosi_key(cfg, flavor).digest,
+        # buildah, which assembles the images, comes from the builder image.
+        "dockerfile": project_file_sha(cfg, "Dockerfile"),
+        # Which files become layers (and extra ones, like the RPi firmware), and how.
+        "modules": modules_sha(
+            "artifacts.py",
+            "buildah.py",
+            "oci/_build.py",
+            "oci/_publish.py",
+            "traits/output/__init__.py",
+            "traits/platform/rpi.py",
+        ),
+    }
+    if flavor.has_iso():
+        inputs["iso"] = iso_key(cfg, flavor).digest
+    return CacheKey("release", flavor.id, cfg.arch, inputs)
+
+
+def combined_release_key(flavor_id: str, arch_keys: dict[str, CacheKey]) -> CacheKey:
+    inputs = {arch: key.digest for arch, key in sorted(arch_keys.items())}
+    return CacheKey("release", flavor_id, "combined", inputs)
