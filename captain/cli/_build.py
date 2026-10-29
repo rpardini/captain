@@ -111,6 +111,7 @@ def build_cmd(
     # Instantiate and generate the flavor.
     flavor = captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
     flavor.generate()
+    cache.announce(cfg)
 
     # A cached mkosi output (initramfs or disk image) makes tools and kernel unnecessary;
     # --force-tools means the tools may have changed, so the image is rebuilt with them.

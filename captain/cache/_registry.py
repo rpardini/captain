@@ -19,8 +19,11 @@ import subprocess
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
 from typing import BinaryIO
+
+from captain.progress import ProgressReader
 
 log = logging.getLogger(__name__)
 
@@ -158,7 +161,7 @@ class Registry:
         url: str,
         *,
         push: bool = False,
-        data: bytes | BinaryIO | None = None,
+        data: bytes | BinaryIO | ProgressReader | None = None,
         headers: dict[str, str] | None = None,
     ):
         """Send a request, negotiating auth once on 401. Returns the open response.
@@ -269,8 +272,10 @@ class Registry:
                 return False
             raise RegistryError(f"HEAD blob {repo}@{digest}: HTTP {exc.code}") from None
 
-    def get_blob(self, repo: str, digest: str, dest: Path) -> None:
-        """Stream a blob to *dest*, verifying its digest."""
+    def get_blob(
+        self, repo: str, digest: str, dest: Path, progress: Callable[[int], None] | None = None
+    ) -> None:
+        """Stream a blob to *dest*, verifying its digest; *progress* gets each chunk's size."""
         try:
             resp = self._request("GET", repo, f"/v2/{repo}/blobs/{digest}")
             if isinstance(resp, urllib.error.HTTPError):  # redirect to storage; no auth there
@@ -282,12 +287,24 @@ class Registry:
             while chunk := resp.read(_CHUNK):
                 sha.update(chunk)
                 out.write(chunk)
+                if progress:
+                    progress(len(chunk))
         if f"sha256:{sha.hexdigest()}" != digest:
             dest.unlink(missing_ok=True)
             raise RegistryError(f"digest mismatch for {repo}@{digest}")
 
-    def upload_blob(self, repo: str, digest: str, size: int, source: Path | bytes) -> None:
-        """Monolithic upload (POST, then a streaming PUT), unless the blob already exists."""
+    def upload_blob(
+        self,
+        repo: str,
+        digest: str,
+        size: int,
+        source: Path | bytes,
+        progress: Callable[[int], None] | None = None,
+    ) -> None:
+        """Monolithic upload (POST, then a streaming PUT), unless the blob already exists.
+
+        *progress* gets the size of each chunk sent from a *source* file.
+        """
         if self.blob_exists(repo, digest):
             log.debug("Blob %s already in %s", digest, repo)
             return
@@ -302,10 +319,9 @@ class Registry:
                 with self._request("PUT", repo, url, push=True, data=source, headers=headers):
                     pass
             else:
-                with (
-                    open(source, "rb") as f,
-                    self._request("PUT", repo, url, push=True, data=f, headers=headers),
-                ):
-                    pass
+                with open(source, "rb") as f:
+                    data = ProgressReader(f, progress) if progress else f
+                    with self._request("PUT", repo, url, push=True, data=data, headers=headers):
+                        pass
         except urllib.error.HTTPError as exc:
             raise RegistryError(f"upload blob {repo}@{digest}: HTTP {exc.code}") from None

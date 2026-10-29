@@ -17,16 +17,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from rich.progress import (
-    BarColumn,
-    DownloadColumn,
-    Progress,
-    TextColumn,
-    TimeRemainingColumn,
-    TransferSpeedColumn,
-)
-
-from captain import console
+from captain import progress
 from captain.config import Config
 from captain.util import ensure_dir, run, safe_extractall
 
@@ -42,22 +33,10 @@ def _download_with_progress(url: str, filename: Path) -> None:
     req = urllib.request.Request(url)
     with urllib.request.urlopen(req, timeout=_DOWNLOAD_TIMEOUT) as resp:
         total = int(resp.headers.get("Content-Length", 0)) or None
-        with Progress(
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            DownloadColumn(),
-            TransferSpeedColumn(),
-            TimeRemainingColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task("    Downloading", total=total)
-            with open(filename, "wb") as out:
-                while True:
-                    buf = resp.read(8192)
-                    if not buf:
-                        break
-                    out.write(buf)
-                    progress.update(task, advance=len(buf))
+        with progress.transfer("    Downloading", total) as advance, open(filename, "wb") as out:
+            while buf := resp.read(1 << 20):
+                out.write(buf)
+                advance(len(buf))
 
 
 def download_kernel(cfg: Config, dest_dir: Path) -> Path:
