@@ -56,6 +56,7 @@ class CacheScope:
     context: str  # human description of the detected context
     read: list[Location] = field(default_factory=list)
     write: Location | None = None
+    no_write_reason: str = ""  # why *write* is None, for humans
 
 
 def _upstream() -> Location | None:
@@ -131,13 +132,17 @@ def _github_actions_scope(cfg: Config, upstream: Location | None) -> CacheScope:
     if fork_pr and head_repo is not None and head_repo != "unknown/unknown":
         head = Location.for_github(head_repo)
     read = _dedupe([head, own, upstream])
-    write = None if fork_pr or cfg.cache_mode != "on" else own
+    write, no_write_reason = own, ""
+    if fork_pr:
+        write, no_write_reason = None, "PR from a fork"
+    elif cfg.cache_mode != "on":
+        write, no_write_reason = None, f"--cache {cfg.cache_mode}"
 
     kind = "upstream" if upstream is not None and str(own) == str(upstream) else "downstream"
     context = f"GitHub Actions, {kind} repo {repo}, event {event or '?'}"
     if fork_pr:
         context += f", PR from fork {head_repo} (read-only)"
-    return CacheScope(context, read, write)
+    return CacheScope(context, read, write, no_write_reason)
 
 
 def _local_scope(cfg: Config, upstream: Location | None) -> CacheScope:
@@ -145,17 +150,24 @@ def _local_scope(cfg: Config, upstream: Location | None) -> CacheScope:
     how = "CAPTAIN_CACHE_DOWNSTREAM"
     if downstream is None:
         downstream, how = _local_downstream(cfg.project_dir)
-    write = None
-    if cfg.cache_push and cfg.cache_mode == "on":
-        if downstream is None:
+    write, no_write_reason = None, ""
+    if cfg.cache_mode != "on":
+        no_write_reason = f"--cache {cfg.cache_mode}"
+    elif downstream is None:
+        if cfg.cache_push:
             log.warning("--cache-push given, but there is no downstream cache to push to")
+        no_write_reason = "no downstream (fork) cache to push to"
+    elif cfg.cache_push:
         write = downstream
-    return CacheScope(f"local build, downstream from {how}", _dedupe([downstream, upstream]), write)
+    else:
+        no_write_reason = f"local build; add --cache-push to push to {downstream}"
+    read = _dedupe([downstream, upstream])
+    return CacheScope(f"local build, downstream from {how}", read, write, no_write_reason)
 
 
 def resolve_scope(cfg: Config) -> CacheScope:
     if cfg.cache_mode == "off":
-        return CacheScope("cache disabled (--cache off)")
+        return CacheScope("disabled", no_write_reason="--cache off")
     upstream = _upstream()
     if os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("GITHUB_REPOSITORY"):
         return _github_actions_scope(cfg, upstream)

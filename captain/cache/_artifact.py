@@ -9,6 +9,7 @@ import tarfile
 from collections.abc import Iterable
 from pathlib import Path
 
+from captain import progress
 from captain.util import safe_extractall
 
 from ._keys import CacheKey
@@ -80,13 +81,20 @@ def push(
     tar_path = work_dir / f"{key.tag}.tar{'.gz' if compress else ''}"
     try:
         log.info("Packing %s for the cache...", src_dir)
-        _deterministic_tar(src_dir, tar_path, compress, exclude)
-        digest, size = _file_digest(tar_path), tar_path.stat().st_size
-        log.info("Uploading %s (%.1fM) to %s/%s", key.tag, size / (1 << 20), registry.host, repo)
+        with progress.status(f"Packing {key}..."):
+            _deterministic_tar(src_dir, tar_path, compress, exclude)
+            digest, size = _file_digest(tar_path), tar_path.stat().st_size
         registry.upload_blob(
             repo, EMPTY_CONFIG_DESCRIPTOR["digest"], len(EMPTY_CONFIG), EMPTY_CONFIG
         )
-        registry.upload_blob(repo, digest, size, tar_path)
+        if registry.blob_exists(repo, digest):
+            log.info("Layer of %s is already in %s/%s", key.tag, registry.host, repo)
+        else:
+            log.info(
+                "Uploading %s (%.1fM) to %s/%s", key.tag, size / (1 << 20), registry.host, repo
+            )
+            with progress.transfer(f"    Uploading {key.kind}", size) as advance:
+                registry.upload_blob(repo, digest, size, tar_path, advance)
     finally:
         tar_path.unlink(missing_ok=True)
 
@@ -128,9 +136,10 @@ def pull(registry: Registry, repo: str, key: CacheKey, dest_dir: Path, work_dir:
         "Downloading %s (%.1fM) from %s/%s", key.tag, layer["size"] / (1 << 20), registry.host, repo
     )
     try:
-        registry.get_blob(repo, layer["digest"], blob)
+        with progress.transfer(f"    Downloading {key.kind}", layer["size"]) as advance:
+            registry.get_blob(repo, layer["digest"], blob, advance)
         dest_dir.mkdir(parents=True)
-        with tarfile.open(blob, "r:*") as tf:
+        with progress.status(f"Extracting {key}..."), tarfile.open(blob, "r:*") as tf:
             safe_extractall(tf, dest_dir)
     finally:
         blob.unlink(missing_ok=True)
