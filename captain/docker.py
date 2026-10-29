@@ -158,6 +158,9 @@ def run_in_builder(
         "ARCH": cfg.arch,
         "FLAVOR_ID": cfg.flavor_id,
         "KERNEL_VERSION": cfg.kernel_version,
+        # folded into flavor hashes; must match for in-container stages (iso, release)
+        "ARMBIAN_VERSION": cfg.armbian_version or "",
+        "KUBERNETES_VERSION": cfg.kubernetes_version,
         "FORCE_TOOLS": str(int(cfg.force_tools)),
         "FORCE_ISO": str(int(cfg.force_iso)),
         "FORCE_KERNEL": f"{int(cfg.force_kernel)!s}",

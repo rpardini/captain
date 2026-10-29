@@ -11,7 +11,12 @@ from typing import Any
 import click
 from trogon import tui
 
-from captain.config import DEFAULT_FLAVOR_ID, DEFAULT_KERNEL_VERSION, Config
+from captain.config import (
+    DEFAULT_FLAVOR_ID,
+    DEFAULT_KERNEL_VERSION,
+    DEFAULT_KUBERNETES_VERSION,
+    Config,
+)
 from captain.flavor import list_available_flavors
 from captain.util import detect_current_machine_arch
 
@@ -37,6 +42,7 @@ class CliContext:
     drop_old_caches: bool
     kernel_version: str
     armbian_version: str | None
+    kubernetes_version: str
 
     def make_config(self, **overrides: Any) -> Config:
         """Build a :class:`Config` from the common options plus per-command *overrides*."""
@@ -52,6 +58,7 @@ class CliContext:
             drop_old_caches=self.drop_old_caches,
             kernel_version=self.kernel_version,
             armbian_version=self.armbian_version,
+            kubernetes_version=self.kubernetes_version,
             **overrides,
         )
 
@@ -177,6 +184,13 @@ CONTEXT_SETTINGS = dict(
         "when armbian-next updates (env: ARMBIAN_VERSION). Empty = no cache-bust."
     ),
 )
+@click.option(
+    "--kubernetes-version",
+    envvar="KUBERNETES_VERSION",
+    default=DEFAULT_KUBERNETES_VERSION,
+    show_default=True,
+    help="Kubernetes minor version (pkgs.k8s.io) for k8s-role flavors (env: KUBERNETES_VERSION).",
+)
 @click.pass_context
 def cli(
     ctx: click.Context,
@@ -191,6 +205,7 @@ def cli(
     drop_old_caches: bool,
     kernel_version: str,
     armbian_version: str | None,
+    kubernetes_version: str,
 ) -> None:
     """CaptainOS build system — click CLI."""
     # Configure log level based on --verbose.
@@ -217,6 +232,7 @@ def cli(
         drop_old_caches=drop_old_caches,
         kernel_version=kernel_version,
         armbian_version=armbian_version,
+        kubernetes_version=kubernetes_version,
     )
 
 
