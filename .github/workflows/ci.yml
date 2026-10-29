@@ -32,6 +32,7 @@ jobs:
       armbian_version: ${{ steps.versions.outputs.armbian_version }}
       matrix: ${{ steps.flavors.outputs.matrix }}
       matrix_combined: ${{ steps.flavors.outputs.matrix_combined }}
+      has_combined: ${{ steps.flavors.outputs.has_combined }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -197,7 +198,8 @@ jobs:
   # when the combined image of these outputs is already published.
   # -------------------------------------------------------------------
   publish-combined:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    # custom/builds.txt may select no multi-arch flavor: an empty matrix is an error
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && needs.prepare.outputs.has_combined == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix_combined) }}
@@ -256,7 +258,8 @@ jobs:
   # -------------------------------------------------------------------
   release:
     name: "release v0.0.0-ci.${{ github.run_number }}"
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.repository != 'tinkerbell/captain'
+    # !cancelled() && !failure(): also when publish-combined is skipped (no multi-arch flavors)
+    if: ${{ !cancelled() && !failure() && github.ref == 'refs/heads/main' && github.event_name == 'push' && github.repository != 'tinkerbell/captain' }}
     needs: [ build-captainos, publish-combined ]
     permissions:
       contents: write
