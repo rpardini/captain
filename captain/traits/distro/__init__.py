@@ -22,12 +22,18 @@ class Distro(Trait):
     # Packages providing switch_root(8), when not already in util-linux.
     switch_root_packages: ClassVar[frozenset[str]] = frozenset()
 
-    def __init__(self, release: str) -> None:
+    def __init__(self, release: str, cache_epoch: int = 0) -> None:
         self.release = release
+        # Emergency knob: bump to rebuild every flavor of this distro despite
+        # unchanged inputs, eg. after a CVE fix lands in its package repos.
+        self.cache_epoch = cache_epoch
 
     @property
     def name(self) -> str:
         return f"{self.mkosi_distribution}-{self.release}"
+
+    def cache_bust_token(self, flavor: Flavor) -> str:
+        return f"{self.name}-epoch-{self.cache_epoch}" if self.cache_epoch else ""
 
     def map_packages(self, packages: set[str]) -> set[str]:
         mapped = {self.package_map.get(p, p) for p in packages}
