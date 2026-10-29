@@ -18,7 +18,15 @@ from pathlib import Path
 from captain.config import Config
 
 from . import _artifact
-from ._keys import CacheKey, iso_key, kernel_key, mkosi_key, tools_key
+from ._keys import (
+    CacheKey,
+    combined_release_key,
+    iso_key,
+    kernel_key,
+    mkosi_key,
+    release_key,
+    tools_key,
+)
 from ._registry import Registry, RegistryError
 from ._scope import CacheScope, Location, resolve_scope
 
@@ -30,10 +38,12 @@ __all__ = [
     "CacheKey",
     "CacheScope",
     "Location",
+    "combined_release_key",
     "iso_key",
     "kernel_key",
     "lookup",
     "mkosi_key",
+    "release_key",
     "require_build",
     "restore",
     "save",
