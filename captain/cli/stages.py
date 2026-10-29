@@ -49,18 +49,14 @@ def build_kernel_stage(cfg: Config) -> None:
     # --- docker -------------------------------------------------------
     builder.obtain_builder(cfg)
     log.info("Building kernel (docker relaunch)...")
+    owned = [f"/work/mkosi.input/kernel/{cfg.arch}", "/work/out"]
     if cfg.kernel_menuconfig:
         log.info("Launching interactive kernel configuration (menuconfig)...")
-        docker.run_captain_in_builder(cfg, ["kernel"], extra_docker_args=["-i", "-t"])
+        docker.run_captain_in_builder(
+            cfg, ["kernel"], extra_docker_args=["-i", "-t"], owned_paths=owned
+        )
     else:
-        docker.run_captain_in_builder(cfg, ["kernel"])
-    docker.fix_docker_ownership(
-        cfg,
-        [
-            f"/work/mkosi.input/kernel/{cfg.arch}",
-            "/work/out",
-        ],
-    )
+        docker.run_captain_in_builder(cfg, ["kernel"], owned_paths=owned)
     if not cfg.kernel_menuconfig:
         cache.save(cfg, key, cfg.kernel_output)
 
@@ -88,8 +84,7 @@ def _build_tools_stage(cfg: Config) -> None:
     else:
         builder.obtain_builder(cfg)
         log.info("Downloading tools (nerdctl, containerd, etc.) docker...")
-        docker.run_captain_in_builder(cfg, ["tools"])
-        docker.fix_docker_ownership(cfg, ["/work/mkosi.input"])
+        docker.run_captain_in_builder(cfg, ["tools"], owned_paths=["/work/mkosi.input"])
     cache.save(cfg, key, cfg.tools_output)
 
 
@@ -155,10 +150,7 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
         "--package-cache-dir=/cache/packages",
         "build",
         *mkosi_args,
-    )
-    docker.fix_docker_ownership(
-        cfg,
-        [
+        owned_paths=[
             f"/work/mkosi.output/{cfg.output_kind}/{cfg.flavor_id}/{cfg.arch}",
             "/work/out",
         ],
@@ -187,13 +179,8 @@ def _build_iso_stage(cfg: Config, flavor: Flavor) -> None:
     else:
         builder.obtain_builder(cfg)
         log.info("Building ISO (docker)...")
-        docker.run_captain_in_builder(cfg, ["iso"])
-        docker.fix_docker_ownership(
-            cfg,
-            [
-                "/work/mkosi.output/iso",
-                "/work/out",
-            ],
+        docker.run_captain_in_builder(
+            cfg, ["iso"], owned_paths=["/work/mkosi.output/iso", "/work/out"]
         )
     # staging/ is just grub-mkrescue's input
     cache.save(cfg, key, cfg.iso_output, exclude=["staging"])

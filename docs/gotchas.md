@@ -100,6 +100,9 @@ Stumbling blocks hit while building the trait-based flavors (Rocky, Ubuntu, k8s 
 - Values folded into the flavor hash (`ARMBIAN_VERSION`, `KUBERNETES_VERSION`) must be passed into the builder
   container, or in-container stages (`captain iso`, release) compute a different hash and miss the outputs.
 - `docker run -v` on a non-existent host path creates it as root: create generated dirs first.
+- Builder containers run as root; on Linux hosts their outputs are chown'ed back to the host user by a wrapper in the
+  same container (`docker._OWNED_WRAPPER`, the stage's `owned_paths`), even after a failure. A stage writing somewhere
+  new must add that path, or later host-side steps (eg. cache restore's `rmtree`) hit root-owned files.
 - The `captain kernel` / `captain iso` stages import `captain/` from the live bind mount: editing code mid-build can
   change what runs (or the computed hash).
 - Builder image is tagged by Dockerfile hash: any Dockerfile change rebuilds it (minutes).

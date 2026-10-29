@@ -291,8 +291,7 @@ def skip_or_relaunch_in_docker(cfg: Config, subcommand: str) -> bool:
         from captain import builder, docker
 
         builder.obtain_builder(cfg)
-        docker.run_captain_in_builder(cfg, ["release", subcommand])
-        docker.fix_docker_ownership(cfg, ["/work/out"])
+        docker.run_captain_in_builder(cfg, ["release", subcommand], owned_paths=["/work/out"])
         return True
 
     # --- native mode ------------------------------------------------------
