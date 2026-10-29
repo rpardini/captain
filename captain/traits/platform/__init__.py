@@ -17,6 +17,10 @@ class Platform(Trait):
     # The kernel ships DTBs worth exporting (arm64 only).
     ships_dtbs: ClassVar[bool] = True
 
+    def kernel_dtb_glob(self, flavor: Flavor) -> str:
+        """Where the kernel installs its DTBs, relative to the root (a single-match glob)."""
+        return flavor.distro.kernel_dtb_glob
+
 
 class Acpi(Platform):
     """UEFI+ACPI machines."""
@@ -71,6 +75,8 @@ class Armbian(Platform):
 
     content = "platform/armbian"
     supported_architectures = frozenset(["arm64"])
+    # Releases with their own armbian-<release> suite; kernels are in the shared "armbian" suite.
+    release_suites: ClassVar[frozenset[str]] = frozenset(["bookworm", "trixie", "forky"])
 
     def __init__(self, kernel_package: str) -> None:
         self.kernel_package = kernel_package
@@ -87,6 +93,10 @@ class Armbian(Platform):
 
     def keep_hwdb(self, flavor: Flavor) -> bool:
         return True
+
+    def kernel_dtb_glob(self, flavor: Flavor) -> str:
+        # Armbian's kernel .debs use Debian's layout, whatever the distro.
+        return "usr/lib/linux-image-*"
 
     def cache_bust_token(self, flavor: Flavor) -> str:
         # Fold the armbian-next repo version token in so these flavors rebuild
