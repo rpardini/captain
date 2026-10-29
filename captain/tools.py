@@ -14,11 +14,15 @@ import tarfile
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import BinaryIO
 
+from captain import progress
 from captain.config import Config
 from captain.util import ensure_dir, safe_extractall
 
 log = logging.getLogger(__name__)
+
+_TIMEOUT = 60  # seconds
 
 
 @dataclass(slots=True)
@@ -74,13 +78,24 @@ TOOLS: list[ToolSpec] = [
 ]
 
 
+def _fetch(url: str, out: BinaryIO) -> None:
+    """Stream *url* into *out*, with a progress bar on a terminal."""
+    with urllib.request.urlopen(url, timeout=_TIMEOUT) as resp:
+        total = int(resp.headers.get("Content-Length", 0)) or None
+        with progress.transfer(f"    {url.rsplit('/', 1)[-1]}", total) as advance:
+            while chunk := resp.read(1 << 16):
+                out.write(chunk)
+                advance(len(chunk))
+
+
 def _download_tarball(url: str, dest_dir: Path, members: list[str]) -> None:
     """Download a gzipped tarball and extract specific members."""
     log.info("    Downloading %s", url)
-    with urllib.request.urlopen(url, timeout=60) as resp:
-        data = resp.read()
+    data = io.BytesIO()
+    _fetch(url, data)
+    data.seek(0)
 
-    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tf:
+    with tarfile.open(fileobj=data, mode="r:gz") as tf:
         # Build a set of acceptable member names (with and without ./ prefix)
         wanted = set()
         for m in members:
@@ -100,10 +115,9 @@ def _download_tarball(url: str, dest_dir: Path, members: list[str]) -> None:
 def _download_binary(url: str, dest: Path) -> None:
     """Download a single binary file."""
     log.info("    Downloading %s", url)
-    with urllib.request.urlopen(url, timeout=60) as resp:
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        with open(dest, "wb") as f:
-            f.write(resp.read())
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with open(dest, "wb") as f:
+        _fetch(url, f)
     dest.chmod(dest.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 

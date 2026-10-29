@@ -111,6 +111,7 @@ def build_cmd(
     # Instantiate and generate the flavor.
     flavor = captain.flavor.create_and_setup_flavor_for_id(cfg.flavor_id, cfg)
     flavor.generate()
+    cache.announce(cfg)
 
     if cfg.mkosi_mode == "skip":
         log.info("MKOSI_MODE=skip — skipping image assembly")

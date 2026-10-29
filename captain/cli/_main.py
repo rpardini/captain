@@ -150,6 +150,8 @@ CONTEXT_SETTINGS = dict(
 )
 @click.option(
     "--flavor-id",
+    "--flavor",
+    "flavor_id",
     envvar="FLAVOR_ID",
     default=DEFAULT_FLAVOR_ID,
     show_default=True,
