@@ -21,12 +21,28 @@ log = logging.getLogger(__name__)
     },
     short_help="Run the built captainos kernel+initramfs in QEMU.",
 )
+@click.option(
+    "--mem",
+    "qemu_mem",
+    envvar="QEMU_MEM",
+    default="2G",
+    show_default=True,
+    help="Guest memory (env: QEMU_MEM).",
+)
+@click.option(
+    "--smp",
+    "qemu_smp",
+    envvar="QEMU_SMP",
+    default="2",
+    show_default=True,
+    help="Guest CPUs (env: QEMU_SMP).",
+)
 @click.pass_obj
 @click.pass_context
-def shell_cmd(ctx: Context, cli_ctx: CliContext) -> None:
+def shell_cmd(ctx: Context, cli_ctx: CliContext, qemu_mem: str, qemu_smp: str) -> None:
     log.debug("Running captainos in QEMU...")
 
-    cfg = cli_ctx.make_config()
+    cfg = cli_ctx.make_config(qemu_mem=qemu_mem, qemu_smp=qemu_smp)
 
     extra_args: list[str] = ctx.args
     log.debug(f"Extra args passed to qemu: {extra_args}")
