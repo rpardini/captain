@@ -97,16 +97,6 @@ else
 	log info "No DTB source directory found at ${DTB_SRC_DIR}; skipping DTB export"
 fi
 
-# Keep the kernel config (kubeadm's preflight, among others, reads it) where /boot's removal won't take it.
-for kconfig in "${BUILDROOT}"/boot/config-*; do
-	[[ -f "${kconfig}" ]] || continue
-	kver="${kconfig##*/config-}"
-	if [[ -d "${BUILDROOT}/usr/lib/modules/${kver}" && ! -f "${BUILDROOT}/usr/lib/modules/${kver}/config" ]]; then
-		log info "Keeping kernel config for ${kver} as /usr/lib/modules/${kver}/config"
-		cp -v "${kconfig}" "${BUILDROOT}/usr/lib/modules/${kver}/config"
-	fi
-done
-
 log info "Removing /boot from the image to save space"
 rm -rf "${BUILDROOT:?}"/boot
 

@@ -67,6 +67,7 @@ class Flavor:
         if cfg is None:
             raise ValueError("cfg (Config) cannot be None")
         self.cfg = cfg
+        cfg.output_kind = self.output.output_kind
 
     # --- questions answered by the traits ---------------------------------
 
