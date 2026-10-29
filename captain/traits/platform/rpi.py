@@ -33,6 +33,9 @@ class ArmbianRpi(Armbian):
     def __init__(self) -> None:
         super().__init__("linux-image-current-bcm2711")
 
+    def custom_names(self) -> list[str]:
+        return [*super().custom_names(), "rpi"]
+
     def kernel_cmdline_extra(self) -> list[str]:
         return [
             "rootwait",

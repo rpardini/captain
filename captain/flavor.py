@@ -13,6 +13,7 @@ import jinja2
 from rich.table import Table
 
 import captain
+import captain.custom
 from captain.artifacts import OutputArchArtifact
 from captain.config import Config
 from captain.traits import TRAITS_DIR, Axis, Trait
@@ -95,9 +96,9 @@ class Flavor:
     def has_iso(self) -> bool:
         return self.output.supports_iso and self.platform.iso_capable
 
-    def custom_packages(self) -> set[str]:
-        # look into cfg.custom_dir/packages.txt, if it exists, read each non-comment line
-        custom_packages_file = self.cfg.custom_dir / "packages.txt"
+    def custom_packages(self, layer: Path) -> set[str]:
+        # look into <layer>/packages.txt, if it exists, read each non-comment line
+        custom_packages_file = layer / "packages.txt"
         if not custom_packages_file.exists():
             return set()
         log.debug("Reading custom packages from %s", custom_packages_file)
@@ -260,26 +261,38 @@ class Flavor:
         files[conf_path] = _GeneratedFile(content.encode(), 0o644)
 
     def _generate_custom(self, files: dict[str, _GeneratedFile]) -> None:
-        """The user's custom/ dir, as the last drop-in. Use-cases:
+        """The user's custom/ dir and matching custom/by-<axis>/<value>/ dirs, as the last
+        drop-in. Use-cases:
         - add CA root certificate to global trust store (via ca-certificates package)
         - add some package (eg firmware) via custom/packages.txt
         - configure containerd to use specific mirrors
         - run some postinst or finalize script to do some custom configuration
+
+        Layers merge by name, general to specific: same-path files and same-named
+        scripts from a later layer replace earlier ones; scripts run sorted by name.
         """
-        custom_dir = self.cfg.custom_dir
+        layers = captain.custom.layers(self)
         dropin = f"mkosi.conf.d/{Axis.CUSTOM.value:02d}-custom"
-        self._add_static_dir(files, custom_dir / "files", f"{dropin}/mkosi.extra")
+        for layer in layers:
+            self._add_static_dir(files, layer / "files", f"{dropin}/mkosi.extra")
         for in_dir, script_name in (
             ("mkosi-postinst", "mkosi.postinst"),
             ("mkosi-finalize", "mkosi.finalize"),
         ):
-            scripts_dir = custom_dir / in_dir
-            if scripts_dir.is_dir():
-                scripts = [f for f in sorted(scripts_dir.iterdir()) if f.is_file()]
-                log.debug("Adding custom %s scripts from %s: %s", script_name, scripts_dir, scripts)
-                if scripts:
-                    files[f"{dropin}/{script_name}"] = self._script(scripts)
-        packages = self.distro.map_packages(self.custom_packages())
+            by_name = {
+                f.name: f
+                for layer in layers
+                if (layer / in_dir).is_dir()
+                for f in sorted((layer / in_dir).iterdir())
+                if f.is_file()
+            }
+            scripts = [by_name[name] for name in sorted(by_name)]
+            log.debug("Adding custom %s scripts: %s", script_name, scripts)
+            if scripts:
+                files[f"{dropin}/{script_name}"] = self._script(scripts)
+        packages = self.distro.map_packages(
+            set().union(*(self.custom_packages(layer) for layer in layers))
+        )
         if packages:
             settings = "[Content]\nPackages=\n" + "".join(f"    {p}\n" for p in sorted(packages))
             files[f"{dropin}/mkosi.conf"] = _GeneratedFile(settings.encode(), 0o644)
