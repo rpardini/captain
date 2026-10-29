@@ -28,6 +28,15 @@ _TIMEOUT = 120  # seconds, per socket operation
 _CHUNK = 1 << 20
 
 OCI_MANIFEST = "application/vnd.oci.image.manifest.v1+json"
+# Any manifest or index, for re-tagging whatever is there.
+ANY_MANIFEST = ", ".join(
+    [
+        OCI_MANIFEST,
+        "application/vnd.oci.image.index.v1+json",
+        "application/vnd.docker.distribution.manifest.v2+json",
+        "application/vnd.docker.distribution.manifest.list.v2+json",
+    ]
+)
 
 
 class RegistryError(Exception):
@@ -182,8 +191,10 @@ class Registry:
     def manifest_exists(self, repo: str, reference: str) -> bool:
         """False also when *repo* is not accessible (or doesn't exist)."""
         try:
+            # Any manifest type: release images are OCI indexes, and some registries
+            # (eg. registry:2) answer 404 when the Accept header doesn't cover the type.
             with self._request(
-                "HEAD", repo, f"/v2/{repo}/manifests/{reference}", headers={"Accept": OCI_MANIFEST}
+                "HEAD", repo, f"/v2/{repo}/manifests/{reference}", headers={"Accept": ANY_MANIFEST}
             ):
                 return True
         except RegistryDenied:
@@ -220,6 +231,32 @@ class Registry:
                 pass
         except urllib.error.HTTPError as exc:
             raise RegistryError(f"PUT manifest {repo}:{reference}: HTTP {exc.code}") from None
+
+    def retag(self, repo: str, src: str, dst: str) -> None:
+        """Point tag *dst* at whatever *src* is (manifest or index), byte for byte.
+
+        Everything it references is already in *repo*, so no blobs move.
+        """
+        try:
+            with self._request(
+                "GET",
+                repo,
+                f"/v2/{repo}/manifests/{src}",
+                push=True,
+                headers={"Accept": ANY_MANIFEST},
+            ) as resp:
+                body, media_type = resp.read(), resp.headers["Content-Type"]
+            with self._request(
+                "PUT",
+                repo,
+                f"/v2/{repo}/manifests/{dst}",
+                push=True,
+                data=body,
+                headers={"Content-Type": media_type},
+            ):
+                pass
+        except urllib.error.HTTPError as exc:
+            raise RegistryError(f"retag {repo}:{src} → {dst}: HTTP {exc.code}") from None
 
     # --- blobs ----------------------------------------------------------------
 
