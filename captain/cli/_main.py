@@ -247,6 +247,7 @@ def main() -> None:
     from captain.cli import (  # noqa: F401
         _build,
         _builder,
+        _flavors,
         _iso,
         _kernel,
         _prepare,

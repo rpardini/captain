@@ -16,6 +16,17 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      # The release pulls every flavor's artifacts (~10G) onto one runner: make room first.
+      # Only on GitHub-hosted runners; never touch a self-hosted runner's toolchains.
+      - name: Free disk space (GitHub-hosted runners only)
+        if: runner.environment == 'github-hosted'
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/local/share/powershell /usr/local/share/chromium
+          sudo docker image prune --all --force > /dev/null
+          df -h /
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
@@ -36,13 +47,10 @@ jobs:
 
       - name: Pull release artifacts
         run: |
-          uv run captain --flavor-id trixie-full release --target combined pull --pull-output release-artifacts
-          uv run captain --flavor-id trixie-slim release --target combined pull --pull-output release-artifacts
-          uv run captain --flavor-id trixie-armbian-rpi release --target arm64 pull --pull-output release-artifacts
-          uv run captain --flavor-id trixie-rockchip64 release --target arm64 pull --pull-output release-artifacts
-          uv run captain --flavor-id trixie-meson64 release --target arm64 pull --pull-output release-artifacts
-          uv run captain --flavor-id trixie-rockchip64-vendor release --target arm64 pull --pull-output release-artifacts
-          uv run captain --flavor-id trixie-genio release --target arm64 pull --pull-output release-artifacts
+          # one line per flavor in the registry (captain/flavors.py): <id> <target> <arch> <tag-suffix>
+          uv run captain list-flavors --release | while read -r flavor target arch _suffix; do
+            uv run captain --flavor-id "${flavor}" --arch "${arch}" release --target "${target}" pull --pull-output release-artifacts < /dev/null
+          done
 
       - name: "directories -> tarball"
         working-directory: out/release-artifacts
@@ -66,23 +74,9 @@ jobs:
             --generate-notes \
             --title "${{ github.ref_name }}"
 
-      - name: Tag (trixie-full)
-        run: uv run captain --flavor-id trixie-full release tag --new-tag "${{ github.ref_name }}"
-
-      - name: Tag (trixie-slim)
-        run: uv run captain --flavor-id trixie-slim release tag --new-tag "${{ github.ref_name }}-slim"
-
-      - name: Tag (trixie-armbian-rpi)
-        run: uv run captain --flavor-id trixie-armbian-rpi --arch arm64 release tag --new-tag "${{ github.ref_name }}-rpi"
-
-      - name: Tag (trixie-rockchip64)
-        run: uv run captain --flavor-id trixie-rockchip64 --arch arm64 release tag --new-tag "${{ github.ref_name }}-rockchip64"
-
-      - name: Tag (trixie-meson64)
-        run: uv run captain --flavor-id trixie-meson64 --arch arm64 release tag --new-tag "${{ github.ref_name }}-meson64"
-
-      - name: Tag (trixie-rockchip64-vendor)
-        run: uv run captain --flavor-id trixie-rockchip64-vendor --arch arm64 release tag --new-tag "${{ github.ref_name }}-rockchip64-vendor"
-
-      - name: Tag (trixie-genio)
-        run: uv run captain --flavor-id trixie-genio --arch arm64 release tag --new-tag "${{ github.ref_name }}-genio"
+      - name: Tag all flavors
+        run: |
+          # tag suffixes are kept stable for already-published flavors (eg "" for trixie-full, "-slim", "-rpi")
+          uv run captain list-flavors --release | while read -r flavor target arch suffix; do
+            uv run captain --flavor-id "${flavor}" --arch "${arch}" release tag --new-tag "${{ github.ref_name }}${suffix}" < /dev/null
+          done
