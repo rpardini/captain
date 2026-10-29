@@ -26,6 +26,10 @@ class Mem(Output):
     content = "output/mem"
     supports_iso = True
 
+    def packages(self, flavor: Flavor) -> set[str]:
+        # /init switch_root's from rootfs to a tmpfs before starting systemd
+        return set(flavor.distro.switch_root_packages)
+
     def kernel_initramfs_packages(self, flavor: Flavor) -> set[str]:
         return flavor.distro.noop_initramfs_packages()
 
