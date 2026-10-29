@@ -80,6 +80,10 @@ class Trait:
         """Token rendered into the generated config so the flavor hash changes on demand."""
         return ""
 
+    def cache_inputs(self, flavor: Flavor) -> dict[str, str]:
+        """Build-cache key inputs not visible in the rendered mkosi tree (eg. local packages)."""
+        return {}
+
     def pre_mkosi(self, flavor: Flavor) -> None:
         pass
 
