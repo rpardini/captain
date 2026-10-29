@@ -17,3 +17,9 @@ function log() {
 	echo -e "${emoji} ${ansi_reset}[${color}${level}${ansi_reset}] ${color}${*}${ansi_reset}" >&2
 }
 
+
+# Facts about the flavor being built, for scripts (including custom/ ones) to branch on.
+declare -r CAPTAIN_FLAVOR_ID="{{ flavor.id }}"
+declare -r CAPTAIN_DISTRO="{{ flavor.distro.mkosi_distribution }}"
+declare -r CAPTAIN_DISTRO_RELEASE="{{ flavor.distro.release }}"
+declare -r CAPTAIN_DISTRO_FAMILY="{{ flavor.distro.family }}" # deb or rpm

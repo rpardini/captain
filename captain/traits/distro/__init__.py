@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from captain.traits import Axis, Trait
+
+if TYPE_CHECKING:
+    from captain.flavor import Flavor
 
 
 class Distro(Trait):
@@ -14,6 +17,12 @@ class Distro(Trait):
     mkosi_distribution: ClassVar[str]
     # Logical (Debian) package name -> this distro's name; None drops the package.
     package_map: ClassVar[dict[str, str | None]] = {}
+    # Where the distro's own kernel installs its DTBs, relative to the root (a single-match glob).
+    kernel_dtb_glob: ClassVar[str]
+    # ID_LIKE= for CaptainOS' own os-release (in-memory outputs).
+    os_release_id_like: ClassVar[str]
+    # Packages providing switch_root(8), when not already in util-linux.
+    switch_root_packages: ClassVar[frozenset[str]] = frozenset()
 
     def __init__(self, release: str) -> None:
         self.release = release
@@ -41,6 +50,7 @@ class Distro(Trait):
 class DebFamily(Distro):
     family = "deb"
     content = "distro/deb"
+    kernel_dtb_glob = "usr/lib/linux-image-*"
 
     def noop_initramfs_packages(self) -> set[str]:
         return {"tiny-initramfs"}
@@ -48,6 +58,64 @@ class DebFamily(Distro):
 
 class Debian(DebFamily):
     mkosi_distribution = "debian"
+    os_release_id_like = "debian"
 
     def generic_kernel_packages(self) -> set[str]:
         return {"linux-image-generic"}
+
+
+class Ubuntu(DebFamily):
+    """Ubuntu; needs universe (tiny-initramfs, fastfetch)."""
+
+    content = "distro/ubuntu"
+    mkosi_distribution = "ubuntu"
+    kernel_dtb_glob = "usr/lib/firmware/*/device-tree"
+    switch_root_packages = frozenset(["util-linux-extra"])
+    os_release_id_like = "ubuntu debian"
+
+    def generic_kernel_packages(self) -> set[str]:
+        # linux-image-generic depends on linux-firmware (~770M of every firmware there is);
+        # the empty linux-firmware-minimal provides it, matching Debian's firmware-less kernel.
+        return {"linux-image-generic", "linux-firmware-minimal"}
+
+
+class RpmFamily(Distro):
+    family = "rpm"
+    content = "distro/rpm"
+    kernel_dtb_glob = "usr/lib/modules/*/dtb"
+    package_map: ClassVar[dict[str, str | None]] = {
+        "apt": "dnf",
+        "dmsetup": "device-mapper",
+        "iproute2": "iproute",
+        "iptables": "iptables-nft",
+        "iputils-ping": "iputils",
+        "login": None,  # in util-linux
+        "polkitd": "polkit",
+        "procps": "procps-ng",
+        "systemd-sysv": None,  # in systemd
+        "udev": "systemd-udev",
+    }
+
+    def packages(self, flavor: Flavor) -> set[str]:
+        # Debian's systemd ships networkd; RPM distros split it out.
+        return {"systemd-networkd"}
+
+    def noop_initramfs_packages(self) -> set[str]:
+        # The kernel hard-requires dracut, which it gets anyway; nothing to add.
+        return set()
+
+
+class Rocky(RpmFamily):
+    """Rocky Linux; needs EPEL (systemd-networkd, systemd-timesyncd, fastfetch, pv)."""
+
+    content = "distro/rocky"
+    mkosi_distribution = "rocky"
+    os_release_id_like = "rocky rhel centos fedora"
+
+    def packages(self, flavor: Flavor) -> set[str]:
+        return super().packages(flavor) | {"rocky-release", "epel-release"}
+
+    def generic_kernel_packages(self) -> set[str]:
+        # EL10 moved nft_compat and the xt_* matches/targets to kernel-modules-extra;
+        # CNI's iptables(-nft) rules need them, as does kube-proxy.
+        return {"kernel", "kernel-modules-extra"}
