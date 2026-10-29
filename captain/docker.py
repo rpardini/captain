@@ -21,34 +21,13 @@ from captain.util import run
 
 log = logging.getLogger(__name__)
 
-# The builder container runs as root, so what it writes into bind mounts is root-owned on
-# Linux hosts. This wrapper (PID 1) runs the command as a child, forwarding INT/TERM to it,
-# then — even if it failed — hands $CAPTAIN_OWNED_PATHS back to the host user, and exits
-# with the command's status. `<&0` keeps stdin (eg. menuconfig's tty) for the background job.
-_OWNED_WRAPPER = """
-"$@" <&0 &
-pid=$!
-trap 'kill -s INT "$pid" 2>/dev/null' INT
-trap 'kill -s TERM "$pid" 2>/dev/null' TERM
-wait "$pid"; rc=$?
-while kill -0 "$pid" 2>/dev/null; do wait "$pid"; rc=$?; done
-for p in $CAPTAIN_OWNED_PATHS; do
-    [ -e "$p" ] && chown -R "$CAPTAIN_HOST_UID:$CAPTAIN_HOST_GID" "$p"
-done
-exit "$rc"
-"""
-
 
 def run_in_builder(
-    cfg: Config,
-    command_and_args: list[str],
-    extra_docker_args: list[str] | None = None,
-    owned_paths: list[str] | None = None,
+    cfg: Config, command_and_args: list[str], extra_docker_args: list[str] | None = None
 ) -> None:
     """Run a command inside the Docker builder container.
 
-    *extra_docker_args* are added to the docker run flags. *owned_paths* (container paths,
-    eg. /work/out) are chown'ed to the host user when the command ends, in the same container.
+    *extra_args* are appended after the docker run flags and image name.
     """
 
     docker_envs: dict[str, str] = {
@@ -157,17 +136,6 @@ def run_in_builder(
     ]
     docker_args += [cfg.builder_image]
 
-    # Only Linux hosts see the container's root ownership; macOS VMs map files to the user.
-    if owned_paths and os.getuid() != 0 and platform.system() == "Linux":
-        docker_args += [
-            "-e",
-            f"CAPTAIN_HOST_UID={os.getuid()}",
-            "-e",
-            f"CAPTAIN_HOST_GID={os.getgid()}",
-            "-e",
-            f"CAPTAIN_OWNED_PATHS={' '.join(owned_paths)}",
-        ]
-        docker_args += ["/bin/sh", "-c", _OWNED_WRAPPER, "sh"]
     docker_args.extend(command_and_args)
 
     # Handle exceptions: when re-launching in Docker, the inner instance already showed
@@ -182,10 +150,7 @@ def run_in_builder(
 
 
 def run_captain_in_builder(
-    cfg: Config,
-    command_and_args: list[str],
-    extra_docker_args: list[str] | None = None,
-    owned_paths: list[str] | None = None,
+    cfg: Config, command_and_args: list[str], extra_docker_args: list[str] | None = None
 ):
     log.debug("Running 'captain %s' in builder container...", command_and_args)
     run_in_builder(
@@ -198,13 +163,10 @@ def run_captain_in_builder(
             *command_and_args,
         ],
         extra_docker_args=extra_docker_args,
-        owned_paths=owned_paths,
     )
 
 
-def run_mkosi_in_builder(
-    cfg: Config, *mkosi_args: str, owned_paths: list[str] | None = None
-) -> None:
+def run_mkosi_in_builder(cfg: Config, *mkosi_args: str) -> None:
     """Run mkosi inside the builder container."""
     ensure_binfmt(cfg)
     run_in_builder(
@@ -214,7 +176,6 @@ def run_mkosi_in_builder(
             f"--architecture={cfg.arch_info.mkosi_arch}",
             *mkosi_args,
         ],
-        owned_paths=owned_paths,
     )
 
 
@@ -253,3 +214,55 @@ def ensure_binfmt(cfg: Config) -> None:
     if result.returncode != 0:
         log.warning("Could not auto-register binfmt handlers.")
         log.warning("Run manually: docker run --privileged --rm tonistiigi/binfmt --install all")
+
+
+def fix_docker_ownership(cfg: Config, paths: list[str]) -> None:
+    """Fix ownership of Docker-created files (container runs as root).
+
+    Spawns a lightweight container to ``chown -R`` the given paths
+    back to the calling user so that subsequent native-mode stages
+    and the host user can read/write them.
+
+    Idempotent: skips the chown if every path either does not exist
+    or is already owned by the current user.
+    """
+    uid = os.getuid()
+    gid = os.getgid()
+
+    needs_fix: list[str] = []
+    for p in paths:
+        host_path = Path(p.replace("/work", str(cfg.project_dir), 1))
+        if not host_path.exists():
+            continue
+        check_paths = [host_path]
+        if host_path.is_dir():
+            check_paths.extend(host_path.rglob("*"))
+        for cp in check_paths:
+            try:
+                st = cp.stat()
+            except OSError:
+                continue
+            if st.st_uid != uid or st.st_gid != gid:
+                needs_fix.append(p)
+                break
+
+    if not needs_fix:
+        return
+
+    log.info("Fixing ownership of Docker-created files...")
+    run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            f"{cfg.project_dir}:/work",
+            "-w",
+            "/work",
+            "debian:trixie",
+            "chown",
+            "-R",
+            f"{uid}:{gid}",
+            *needs_fix,
+        ],
+    )
