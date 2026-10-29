@@ -23,3 +23,39 @@ class Tink(Role):
         # tink-agent-setup unpacks the image with tar (-z for OCI blobs);
         # Essential on Debian, not on Rocky.
         return {"tar", "gzip"}
+
+
+class Kubernetes(Role):
+    """Kubernetes node: kubeadm/kubelet/kubectl from pkgs.k8s.io, containerd (CRI), cloud-init."""
+
+    content = "role/k8s"
+
+    @property
+    def name(self) -> str:
+        return "k8s"
+
+    def packages(self, flavor: Flavor) -> set[str]:
+        return {
+            "kubelet",
+            "kubeadm",
+            "kubectl",
+            "cri-tools",
+            "cloud-init",
+            # cloud-init runs lsb_release on deb distros; resolute's cloud-init doesn't pull it in
+            "lsb-release",
+            # kubeadm preflight requirements
+            "conntrack",
+            "socat",
+            "ebtables",
+            "ethtool",
+        }
+
+
+class KubernetesCapt(Kubernetes):
+    """Kubernetes node for Cluster API Provider Tinkerbell: cloud-init reads Hegel (EC2-style)."""
+
+    content = "role/k8s-capt"
+
+    @property
+    def name(self) -> str:
+        return "k8s-capt"

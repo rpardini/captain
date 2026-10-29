@@ -24,6 +24,10 @@ DEFAULT_FLAVOR_ID = "trixie-full"
 # Override at runtime via --kernel-version or KERNEL_VERSION env var.
 DEFAULT_KERNEL_VERSION = "6.18.39"
 
+# Kubernetes minor version (pkgs.k8s.io repo) for flavors with the k8s role.
+# Override at runtime via --kubernetes-version or KUBERNETES_VERSION env var.
+DEFAULT_KUBERNETES_VERSION = "1.36"
+
 
 @dataclass(slots=True)
 class Config:
@@ -51,6 +55,9 @@ class Config:
     # so they rebuild when armbian-next publishes a newer kernel. Empty/None =
     # no cache-bust (default; stable hash for local builds).
     armbian_version: str | None = None
+
+    # Kubernetes minor version, for flavors with the k8s role
+    kubernetes_version: str = DEFAULT_KUBERNETES_VERSION
 
     # Docker
     builder_registry: str | None = None

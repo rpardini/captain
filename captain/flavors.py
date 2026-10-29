@@ -10,7 +10,7 @@ from captain.traits.distro import Debian, Rocky, Ubuntu
 from captain.traits.output import Mem
 from captain.traits.platform import AcpiCaptainKernel, AcpiDistroKernel, Armbian
 from captain.traits.platform.rpi import ArmbianRpi
-from captain.traits.role import Tink
+from captain.traits.role import KubernetesCapt, Tink
 
 TRIXIE = Debian("trixie")
 RESOLUTE = Ubuntu("resolute")
@@ -108,3 +108,18 @@ FLAVORS: list[Flavor] = [
         output=Mem(),
     ),
 ]
+
+# Kubernetes (CAPT) nodes, from the same bases as the tink flavors above.
+for _base_id in ("trixie-full", "resolute-full", "rockylinux10-full", "trixie-rockchip64"):
+    _base = next(f for f in FLAVORS if f.id == _base_id)
+    FLAVORS.append(
+        Flavor(
+            id=f"mem-k8s-capt-{_base_id}",
+            name=f"In-memory Kubernetes (CAPT) node, {_base.name}",
+            description=f"In-memory Kubernetes node for CAPT; {_base.description}",
+            distro=_base.distro,
+            platform=_base.platform,
+            role=KubernetesCapt(),
+            output=Mem(),
+        )
+    )
