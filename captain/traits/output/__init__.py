@@ -112,6 +112,7 @@ class Img(Output):
         if flavor.platform.boot_scheme == "uefi" and flavor.cfg.arch == "amd64":
             # arm64 UEFI machines advertise their serial console via ACPI SPCR
             cmdline += ["console=tty0", "console=ttyS0,115200"]
+        cmdline += flavor.platform.kernel_cmdline_extra()
         return " ".join(cmdline)
 
     def collect_artifacts(self, flavor: Flavor) -> None:

@@ -16,12 +16,16 @@ class Platform(Trait):
     iso_capable: ClassVar[bool] = False
     # The kernel ships DTBs worth exporting (arm64 only).
     ships_dtbs: ClassVar[bool] = True
-    # How disk images boot: "uefi" (ESP + systemd-boot) or "extlinux" (U-Boot)
+    # How disk images boot: "uefi" (ESP + systemd-boot), "extlinux" (U-Boot) or "rpi" (RPi firmware)
     boot_scheme: ClassVar[str]
 
     def kernel_dtb_glob(self, flavor: Flavor) -> str:
         """Where the kernel installs its DTBs, relative to the root (a single-match glob)."""
         return flavor.distro.kernel_dtb_glob
+
+    def kernel_cmdline_extra(self) -> list[str]:
+        """Extra kernel command line arguments for disk images."""
+        return []
 
 
 class Acpi(Platform):

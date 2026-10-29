@@ -64,6 +64,32 @@ cat > "${BUILDROOT}/efi/loader/entries/captainos.conf" <<-ENTRY_CONF
 	initrd /captainos/initrd
 	options ${cmdline}
 ENTRY_CONF
+{% elif flavor.platform.boot_scheme == "rpi" %}
+# Raspberry Pi: the firmware (merged into /efi via ExtraTrees) boots kernel8.img itself, no U-Boot.
+# repart copies /efi into the vfat boot partition. Generic for Pi 4B and newer; Tinkerbell
+# workflows may adjust config.txt/cmdline.txt when provisioning.
+dtb_dir="$(echo -n "${BUILDROOT}"/{{ flavor.platform.kernel_dtb_glob(flavor) }})"
+if [[ ! -d "${dtb_dir}/broadcom" || ! -d "${dtb_dir}/overlays" ]]; then
+	log error "No broadcom/ and overlays/ DTB directories found in ${dtb_dir}"
+	exit 1
+fi
+log info "Populating the RPi boot partition (DTBs: ${dtb_dir#"${BUILDROOT}"})"
+mkdir -p "${BUILDROOT}/efi/overlays"
+cp -v "${BUILDROOT}/boot/${kernel_image}" "${BUILDROOT}/efi/kernel8.img"
+cp -v "${BUILDROOT}/boot/initrd.img-${kver}" "${BUILDROOT}/efi/initrd.img"
+cp "${dtb_dir}"/broadcom/*.dtb "${BUILDROOT}/efi/"
+cp "${dtb_dir}"/overlays/*.dtbo "${BUILDROOT}/efi/overlays/"
+if [[ -f "${dtb_dir}/overlays/overlay_map.dtb" ]]; then
+	cp "${dtb_dir}/overlays/overlay_map.dtb" "${BUILDROOT}/efi/overlays/"
+fi
+cat > "${BUILDROOT}/efi/config.txt" <<-CONFIG_TXT
+	# Generic, for Raspberry Pi 4B and newer; Tinkerbell workflows may customize it when provisioning.
+	arm_64bit=1
+	kernel=kernel8.img
+	initramfs initrd.img followkernel
+	enable_uart=1
+CONFIG_TXT
+echo "${cmdline}" > "${BUILDROOT}/efi/cmdline.txt"
 {% else %}
 # DeviceTree: extlinux.conf for U-Boot's distro boot, on the root partition.
 dtb_dir="$(echo -n "${BUILDROOT}"/{{ flavor.platform.kernel_dtb_glob(flavor) }})"
