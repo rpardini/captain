@@ -34,6 +34,9 @@ Stumbling blocks hit while building the trait-based flavors (Rocky, Ubuntu, k8s 
   initrd live on the ESP) and RPi (they live on the vfat `boot` partition); extlinux layouts (no ESP) keep `/boot`.
 - RPi disk images use an `esp`-typed vfat `boot` partition on GPT: the Pi 4/5 EEPROM reads GPT (Pi 3's `bootcode.bin`
   doesn't, hence Pi 4B and newer only). The RPi kernel ships bcm2712 (Pi 5) DTBs too; all are copied.
+- The RPi firmware (`start4.elf`) prepends its own kernel args, including `cgroup_disable=memory`: kubeadm then fails
+  preflight (`missing required cgroups: memory`). The disk image's `cmdline.txt` appends `cgroup_enable=memory
+  cgroup_memory=1`; netbooted (`mem-k8s-capt-*-rpi`) nodes need the same in the `cmdline.txt` Tinkerbell serves.
 - `out/firmware-rpi/` has the same name for every in-memory RPi flavor: locally, the last build wins (CI builds each
   flavor in its own job, so its artifacts don't collide).
 - systemd-repart 257 **ignores `Flags=`** (eg. 0x4, legacy BIOS bootable). U-Boot distro boot falls back to partition 1.

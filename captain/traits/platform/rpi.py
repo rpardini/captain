@@ -37,7 +37,17 @@ class ArmbianRpi(Armbian):
         return [*super().custom_names(), "rpi"]
 
     def kernel_cmdline_extra(self) -> list[str]:
-        return ["rootwait", "console=serial0,115200", "console=tty1"]
+        return [
+            "rootwait",
+            # The last console= is /dev/console (systemd, cloud-init...): serial, as HDMI is
+            # usually unplugged; tty1 still gets kernel messages.
+            "console=tty1",
+            "console=serial0,115200",
+            # The firmware prepends cgroup_disable=memory; kubelet/kubeadm need the memory
+            # controller. The RPi kernel honours a later cgroup_enable=.
+            "cgroup_enable=memory",
+            "cgroup_memory=1",
+        ]
 
     def cache_inputs(self, flavor: Flavor) -> dict[str, str]:
         return super().cache_inputs(flavor) | {"rpi_firmware": self.rpi_fw_tag}
