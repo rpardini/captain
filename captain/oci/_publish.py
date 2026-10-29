@@ -11,7 +11,7 @@ from uuid import uuid4
 from captain import buildah, skopeo
 from captain.artifacts import OutputArchArtifactType
 from captain.config import Config
-from captain.flavor import BaseFlavor
+from captain.flavor import Flavor
 from captain.util import ensure_dir, get_arch_info
 
 from ._build import (
@@ -56,7 +56,7 @@ def _create_push_cleanup(
 
 def _publish_single_arch(
     *,
-    flavor: BaseFlavor,
+    flavor: Flavor,
     layer_tars: list[Path],
     ref: str,
     repository: str,
@@ -96,7 +96,7 @@ def _publish_single_arch(
 
 def _publish_combined(
     *,
-    flavor: BaseFlavor,
+    flavor: Flavor,
     arch_layer_tars: dict[str, list[Path]],
     registry: str,
     repository: str,
@@ -180,7 +180,7 @@ def _publish_combined(
 
 def publish(
     cfg: Config,
-    flavor: BaseFlavor,
+    flavor: Flavor,
     *,
     target: str,
     registry: str,
@@ -328,7 +328,7 @@ def publish(
 
 def create_oci_metadata(
     *,
-    flavor: BaseFlavor,
+    flavor: Flavor,
     image_type: str,
     arch: str | None = None,
     repository: str,
