@@ -46,6 +46,9 @@ class ArmbianRpi(Armbian):
             "cgroup_memory=1",
         ]
 
+    def cache_inputs(self, flavor: Flavor) -> dict[str, str]:
+        return super().cache_inputs(flavor) | {"rpi_firmware": self.rpi_fw_tag}
+
     def _netboot(self, flavor: Flavor) -> bool:
         return flavor.output.output_kind == "initramfs"
 

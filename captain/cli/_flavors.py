@@ -1,7 +1,7 @@
 """``captain list-flavors`` — the flavor registry, for humans and for CI.
 
-``--github-output`` emits ``name=value`` lines for ``$GITHUB_OUTPUT``: the build matrices
-(with and without the CaptainOS kernel build) and the multi-arch "combined" publish matrix.
+``--github-output`` emits ``name=value`` lines for ``$GITHUB_OUTPUT``: the build matrix
+and the multi-arch "combined" publish matrix.
 ``--release`` emits one ``<flavor-id> <target> <arch> <tag-suffix>`` line per flavor, for the
 release workflow (``while read -r id target arch suffix``); the tag suffix may be empty.
 """
@@ -18,7 +18,6 @@ import captain
 from captain.cli._main import cli
 from captain.flavor import Flavor
 from captain.flavors import FLAVORS
-from captain.traits.platform import AcpiCaptainKernel
 from captain.util import get_arch_info
 
 log = logging.getLogger(__name__)
@@ -34,9 +33,7 @@ def _matrix_entries(flavor: Flavor) -> list[dict[str, str | bool]]:
         {
             "arch": arch,
             "output_arch": get_arch_info(arch).output_arch,
-            "captainos_kernel": isinstance(flavor.platform, AcpiCaptainKernel),
             "iso": flavor.has_iso(),
-            "cache": flavor.ci_cache,
             "FLAVOR_ID": flavor.id,
         }
         for arch in sorted(flavor.supported_architectures)
@@ -51,13 +48,10 @@ def list_flavors_cmd(as_json: bool, github_output: bool, release: bool) -> None:
     """List the flavors in the registry (captain/flavors.py)."""
     if github_output:
         entries = [e for f in FLAVORS for e in _matrix_entries(f)]
-        with_kernel = [e for e in entries if e["captainos_kernel"]]
-        without_kernel = [e for e in entries if not e["captainos_kernel"]]
         combined = [
             {"combined_flavor": f.id, "iso": f.has_iso()} for f in FLAVORS if _is_combined(f)
         ]
-        click.echo(f"matrix_with_kernel={json.dumps({'include': with_kernel})}")
-        click.echo(f"matrix={json.dumps({'include': without_kernel})}")
+        click.echo(f"matrix={json.dumps({'include': entries})}")
         click.echo(f"matrix_combined={json.dumps({'include': combined})}")
         return
 
@@ -80,7 +74,6 @@ def list_flavors_cmd(as_json: bool, github_output: bool, release: bool) -> None:
                 "output": f.output.name,
                 "iso": f.has_iso(),
                 "combined": _is_combined(f),
-                "ci_cache": f.ci_cache,
                 "tag_suffix": f.tag_suffix,
             }
             click.echo(json.dumps(entry))
