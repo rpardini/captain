@@ -47,7 +47,15 @@ class Flavor:
     role: Role
     output: Output
     extra: tuple[Trait, ...] = ()
+    # Suffix for release tags (`<tag><suffix>`); None means "-<id>". Stable for published flavors.
+    release_tag_suffix: str | None = None
+    # Keep CI's initramfs/iso caches (GitHub Actions cache; 10 GB per repo, LRU-evicted).
+    ci_cache: bool = False
     cfg: Config = field(init=False, repr=False)
+
+    @property
+    def tag_suffix(self) -> str:
+        return self.release_tag_suffix if self.release_tag_suffix is not None else f"-{self.id}"
 
     @property
     def traits(self) -> list[Trait]:

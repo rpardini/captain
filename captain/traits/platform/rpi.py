@@ -56,7 +56,7 @@ class ArmbianRpi(Armbian):
             return
         artifacts.append(
             OutputArchArtifact(
-                type=OutputArchArtifactType.DIRECTORY, name=self.firmware_out_dirname()
+                type=OutputArchArtifactType.DIRECTORY, name=self.firmware_out_dirname(flavor)
             )
         )
 
@@ -75,7 +75,7 @@ class ArmbianRpi(Armbian):
         cfg = flavor.cfg
         out: Path = ensure_dir(cfg.output_dir)
         log.debug("Copying firmware directory from %s to %s", self.firmware_output(cfg), out)
-        target_fw_dir = out / self.firmware_out_dirname()
+        target_fw_dir = out / self.firmware_out_dirname(flavor)
         if target_fw_dir.exists():
             shutil.rmtree(target_fw_dir)
         shutil.copytree(self.firmware_output(cfg), target_fw_dir)
@@ -132,9 +132,10 @@ class ArmbianRpi(Armbian):
         log.debug("Symlinking initramfs from %s to %s", initramfs_src, initramfs_dst)
         symlink_relative(initramfs_dst, initramfs_src)
 
-    def firmware_out_dirname(self) -> str:
-        # return f"firmware-{cfg.flavor_id}-{cfg.arch_info.output_arch}"
-        return "firmware-rpi"
+    def firmware_out_dirname(self, flavor: Flavor) -> str:
+        # Distinct per flavor (release assets share a namespace); "firmware-rpi" kept for
+        # trixie-armbian-rpi, as its tag suffix "-rpi".
+        return f"firmware{flavor.tag_suffix}"
 
     def firmware_output(self, cfg: Config) -> Path:
         return ensure_dir(cfg.initramfs_output / "firmware")
