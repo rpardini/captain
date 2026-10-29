@@ -119,23 +119,19 @@ def build_cmd(
     # Delegate to flavor, for eg obtaining it's own dependencies.
     flavor.pre_mkosi_stage()
 
-    # Initramfs (mkosi) stage + artifact collection.
-    _build_mkosi_stage(cfg, list(cfg.mkosi_args))
-    artifacts.collect_initramfs(cfg)
-    artifacts.collect_kernel(cfg)
-    artifacts.collect_dtbs(cfg)
-    log.info("Initramfs build complete.")
+    # mkosi stage (initramfs or disk image, per the flavor's output) + artifact collection.
+    _build_mkosi_stage(cfg, list(cfg.mkosi_args), flavor.output.mkosi_image_name)
+    flavor.output.collect_artifacts(flavor)
+    log.info("mkosi build complete.")
 
     flavor.post_mkosi_stage()
 
     # ISO stage (if the flavor supports it).
     if flavor.has_iso():
         _build_iso_stage(cfg)
+        artifacts.collect_iso(cfg)
     else:
         log.info("Flavor '%s' does not produce an ISO — skipping.", flavor.id)
-
-    # Final artifact collection.
-    artifacts.collect(cfg)
 
     # Flavor-driven artifact collection.
     flavor.post_artifact_collect()
