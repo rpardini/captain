@@ -83,7 +83,7 @@ def _build_tools_stage(cfg: Config) -> None:
     docker.fix_docker_ownership(cfg, ["/work/mkosi.input"])
 
 
-def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
+def _build_mkosi_stage(cfg: Config, extra_args: list[str], mkosi_image_name: str) -> None:
     """Run the mkosi image-assembly stage according to *cfg.mkosi_mode*."""
 
     # --- skip ---------------------------------------------------------
@@ -92,10 +92,10 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
         return
 
     # --- idempotency --------------------------------------------------
-    initramfs_image = cfg.initramfs_output / "image.cpio.zst"
+    mkosi_image = cfg.initramfs_output / mkosi_image_name
     force = "--force" in cfg.mkosi_args
-    if initramfs_image.is_file() and not force:
-        log.info("Initramfs already built: %s (use --force to rebuild)", initramfs_image)
+    if mkosi_image.is_file() and not force:
+        log.info("Image already built: %s (use --force to rebuild)", mkosi_image)
         return
 
     mkosi_args = list(cfg.mkosi_args) + list(extra_args)
@@ -145,7 +145,7 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
     docker.obtain_builder(cfg)
     log.info("Building initrd with mkosi (docker)...")
     tools_tree = f"/work/mkosi.input/tools/{cfg.arch}"  # @TODO ooops
-    output_dir = cfg.calc_initramfs_output(Path("/work"), "initramfs")
+    output_dir = cfg.calc_initramfs_output(Path("/work"), cfg.output_kind)
     docker.run_mkosi_in_builder(
         cfg,
         "--directory=/work/mkosi.generated",
@@ -158,7 +158,7 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
     docker.fix_docker_ownership(
         cfg,
         [
-            f"/work/mkosi.output/initramfs/{cfg.flavor_id}/{cfg.arch}",
+            f"/work/mkosi.output/{cfg.output_kind}/{cfg.flavor_id}/{cfg.arch}",
             "/work/out",
         ],
     )

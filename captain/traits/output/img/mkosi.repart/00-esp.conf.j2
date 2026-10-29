@@ -1,0 +1,9 @@
+{% if flavor.platform.boot_scheme == "uefi" -%}
+[Partition]
+Type=esp
+Label=esp
+Format=vfat
+CopyFiles=/efi:/
+SizeMinBytes=256M
+SizeMaxBytes=256M
+{% endif -%}
