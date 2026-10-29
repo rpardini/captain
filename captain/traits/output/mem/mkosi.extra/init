@@ -14,6 +14,10 @@
 # This is the same pattern used by every Linux initramfs (including the
 # LinuxKit-based Hook) to transition from initrd to a real root.
 
+# The kernel starts init without PATH, and shells' built-in defaults differ
+# (Debian's dash includes sbin, Rocky's bash does not).
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
 # Mount essential virtual filesystems for switch_root
 mount -t proc proc /proc
 mount -t sysfs sysfs /sys
