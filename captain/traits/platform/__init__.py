@@ -16,6 +16,8 @@ class Platform(Trait):
     iso_capable: ClassVar[bool] = False
     # The kernel ships DTBs worth exporting (arm64 only).
     ships_dtbs: ClassVar[bool] = True
+    # How disk images boot: "uefi" (ESP + systemd-boot) or "extlinux" (U-Boot)
+    boot_scheme: ClassVar[str]
 
     def kernel_dtb_glob(self, flavor: Flavor) -> str:
         """Where the kernel installs its DTBs, relative to the root (a single-match glob)."""
@@ -27,6 +29,7 @@ class Acpi(Platform):
 
     content = "platform/acpi"
     iso_capable = True
+    boot_scheme = "uefi"
 
     def packages(self, flavor: Flavor) -> set[str]:
         return {"acpid", "efibootmgr"}
@@ -75,6 +78,7 @@ class Armbian(Platform):
 
     content = "platform/armbian"
     supported_architectures = frozenset(["arm64"])
+    boot_scheme = "extlinux"
     # Releases with their own armbian-<release> suite; kernels are in the shared "armbian" suite.
     release_suites: ClassVar[frozenset[str]] = frozenset(["bookworm", "trixie", "forky"])
 

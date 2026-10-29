@@ -126,6 +126,9 @@ apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends apt-utils
 
 # For mkosi building RPM-based distros (Rocky Linux)
 apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends dnf rpm distribution-gpg-keys
+
+# For mkosi building disk images (Format=disk)
+apt-get -o "Dpkg::Use-Pty=0" install -y --no-install-recommends systemd-repart
 EXTRA_FRAG
 
 RUN <<-CONFIG_FRAG
