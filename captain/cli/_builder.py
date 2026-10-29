@@ -6,8 +6,8 @@ import logging
 
 import click
 
+from captain.builder import obtain_builder
 from captain.cli._main import CliContext, cli
-from captain.docker import obtain_builder
 
 log = logging.getLogger(__name__)
 

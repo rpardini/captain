@@ -6,7 +6,7 @@ import logging
 import shutil
 from pathlib import Path
 
-from captain import cache, docker, iso, kernel, tools
+from captain import builder, cache, docker, iso, kernel, tools
 from captain.config import Config
 from captain.flavor import Flavor
 from captain.util import check_kernel_dependencies, check_mkosi_dependencies, run
@@ -47,7 +47,7 @@ def build_kernel_stage(cfg: Config) -> None:
         return
 
     # --- docker -------------------------------------------------------
-    docker.obtain_builder(cfg)
+    builder.obtain_builder(cfg)
     log.info("Building kernel (docker relaunch)...")
     if cfg.kernel_menuconfig:
         log.info("Launching interactive kernel configuration (menuconfig)...")
@@ -86,7 +86,7 @@ def _build_tools_stage(cfg: Config) -> None:
         tools.download_all(cfg)
     # --- docker -------------------------------------------------------
     else:
-        docker.obtain_builder(cfg)
+        builder.obtain_builder(cfg)
         log.info("Downloading tools (nerdctl, containerd, etc.) docker...")
         docker.run_captain_in_builder(cfg, ["tools"])
         docker.fix_docker_ownership(cfg, ["/work/mkosi.input"])
@@ -143,7 +143,7 @@ def _build_mkosi_stage(cfg: Config, extra_args: list[str]) -> None:
         return
 
     # --- docker -------------------------------------------------------
-    docker.obtain_builder(cfg)
+    builder.obtain_builder(cfg)
     log.info("Building initrd with mkosi (docker)...")
     tools_tree = f"/work/mkosi.input/tools/{cfg.arch}"  # @TODO ooops
     output_dir = cfg.calc_initramfs_output(Path("/work"), cfg.output_kind)
@@ -185,7 +185,7 @@ def _build_iso_stage(cfg: Config, flavor: Flavor) -> None:
         iso.build(cfg)
     # --- docker -------------------------------------------------------
     else:
-        docker.obtain_builder(cfg)
+        builder.obtain_builder(cfg)
         log.info("Building ISO (docker)...")
         docker.run_captain_in_builder(cfg, ["iso"])
         docker.fix_docker_ownership(
