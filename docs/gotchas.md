@@ -6,6 +6,9 @@ Stumbling blocks hit while building the trait-based flavors (Rocky, Ubuntu, k8s 
 
 - The old generator walked `rglob("*")` + `is_file()`, silently **dropping symlinks**: unit masks (`-> /dev/null`) and
   `default.target` never reached the image. Symlinks are now copied as symlinks.
+- Don't commit symlinks into trait dirs: links to in-image paths (eg. `default.target -> multi-user.target`) dangle in
+  the repo and break tools that read files by path (code review: "cannot be read from repo (ENOENT)"). Use
+  `systemctl mask` / `set-default` in a postinst instead.
 - Jinja strips one trailing newline by default; static `*.j2` files are rendered with `keep_trailing_newline=True`.
 - Bash `${#array[@]}` contains `{#`, which Jinja reads as a comment start: wrap such code in `{% raw %}`.
 - Use `{% if … -%}` / `{% endif -%}` in line-oriented templates, or you get stray blank lines.
