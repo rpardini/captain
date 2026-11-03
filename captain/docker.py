@@ -21,6 +21,9 @@ from captain.util import run
 
 log = logging.getLogger(__name__)
 
+# Passed to the builder container by name only (see run_in_builder).
+_SECRET_ENVS = frozenset({"REGISTRY_USERNAME", "REGISTRY_PASSWORD"})
+
 
 def run_in_builder(
     cfg: Config, command_and_args: list[str], extra_docker_args: list[str] | None = None
@@ -95,11 +98,13 @@ def run_in_builder(
         table.add_column("Environment Variable", style="green")
         table.add_column("Value", style="yellow")
         for key, value in sorted(docker_envs.items()):
-            table.add_row(key, value)
+            table.add_row(key, "***" if key in _SECRET_ENVS and value else value)
         captain.console.print(table)
 
     for k, v in docker_envs.items():
-        docker_args += ["-e", f"{k}={v}"]
+        # Secrets by name only: docker takes the value from its own environment, so it is
+        # neither on the command line (ps, DEBUG logs) nor printed.
+        docker_args += ["-e", k if k in _SECRET_ENVS else f"{k}={v}"]
 
     if os.environ.get("GITHUB_ACTIONS") == "true":
         log.debug("Running in GitHub Actions, adding bind mount for Docker credentials...")
