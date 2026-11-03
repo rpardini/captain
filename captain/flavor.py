@@ -206,7 +206,8 @@ class Flavor:
         for src in sorted(src_dir.rglob("*")):
             relative = src.relative_to(src_dir)
             if src.is_symlink():
-                # eg units masked via /dev/null, or default.target -> multi-user.target
+                # eg. in custom/ layers; traits mask/set-default via postinst instead
+                # (dangling links break tools)
                 link = str(src.readlink()).encode()
                 files[f"{dest_prefix}/{relative}"] = _GeneratedFile(link, 0o777, symlink=True)
                 continue
