@@ -87,11 +87,17 @@ class Img(Output):
 
     UEFI platforms get an ESP with systemd-boot and a BLS entry; DeviceTree platforms get
     an extlinux.conf for U-Boot (assumed to live on SPI/eMMC boot partitions).
+
+    *sector_size* is the GPT's logical sector size; it must match the target disk's (eg. 4096
+    for UFS). Anything but 512 is only for extlinux layouts: firmware won't read a 4K ESP.
     """
 
     content = "output/img"
     output_kind = "image"
     label = "disk image"
+
+    def __init__(self, sector_size: int = 512) -> None:
+        self.sector_size = sector_size
 
     def kernel_initramfs_packages(self, flavor: Flavor) -> set[str]:
         return flavor.distro.default_initramfs_packages()

@@ -32,7 +32,9 @@ Stumbling blocks hit while building the trait-based flavors (Rocky, Ubuntu, k8s 
 ## systemd-repart / disk images
 
 - repart may format the ESP with **4K sectors**; EDK2 then sees no filesystem on a 512-byte-sector disk (falls to the
-  EFI shell). Pin `SectorSize=512`.
+  EFI shell). Pin `SectorSize=512`. extlinux images (no ESP) may use 4096 instead (`Img(sector_size=)`), and must for
+  disks with 4K logical blocks (eg. Genio UFS), or the kernel and U-Boot find no GPT: `img-k8s-capt-trixie-genio` is
+  4K, so it won't boot from eMMC/SD.
 - With an ESP defined, the root partition's `CopyFiles=/` ends up with an **empty `/boot`**. Fine for UEFI (kernel +
   initrd live on the ESP) and RPi (they live on the vfat `boot` partition); extlinux layouts (no ESP) keep `/boot`.
 - RPi disk images use an `esp`-typed vfat `boot` partition on GPT: the Pi 4/5 EEPROM reads GPT (Pi 3's `bootcode.bin`

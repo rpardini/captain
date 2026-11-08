@@ -118,6 +118,8 @@ FLAVORS: list[Flavor] = [
 
 # Kubernetes (CAPT) nodes, from the same bases as the tink flavors above: as disk images
 # for final deployment (img-), and in-memory (mem-) for machines without a proper disk.
+# Disk image sector sizes other than 512: Genio boards' UFS has 4K logical blocks (eMMC/SD: 512).
+_img_sector_sizes = {"trixie-genio": 4096}
 for _base_id in (
     "trixie-full",
     "resolute-full",
@@ -135,7 +137,7 @@ for _base_id in (
             distro=_base.distro,
             platform=_base.platform,
             role=KubernetesCapt(),
-            output=Img(),
+            output=Img(sector_size=_img_sector_sizes.get(_base_id, 512)),
         ),
         Flavor(
             id=f"mem-k8s-capt-{_base_id}",
@@ -147,3 +149,9 @@ for _base_id in (
             output=Mem(),
         ),
     ]
+
+# Firmware won't read a 4K ESP (docs/gotchas.md): other sector sizes are for extlinux images only.
+for _flavor in FLAVORS:
+    _out, _boot = _flavor.output, _flavor.platform.boot_scheme
+    if isinstance(_out, Img) and _out.sector_size != 512 and _boot != "extlinux":
+        raise ValueError(f"{_flavor.id}: sector_size {_out.sector_size} needs an extlinux platform")

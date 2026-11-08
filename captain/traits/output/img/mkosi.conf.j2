@@ -1,7 +1,8 @@
 [Output]
 Format=disk
-# Otherwise repart may pick 4K, formatting an ESP that firmware won't read on 512-byte-sector disks.
-SectorSize=512
+# Pinned, or repart may pick 4K, formatting an ESP that firmware won't read on 512-byte-sector disks.
+# extlinux images may use 4096 instead, for disks with 4K logical blocks (UFS): see Img.
+SectorSize={{ flavor.output.sector_size }}
 CompressOutput=zstd
 CompressLevel=19
 
