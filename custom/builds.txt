@@ -21,5 +21,7 @@
 # mem-k8s-capt-rockylinux10-full
 # img-k8s-capt-trixie-rockchip64
 # mem-k8s-capt-trixie-rockchip64
+# img-k8s-capt-trixie-genio
+# mem-k8s-capt-trixie-genio
 # img-k8s-capt-trixie-armbian-rpi
 # mem-k8s-capt-trixie-armbian-rpi

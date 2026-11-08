@@ -123,6 +123,7 @@ for _base_id in (
     "resolute-full",
     "rockylinux10-full",
     "trixie-rockchip64",
+    "trixie-genio",
     "trixie-armbian-rpi",
 ):
     _base = next(f for f in FLAVORS if f.id == _base_id)
