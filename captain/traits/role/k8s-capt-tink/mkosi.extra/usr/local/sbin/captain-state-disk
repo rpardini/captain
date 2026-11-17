@@ -1,0 +1,146 @@
+#!/bin/bash
+# /usr/local/sbin/captain-state-disk — Put an in-memory node's state volumes on disk(s), with systemd-repart.
+# Run by the Tinkerbell Workflow (a host script Action) before captain-k8s-handoff; again on every (re)provision.
+#
+# STATE_VOLUMES: one volume per line, "<name> <mountpoint> <size> <policy> <disk>":
+#   name        [a-z0-9-]+; the GPT partition label is captain-<name>
+#   mountpoint  eg. /var/lib/containerd
+#   size        eg. 40G (fixed), or 'rest': what's left of its disk (several 'rest' on a disk share it)
+#   policy      keep: reuse the filesystem if the partition is already there; wipe: mkfs on every run
+#   disk        whole-disk device, eg. /dev/vda or /dev/disk/by-id/...
+#
+# One volume is one partition on one disk. Only disks named by a volume are touched. A disk holding anything but
+# captain-* partitions, or whose captain-* partitions don't match the volumes, is repartitioned from scratch.
+# Mount units go to /run: a reboot loses them, as it loses the rest of the in-memory node.
+
+set -euo pipefail
+
+log() { echo "captain-state-disk: $*" >&2; }
+
+declare -r REPART_DIR="/run/captain/repart.d"
+declare -r UNIT_DIR="/run/systemd/system"
+declare -r SERVICES="kubelet.service containerd.service" # stopped while their dirs get mounted
+
+[[ -n "${STATE_VOLUMES:-}" ]] || { log "STATE_VOLUMES is empty: nothing to do"; exit 0; }
+
+declare -a names=() mounts=() sizes=() policies=() disks=()
+while read -r name mount size policy disk extra; do
+	[[ -z "${name}" || "${name}" == \#* ]] && continue
+	[[ -z "${extra:-}" && -n "${disk:-}" ]] || { log "bad line: '${name} ${mount} ${size} ${policy} ${disk} ${extra:-}'"; exit 1; }
+	[[ "${name}" =~ ^[a-z0-9-]+$ ]] || { log "bad volume name '${name}'"; exit 1; }
+	[[ "${mount}" == /?* ]] || { log "${name}: mountpoint '${mount}' is not an absolute path below /"; exit 1; }
+	[[ "${size}" == "rest" || "${size}" =~ ^[0-9]+[KMGT]?$ ]] || { log "${name}: bad size '${size}'"; exit 1; }
+	[[ "${policy}" == "keep" || "${policy}" == "wipe" ]] || { log "${name}: bad policy '${policy}'"; exit 1; }
+	[[ -b "${disk}" ]] || { log "${name}: '${disk}' is not a block device"; exit 1; }
+	names+=("${name}") mounts+=("${mount}") sizes+=("${size}") policies+=("${policy}") disks+=("$(readlink -f "${disk}")")
+done <<< "${STATE_VOLUMES}"
+log "volumes: ${names[*]}"
+
+# The partition labelled captain-<name> on a given disk (by-partlabel is global; another disk could have one too).
+part_of() { lsblk -nrpo NAME,PARTLABEL "$1" | awk -v l="captain-$2" '$2 == l { print $1 }'; }
+
+# Stop what uses the volumes, and unmount them (re-runs, eg. a Workflow retry). --job-mode=ignore-dependencies:
+# tink-agent Requires containerd, and stopping it would kill this very script.
+declare -a was_active=()
+for svc in ${SERVICES}; do
+	if systemctl is-active -q "${svc}"; then
+		was_active+=("${svc}")
+		log "stopping ${svc}"
+		systemctl stop --job-mode=ignore-dependencies "${svc}"
+	fi
+done
+for i in "${!names[@]}"; do
+	unit="$(systemd-escape -p --suffix=mount "${mounts[i]}")"
+	systemctl stop "${unit}" 2> /dev/null || true
+	if mountpoint -q "${mounts[i]}"; then umount "${mounts[i]}"; fi
+done
+
+declare -A fresh=() # volumes whose partition repart creates (and formats) in this run
+for disk in $(printf '%s\n' "${disks[@]}" | sort -u); do
+	defs="${REPART_DIR}/$(basename "${disk}")"
+	rm -rf "${defs}"
+	mkdir -p "${defs}"
+	wanted="" n=0
+	for i in "${!names[@]}"; do
+		[[ "${disks[i]}" == "${disk}" ]] || continue
+		n=$((n + 1))
+		wanted+="captain-${names[i]}"$'\n'
+		{
+			echo "[Partition]"
+			echo "Type=linux-generic"
+			echo "Label=captain-${names[i]}"
+			echo "Format=ext4"
+			if [[ "${sizes[i]}" != "rest" ]]; then
+				echo "SizeMinBytes=${sizes[i]}"
+				echo "SizeMaxBytes=${sizes[i]}"
+			fi
+		} > "${defs}/$(printf '%02d' "${n}")-${names[i]}.conf"
+	done
+
+	# repart matches existing partitions to definitions by type and order, not label: only trust a disk whose
+	# partitions are exactly our labels, in order. Anything else (another OS, a changed layout) starts over.
+	existing="$(lsblk -nrpo TYPE,PARTLABEL "${disk}" | awk '$1 == "part" { print ($2 == "" ? "(unlabelled)" : $2) }')"
+	empty="allow"
+	if [[ -n "$(lsblk -nrdo FSTYPE "${disk}")" ]]; then
+		log "${disk}: whole-disk filesystem ($(lsblk -nrdo FSTYPE "${disk}")): WIPING it"
+		empty="force"
+	elif [[ -n "${existing}" && "${existing}"$'\n' != "${wanted}" ]]; then
+		log "${disk}: partitions '$(echo ${existing})' don't match the volumes '$(echo ${wanted})': WIPING it"
+		empty="force"
+	fi
+	for i in "${!names[@]}"; do
+		[[ "${disks[i]}" == "${disk}" ]] || continue
+		if [[ "${empty}" == "force" || -z "$(part_of "${disk}" "${names[i]}")" ]]; then fresh[${names[i]}]=1; fi
+	done
+
+	# --seed=random: the default seed (machine-id) gives the same UUIDs to same-index partitions on every disk
+	log "${disk}: systemd-repart --empty=${empty}, definitions in ${defs}"
+	systemd-repart --dry-run=no --empty="${empty}" --seed=random --definitions="${defs}" --no-pager "${disk}"
+done
+udevadm settle
+
+for i in "${!names[@]}"; do
+	part="$(part_of "${disks[i]}" "${names[i]}")"
+	[[ -b "${part}" ]] || { log "${names[i]}: no partition captain-${names[i]} on ${disks[i]} after repart"; exit 1; }
+	partuuid="$(lsblk -nrdo PARTUUID "${part}")"
+	[[ "$(lsblk -nrpo PARTUUID | grep -cxF "${partuuid}")" == 1 ]] || { log "${names[i]}: PARTUUID ${partuuid} isn't unique"; exit 1; }
+	if [[ -n "${fresh[${names[i]}]:-}" ]]; then
+		log "${names[i]}: ${part} is new"
+	elif [[ "${policies[i]}" == "wipe" ]]; then
+		log "${names[i]}: wiping ${part}"
+		mkfs.ext4 -q -F -L "$(printf '%.16s' "captain-${names[i]}")" "${part}" # as repart labels them
+	else
+		log "${names[i]}: keeping ${part}"
+		e2fsck -p "${part}" || [[ $? -le 1 ]] # 1: errors corrected
+	fi
+
+	# Drop what's in the (tmpfs) mountpoint: it'd be hidden under the mount, still using RAM.
+	if [[ -d "${mounts[i]}" ]]; then find "${mounts[i]}" -mindepth 1 -xdev -delete; fi
+	unit="$(systemd-escape -p --suffix=mount "${mounts[i]}")"
+	cat > "${UNIT_DIR}/${unit}" <<- UNIT
+		# Written by captain-state-disk
+		[Unit]
+		Description=Captain state volume ${names[i]}
+		Before=${SERVICES}
+
+		[Mount]
+		What=/dev/disk/by-partuuid/${partuuid}
+		Where=${mounts[i]}
+		Type=ext4
+		Options=noatime
+	UNIT
+done
+
+systemctl daemon-reload
+for i in "${!names[@]}"; do
+	unit="$(systemd-escape -p --suffix=mount "${mounts[i]}")"
+	log "${names[i]}: mounting ${mounts[i]}"
+	systemctl start "${unit}"
+	resize2fs "$(findmnt -nro SOURCE "${mounts[i]}")" # online grow, if its partition grew; no-op otherwise
+done
+
+for svc in "${was_active[@]}"; do
+	log "starting ${svc}"
+	systemctl start --job-mode=ignore-dependencies "${svc}"
+done
+lsblk -o NAME,SIZE,PARTLABEL,FSTYPE,MOUNTPOINTS $(printf '%s\n' "${disks[@]}" | sort -u) >&2

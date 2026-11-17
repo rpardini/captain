@@ -1,0 +1,5 @@
+# nerdctl configuration (in-memory Kubernetes node with tink-agent)
+# Own CNI config dir: /etc/cni/net.d is the cluster CNI's (kubelet would pick up nerdctl's bridge otherwise).
+cni_path = "/opt/cni/bin"
+cni_netconfpath = "/etc/nerdctl/cni/net.d"
+namespace = "tinkerbell"

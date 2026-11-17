@@ -79,3 +79,30 @@ class KubernetesCapt(Kubernetes):
     @property
     def name(self) -> str:
         return "k8s-capt"
+
+
+class KubernetesCaptTink(KubernetesCapt, Tink):
+    """In-memory CAPT node: tink-agent runs the Workflow, which then releases cloud-init (kubeadm).
+
+    Content along the MRO: tink, then k8s and k8s-capt over it (containerd keeps CRI), then ours.
+    """
+
+    content = "role/k8s-capt-tink"
+    title = "Kubernetes node (Cluster API Provider Tinkerbell, in-memory)"
+    hints = (
+        "cloud-init is held back until the Workflow runs `captain-k8s-handoff`.",
+        "Use `journalctl -u tink-agent` command to access the tink worker/agent logs.",
+        *KubernetesCapt.hints,
+    )
+
+    @property
+    def name(self) -> str:
+        return "k8s-capt-tink"
+
+    def custom_names(self) -> list[str]:
+        return ["k8s-capt", self.name]
+
+    def packages(self, flavor: Flavor) -> set[str]:
+        # captain-state-disk: systemd-repart, formatting with mkfs.ext4
+        state_disk = {"systemd-repart", "e2fsprogs"}
+        return KubernetesCapt.packages(self, flavor) | Tink.packages(self, flavor) | state_disk

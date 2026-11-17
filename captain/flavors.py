@@ -10,7 +10,7 @@ from captain.traits.distro import Debian, Rocky, Ubuntu
 from captain.traits.output import Img, Mem
 from captain.traits.platform import AcpiCaptainKernel, AcpiDistroKernel, Armbian
 from captain.traits.platform.rpi import ArmbianRpi
-from captain.traits.role import KubernetesCapt, Tink
+from captain.traits.role import KubernetesCapt, KubernetesCaptTink, Tink
 
 TRIXIE = Debian("trixie")
 RESOLUTE = Ubuntu("resolute")
@@ -145,7 +145,7 @@ for _base_id in (
             description=f"In-memory Kubernetes node for CAPT; {_base.description}",
             distro=_base.distro,
             platform=_base.platform,
-            role=KubernetesCapt(),
+            role=KubernetesCaptTink(),
             output=Mem(),
         ),
     ]

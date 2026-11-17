@@ -100,13 +100,26 @@ mkosi drop-in content (see `captain/traits/__init__.py`). Here is a current list
 | `resolute-full`            | `amd64`, `arm64` | yes | Ubuntu 26.04 Resolute, standard Ubuntu linux-image-generic kernel (no linux-firmware), working `apt`                  |
 | `resolute-rockchip64`      | `arm64`          | no  | Ubuntu 26.04 Resolute for Rockchip boards, using Armbian's _mainline_ rockchip64 kernel                               |
 | `rockylinux10-full`        | `amd64`, `arm64` | yes | Rocky Linux 10 (+EPEL), standard Rocky kernel, working `dnf`. amd64 requires x86-64-v3 (Haswell or newer) CPUs        |
-| `mem-k8s-capt-<base>`      | as `<base>`      | as  | In-memory Kubernetes node for CAPT (kubeadm/kubelet/kubectl, containerd CRI, cloud-init for Tootles)                  |
+| `mem-k8s-capt-<base>`      | as `<base>`      | as  | In-memory Kubernetes node for CAPT (kubeadm/kubelet/kubectl, containerd CRI, cloud-init for Tootles), plus tink-agent  |
 | `img-k8s-capt-<base>`      | as `<base>`      | no  | Kubernetes node **disk image** for CAPT (as above, plus ssh; root autologin on consoles, password locked; users via cloud-init) |
 
 k8s `<base>`s: `trixie-full`, `resolute-full`, `rockylinux10-full`, `trixie-rockchip64`, `trixie-genio`, `trixie-armbian-rpi`.
 
 The flavors above without a prefix run tink-agent from memory. `mem-k8s-capt-*` flavors install Kubernetes from
 pkgs.k8s.io; pick the minor with `--kubernetes-version` (or environment `KUBERNETES_VERSION`, default `1.36`).
+
+`mem-k8s-capt-*` flavors also run tink-agent, as CAPT still runs a Workflow for every Machine; cloud-init is held back
+(`/etc/cloud/cloud-init.disabled`) until that Workflow says so, since CAPT only puts the bootstrap userData into
+Tootles once it claims the machine. Two helpers, for the Workflow's host script (`run:`) Actions:
+
+- `captain-state-disk`: puts state volumes (eg. `/var/lib/containerd`, `/var/lib/kubelet`) on disk partitions, via
+  systemd-repart, each kept or wiped on every run. `STATE_VOLUMES` holds one `<name> <mountpoint> <size|rest> <keep|wipe>
+  <disk>` per line; only the disks named there are touched, and a disk with anything but its `captain-*` partitions,
+  in order, is repartitioned from scratch. Mounts go to `/run`: a reboot drops them, with the rest of the node.
+- `captain-k8s-handoff`: points cloud-init at Tootles (`METADATA_URL`), then, detached, stops tink-agent and starts
+  cloud-init (kubeadm join). The Workflow's last Action.
+
+A rebooted node comes back with neither: it's a new, unprovisioned machine to CAPT (eg. a MachineHealthCheck replaces it).
 
 `img-*` flavors produce a raw GPT disk image (`out/captainos-<flavor-id>-<arch>.img.zst`) for final deployment
 (eg. Tinkerbell's `image2disk`/`oci2disk`), booting with the distro's own initrd and `root=PARTLABEL=root`:

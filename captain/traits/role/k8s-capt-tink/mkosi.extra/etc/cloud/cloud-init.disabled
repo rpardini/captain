@@ -1,0 +1,2 @@
+# cloud-init (kubeadm join) is held back until the Tinkerbell Workflow runs captain-k8s-handoff,
+# which removes this file: CAPT only puts the bootstrap userData into Tootles once it claims the machine.

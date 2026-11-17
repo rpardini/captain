@@ -1,0 +1,41 @@
+#!/bin/bash
+# /usr/local/sbin/captain-k8s-handoff — Hand an in-memory node over from the Tinkerbell Workflow to Kubernetes.
+# The Workflow's last Action: points cloud-init at Tootles, then (detached from tink-agent) releases cloud-init,
+# which runs CAPT's bootstrap (kubeadm join), and stops tink-agent.
+#
+# METADATA_URL: Tootles' EC2-style metadata URL for this machine, eg. http://<tinkerbell>:7080/tootles/instanceID/<id>
+
+set -euo pipefail
+
+log() { echo "captain-k8s-handoff: $*" >&2; }
+
+if [[ "${CAPTAIN_HANDOFF_DETACHED:-}" != "yes" ]]; then
+	[[ -n "${METADATA_URL:-}" ]] || { log "METADATA_URL is empty"; exit 1; }
+	log "cloud-init datasource: ${METADATA_URL}"
+	# 10_ sorts after Captain's 10-captainos-tinkerbell.cfg, so this wins
+	cat > /etc/cloud/cloud.cfg.d/10_tinkerbell.cfg <<- EOF
+		datasource:
+		  Ec2:
+		    metadata_urls: ["${METADATA_URL}"]
+		    strict_id: false
+		    max_wait: 20
+		    timeout: 5
+		manage_etc_hosts: localhost
+		warnings:
+		  dsid_missing_source: off
+	EOF
+	chmod 0600 /etc/cloud/cloud.cfg.d/10_tinkerbell.cfg
+	# Out of tink-agent's cgroup, which stopping tink-agent kills; the Action completes right away.
+	log "detaching"
+	exec systemd-run --unit=captain-k8s-handoff --collect --setenv=CAPTAIN_HANDOFF_DETACHED=yes "$(readlink -f "$0")"
+fi
+
+sleep 10 # let tink-agent report the Action, completing the Workflow
+log "stopping tink-agent"
+systemctl stop tink-agent.service tink-agent-setup.service
+
+log "releasing cloud-init"
+rm -f /etc/cloud/cloud-init.disabled
+systemctl daemon-reload # cloud-init's generator only wires up cloud-init.target when it isn't disabled
+systemctl start cloud-init.target
+cloud-init status --long || true
