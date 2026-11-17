@@ -3,3 +3,7 @@
 disable ssh.service
 disable ssh.socket
 disable sshd-keygen.service
+
+# kubelet only once handed off: captain-k8s-handoff enables it, kubeadm join starts it (no crash-loop before the join).
+# Sorts before 10-captainos-k8s.preset, which enables it: the first match wins.
+disable kubelet.service

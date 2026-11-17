@@ -116,8 +116,9 @@ Tootles once it claims the machine. Two helpers, for the Workflow's host script 
   systemd-repart, each kept or wiped on every run. `STATE_VOLUMES` holds one `<name> <mountpoint> <size|rest> <keep|wipe>
   <disk>` per line; only the disks named there are touched, and a disk with anything but its `captain-*` partitions,
   in order, is repartitioned from scratch. Mounts go to `/run`: a reboot drops them, with the rest of the node.
-- `captain-k8s-handoff`: points cloud-init at Tootles (`METADATA_URL`), then, detached, stops tink-agent and starts
-  cloud-init (kubeadm join), then sshd (its host keys come from cloud-init). The Workflow's last Action.
+- `captain-k8s-handoff`: points cloud-init at Tootles (`METADATA_URL`), then, detached, stops tink-agent, enables
+  kubelet (disabled until then) and starts cloud-init (kubeadm join), then sshd (its host keys come from cloud-init;
+  systemd-ssh-generator is masked). The Workflow's last Action.
 
 A rebooted node comes back with neither: it's a new, unprovisioned machine to CAPT (eg. a MachineHealthCheck replaces it).
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 # /usr/local/sbin/captain-k8s-handoff — Hand an in-memory node over from the Tinkerbell Workflow to Kubernetes.
 # The Workflow's last Action: points cloud-init at Tootles, then (detached from tink-agent) releases cloud-init,
-# which runs CAPT's bootstrap (kubeadm join), stops tink-agent, and starts sshd.
+# which runs CAPT's bootstrap (kubeadm join), stops tink-agent, enables kubelet, and starts sshd.
 #
 # METADATA_URL: Tootles' EC2-style metadata URL for this machine, eg. http://<tinkerbell>:7080/tootles/instanceID/<id>
 
@@ -33,6 +33,10 @@ fi
 sleep 10 # let tink-agent report the Action, completing the Workflow
 log "stopping tink-agent"
 systemctl stop tink-agent.service tink-agent-setup.service
+
+# Disabled at boot (nothing for it to run before the join); enabled for kubeadm's preflight, which starts it
+log "enabling kubelet"
+systemctl enable kubelet.service
 
 log "releasing cloud-init"
 rm -f /etc/cloud/cloud-init.disabled

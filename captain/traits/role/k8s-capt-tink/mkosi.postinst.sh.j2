@@ -5,3 +5,9 @@
 log info "Moving nerdctl's bridge CNI config out of /etc/cni/net.d..."
 mkdir -p "${BUILDROOT}/etc/nerdctl/cni/net.d"
 mv -v "${BUILDROOT}/etc/cni/net.d/10-bridge.conflist" "${BUILDROOT}/etc/nerdctl/cni/net.d/"
+
+# systemd-ssh-generator: no sshd sockets of its own (AF_UNIX at boot, before the handoff; AF_VSOCK in VMs without a
+# vsock device fails it on every daemon-reload). captain-k8s-handoff starts ssh.service.
+log info "Masking systemd-ssh-generator..."
+mkdir -p "${BUILDROOT}/etc/systemd/system-generators"
+ln -sfv /dev/null "${BUILDROOT}/etc/systemd/system-generators/systemd-ssh-generator"
