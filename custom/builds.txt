@@ -10,15 +10,15 @@ trixie-genio
 # trixie-meson64
 trixie-rockchip64
 # trixie-rockchip64-vendor
-rockylinux10-full
+# rockylinux10-full
 # resolute-full
 # resolute-rockchip64
 img-k8s-capt-trixie-full
 mem-k8s-capt-trixie-full
 # img-k8s-capt-resolute-full
 # mem-k8s-capt-resolute-full
-img-k8s-capt-rockylinux10-full
-mem-k8s-capt-rockylinux10-full
+# img-k8s-capt-rockylinux10-full
+# mem-k8s-capt-rockylinux10-full
 img-k8s-capt-trixie-rockchip64
 mem-k8s-capt-trixie-rockchip64
 img-k8s-capt-trixie-genio
