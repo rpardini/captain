@@ -1,0 +1,7 @@
+# Kubernetes (CAPT) nodes, img- and mem-k8s-capt-* alike: what kohntarkosz-clusters' node scripts would otherwise
+# apt-install at every join (setup_bird.sh: bird2; setup_ssh_access.sh: ssh-import-id), plus node storage clients
+# (Longhorn: open-iscsi; NFS volumes: nfs-common).
+bird2
+ssh-import-id
+open-iscsi
+nfs-common
