@@ -1,0 +1,7 @@
+#!/bin/bash
+# mkosi.finalize (role k8s-capt-tink) — Runs after the image is assembled but before output.
+
+# Every node must get its own ssh host keys: cloud-init generates them once captain-k8s-handoff releases it, which
+# then starts sshd (not enabled at boot: no keys before that).
+log info "Removing build-time ssh host keys..."
+rm -fv "${BUILDROOT}"/etc/ssh/ssh_host_*

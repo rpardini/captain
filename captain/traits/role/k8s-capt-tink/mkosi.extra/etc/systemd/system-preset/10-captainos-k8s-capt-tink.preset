@@ -1,0 +1,5 @@
+# CaptainOS preset: in-memory Kubernetes node
+# sshd only once handed off: captain-k8s-handoff starts it, after cloud-init made the host keys
+disable ssh.service
+disable ssh.socket
+disable sshd-keygen.service

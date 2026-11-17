@@ -16,6 +16,31 @@ class Role(Trait):
     title: ClassVar[str]
     # motd lines pointing at the role's logs and tools.
     hints: ClassVar[tuple[str, ...]] = ()
+    # Module dirs (find -path patterns) the mem output drops: provisioning doesn't need them.
+    trimmed_kernel_modules: ClassVar[tuple[str, ...]] = (
+        # Filesystems not needed for provisioning
+        "*/kernel/fs/btrfs",
+        "*/kernel/fs/nfs",
+        "*/kernel/fs/nfsd",
+        "*/kernel/fs/ceph",
+        "*/kernel/fs/ntfs3",
+        # Network filesystems support (sunrpc is an NFS dependency)
+        "*/kernel/net/sunrpc",
+        "*/kernel/net/ceph",
+        # Block devices
+        "*/kernel/drivers/block/drbd",
+        # Hypervisor / KVM
+        "*/kernel/arch/x86/kvm",
+        "*/kernel/virt",
+        # Niche NIC driver
+        "*/kernel/drivers/net/ethernet/netronome",
+        # Sound stuff
+        "*/kernel/sound",
+        # Media stuff
+        "*/kernel/drivers/media",
+        # Wireless net drivers
+        "*/kernel/drivers/net/wireless",
+    )
 
 
 class Tink(Role):
@@ -44,6 +69,8 @@ class Kubernetes(Role):
         "Use `crictl ps` / `crictl logs` to access pod containers.",
         "On control planes, use `kubectl --kubeconfig /etc/kubernetes/admin.conf`.",
     )
+    # Workloads may need any of them (eg. NFS volumes)
+    trimmed_kernel_modules = ()
 
     @property
     def name(self) -> str:
@@ -103,6 +130,6 @@ class KubernetesCaptTink(KubernetesCapt, Tink):
         return ["k8s-capt", self.name]
 
     def packages(self, flavor: Flavor) -> set[str]:
-        # captain-state-disk: systemd-repart, formatting with mkfs.ext4
-        state_disk = {"systemd-repart", "e2fsprogs"}
-        return KubernetesCapt.packages(self, flavor) | Tink.packages(self, flavor) | state_disk
+        # captain-state-disk: systemd-repart, formatting with mkfs.ext4; sshd once handed off
+        extra = {"systemd-repart", "e2fsprogs", "openssh-server"}
+        return KubernetesCapt.packages(self, flavor) | Tink.packages(self, flavor) | extra

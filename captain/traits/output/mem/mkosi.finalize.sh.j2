@@ -34,34 +34,13 @@ if [[ -d "$MODDIR" ]]; then
     log info "Trimming unnecessary kernel modules..."
     BEFORE=$(du -sb "$MODDIR" | awk '{print $1}')
 
-    # @TODO: this has to be templated, for flavors like fat or full we should keep most modules.
-    # Module directory patterns to remove (relative to kernel/ inside the
-    # modules tree).  Each entry is passed to 'find -path'.
-    EXCLUDE_PATTERNS=(
-        # Filesystems not needed for provisioning
-        "*/kernel/fs/btrfs"
-        "*/kernel/fs/nfs"
-        "*/kernel/fs/nfsd"
-        "*/kernel/fs/ceph"
-        "*/kernel/fs/ntfs3"
-        # Network filesystems support (sunrpc is an NFS dependency)
-        "*/kernel/net/sunrpc"
-        "*/kernel/net/ceph"
-        # Block devices
-        "*/kernel/drivers/block/drbd"
-        # Hypervisor / KVM
-        "*/kernel/arch/x86/kvm"
-        "*/kernel/virt"
-        # Niche NIC driver
-        "*/kernel/drivers/net/ethernet/netronome"
-        # Sound stuff
-        "*/kernel/sound"
-        # Media stuff
-        "*/kernel/drivers/media"
-        # Wireless net drivers
-        "*/kernel/drivers/net/wireless"
-    )
+    # Module directory patterns to remove, from the role (Role.trimmed_kernel_modules).
+    # Each entry is passed to 'find -path'.
+    EXCLUDE_PATTERNS=({% for pattern in flavor.role.trimmed_kernel_modules %}"{{ pattern }}" {% endfor %})
 
+{% if not flavor.role.trimmed_kernel_modules %}
+    log info "  Keeping all kernel modules (role {{ flavor.role.name }})"
+{% endif %}
     for pattern in "${EXCLUDE_PATTERNS[@]}"; do
         log info "  Removing modules matching pattern: '${pattern}'"
         find "$MODDIR" -path "$pattern" -type d -exec rm -rf {} + || true

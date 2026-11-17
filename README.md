@@ -117,7 +117,7 @@ Tootles once it claims the machine. Two helpers, for the Workflow's host script 
   <disk>` per line; only the disks named there are touched, and a disk with anything but its `captain-*` partitions,
   in order, is repartitioned from scratch. Mounts go to `/run`: a reboot drops them, with the rest of the node.
 - `captain-k8s-handoff`: points cloud-init at Tootles (`METADATA_URL`), then, detached, stops tink-agent and starts
-  cloud-init (kubeadm join). The Workflow's last Action.
+  cloud-init (kubeadm join), then sshd (its host keys come from cloud-init). The Workflow's last Action.
 
 A rebooted node comes back with neither: it's a new, unprovisioned machine to CAPT (eg. a MachineHealthCheck replaces it).
 
@@ -192,7 +192,7 @@ Inside `custom/`, `by-<axis>/<value>/` dirs shaped exactly like `custom/` itself
 | `custom/by-family/<value>/`      | `deb`, `rpm`                                                            |
 | `custom/by-distro/<value>/`      | `debian`, `debian-trixie`, `ubuntu`, `ubuntu-resolute`, `rocky`, `rocky-10` |
 | `custom/by-arch/<value>/`        | `amd64`, `arm64`                                                        |
-| `custom/by-role/<value>/`        | `tink`, `k8s-capt`                                                      |
+| `custom/by-role/<value>/`        | `tink`, `k8s-capt` (`img-` and `mem-k8s-capt-*`), `k8s-capt-tink` (`mem-k8s-capt-*`) |
 | `custom/by-output/<value>/`      | `mem`, `img`                                                            |
 | `custom/by-platform/<value>/`    | `acpi`, `armbian`, `rpi`                                                |
 | `custom/by-kernel/<value>/`      | `distro`, `captainos`, `armbian-<branch>-<family>` (eg. `armbian-edge-rockchip64`) |
