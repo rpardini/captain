@@ -7,7 +7,6 @@ enable systemd-timesyncd.service
 enable systemd-time-wait-sync.service
 enable containerd.service
 enable rsyslog.service
-enable rsyslog-hostname-reload.path
 
 disable apt-daily.timer
 disable apt-daily-upgrade.timer
