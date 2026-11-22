@@ -5,3 +5,5 @@ bird2
 ssh-import-id
 open-iscsi
 nfs-common
+# also picocom as my cluster's serial ports are all wired to one another
+picocom
